@@ -4,6 +4,9 @@
     --secundario: #0097A7;
     --gris: #757575;
     --oscuro: #212121;
+    --tercero: #0098DA;   
+    --cuarto: #85C44C; 
+    --quinto: #A93226;
 }
 html {
     box-sizing: border-box;
@@ -23,10 +26,12 @@ body {
     
 }
 h1 {
-    font-size: 1.4rem;
+    font-size: 2rem;
+    color: var(--tercero);
 }
 h1 span {
-    font-size: 1.4rem;
+    font-size: 1rem;
+    color: var(--cuarto);
 }
 h1, h2, h3 {
     text-align: center;
@@ -72,7 +77,7 @@ h3 {
     padding: 1rem 2rem;
     color: var(--blanco);
     text-decoration: none;
-    font-size: 1.4rem;
+    font-size: 1rem;
     font-weight: 700;
 }
 .navegacion a:hover {
@@ -89,13 +94,14 @@ h3 {
 }
 .hero {
     height: 450px;
-    background-image: url(../img/hero.jpg);
+    background-image: url(../img/SB002.jpg);
+    background-size: cover;
     margin-bottom: 2rem;
     position: relative;
 }
 .contenido-hero {
     background-color: rgb(0 0 0 / 70%); /** Otra opción **/
-    background-color: rgba(0, 0, 0, .7);
+    background-color: rgba(0, 0, 0, .3);
     position: absolute;
     width: 100%;
     height: 100%;
@@ -104,10 +110,11 @@ h3 {
    align-items: center;
    justify-content: center;
 }
-
-.contenido-hero h2, 
 .contenido-hero p {
     color: var(--blanco);
+}
+.contenido-hero h2{
+    color: var(--blanco)
 }
 .boton {
     background-color: var(--secundario);
