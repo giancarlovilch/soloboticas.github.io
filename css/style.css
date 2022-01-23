@@ -9,6 +9,7 @@
     --quinto: #A93226;
 }
 html {
+    font-size: 80%;
     box-sizing: border-box;
     min-height: 100%;
     scroll-snap-type: y mandatory;
@@ -16,28 +17,36 @@ html {
 *, *:before, *:after {
     box-sizing: inherit;
 }
+/*Paul Irish Box Sizing*/
 p {
     line-height: 2;
 }
 body {
+    font-size: 16px;
     font-family: 'Krub', sans-serif;
     background-image: linear-gradient(to top, #dfe9f3 0%, white 100%);
     min-height: 100%;
     
 }
+.logotipo {
+    display: flex;
+    justify-content: flex-start;
+    padding-left: 5rem;
+    background-color: whitesmoke;
+}
 h1 {
-    font-size: 2rem;
+    font-size: 3rem;
     color: var(--tercero);
 }
 h1 span {
-    font-size: 1rem;
+    font-size: 1.3rem;
     color: var(--cuarto);
 }
 h1, h2, h3 {
     text-align: center;
 }
 h2 {
-    font-size: 2.4rem;
+    font-size: 2rem;
 }
 h3 {
     color: var(--secundario);
@@ -94,21 +103,22 @@ h3 {
 }
 .hero {
     height: 450px;
-    background-image: url(../img/SB001.jpg);
+    background-image: url(../img/SB002.JPG);
+    background-color: #da54ad;
     background-size: cover;
     margin-bottom: 2rem;
     position: relative;
 }
 .contenido-hero {
-    background-color: rgb(0 0 0 / 70%); /** Otra opción **/
-    background-color: rgba(0, 0, 0, .3);
+    background-color: rgb(0 0 0 / 50%); /** Otra opción **/
+    /*background-color: rgba(0, 0, 0, .3);*/
     position: absolute;
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
-   align-items: center;
-   justify-content: center;
+    align-items: center;
+    justify-content: center;
 }
 .contenido-hero p {
     color: var(--blanco);
@@ -121,12 +131,19 @@ h3 {
     color: var(--blanco);
     margin-top: .5rem;
     padding: .5rem 3rem;
-    border-radius: 5px;
     font-weight: 700;
     text-decoration: none;
     text-transform: uppercase;
+    text-align: center;
     font-size: 1.2rem;
     border:none;
+    width: 100%;
+    border-radius: 5px;
+}
+@media (min-width: 480px) {
+    .boton {
+        width: auto;
+    }
 }
 .boton:hover{
     cursor: pointer;
@@ -169,8 +186,10 @@ h3 {
 
 .formulario {
     background-color: var(--gris);
+/*     width: min(60rem, 100%);
+    margin: 0 auto; */
     padding: 2rem;
-    border-radius: 10px;
+    border-radius: 1rem;
     scroll-snap-align: center;
     scroll-snap-stop: always;
 }
@@ -247,12 +266,15 @@ h3 {
 .campo textarea {
     height: 4rem;
 }
-
 .enviar {
-    display: flex;
-    justify-content: flex-end;
+    width: 100%; 
 }
-
+@media (min-width: 768px) {
+    .enviar {
+        display: flex;
+        justify-content: flex-end;
+    }
+}
 .footer {
     text-align: center;
 }
