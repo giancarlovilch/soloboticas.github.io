@@ -9,7 +9,7 @@
     --quinto: #A93226;
 }
 html {
-    font-size: 80%;
+    font-size: 75%;
     box-sizing: border-box;
     min-height: 100%;
     scroll-snap-type: y mandatory;
@@ -103,7 +103,7 @@ h3 {
 }
 .hero {
     height: 450px;
-    background-image: url(../img/SB002.JPG);
+    background-image: url(../img_1/SB001.jpg);
     background-color: #da54ad;
     background-size: cover;
     margin-bottom: 2rem;
