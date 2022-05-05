@@ -77,14 +77,43 @@ h3 {
   padding: 1rem 0;
   display: flex;
   justify-content: center;
-  gap: 2rem;
+  gap: 3rem;
 }
 .navegacion__enlace {
   font-family: var(--fuente_principal);
   color: var(--blanco);
   font-size: 2.5rem;
 }
+.navegacion__enlace:last-of-type {
+  margin-right: 0;
+}
 .navegacion__enlace--activo,
 .navegacion__enlace:hover {
   color: var(--cuarto);
+}
+/**Grid**/
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2,1fr);
+}
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(3,1fr);
+  }
+}
+/**Productos**/
+.producto {
+   background-color: var(--primario_oscuro);
+}
+.producto__img {
+
+}
+.producto__inf {
+
+}
+.producto__nombre {
+
+}
+.producto__precio {
+
 }
