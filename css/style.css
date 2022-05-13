@@ -102,15 +102,16 @@ h3 {
     }
 }
 .hero {
-    height: 450px;
+    height: 400px;
     background-image: url(../img_1/SB001.jpg);
     background-color: #da54ad;
     background-size: cover;
+    background-position-y:50%;
     margin-bottom: 2rem;
-    position: relative;
+    position:relative;
 }
 .contenido-hero {
-    background-color: rgb(0 0 0 / 50%); /** Otra opción **/
+    background-color: rgb(0 0 0 / 20%); /** Otra opción **/
     /*background-color: rgba(0, 0, 0, .3);*/
     position: absolute;
     width: 100%;
