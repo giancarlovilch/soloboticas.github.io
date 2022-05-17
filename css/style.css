@@ -39,9 +39,16 @@ h1 {
     font-size: 3rem;
     color: var(--tercero);
 }
+
 h1 span {
-    font-size: 1.5rem;
+    font-size: 0.75rem;
     color: var(--cuarto);
+}
+@media (min-width:768px) {
+    h1 span {
+        font-size: 1.5rem;
+        color: var(--cuarto);
+    }
 }
 h1, h2, h3 {
     text-align: center;
