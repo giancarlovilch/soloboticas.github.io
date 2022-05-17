@@ -7,6 +7,7 @@
     --tercero: #0098DA;   
     --cuarto: #85C44C; 
     --quinto: #A93226;
+    --sexto: #E5E7E9;
 }
 html {
     font-size: 75%;
@@ -22,7 +23,7 @@ p {
     line-height: 2;
 }
 body {
-    font-size: 16px;
+    font-size: 1.2rem;
     font-family: 'Krub', sans-serif;
     background-image: linear-gradient(to top, #dfe9f3 0%, white 100%);
     min-height: 100%;
@@ -30,8 +31,8 @@ body {
 }
 .logotipo {
     display: flex;
-    justify-content: flex-start;
-    padding-left: 5rem;
+    justify-content: center;
+    position: relative;
     background-color: whitesmoke;
 }
 h1 {
@@ -39,14 +40,14 @@ h1 {
     color: var(--tercero);
 }
 h1 span {
-    font-size: 1.3rem;
+    font-size: 1.5rem;
     color: var(--cuarto);
 }
 h1, h2, h3 {
     text-align: center;
 }
 h2 {
-    font-size: 2rem;
+    font-size: 1.5rem;
 }
 h3 {
     color: var(--secundario);
@@ -65,6 +66,10 @@ h3 {
     -webkit-box-shadow: 0px 11px 15px -9px rgba(0,0,0,0.63);
     -moz-box-shadow: 0px 11px 15px -9px rgba(0,0,0,0.63);
     box-shadow: 0px 11px 15px -9px rgba(0,0,0,0.63);
+}
+.contenedor h2{
+    /*font-size: 2rem;*/
+
 }
 .nav-bg {
     background-color: var(--secundario);
@@ -103,29 +108,41 @@ h3 {
 }
 .hero {
     height: 400px;
+    max-width: 120rem;
     background-image: url(../img_1/SB001.jpg);
     background-color: #da54ad;
-    background-size: cover;
-    background-position-y:50%;
+    background-size:cover;
+    background-repeat: no-repeat;
+    background-position:center;
     margin-bottom: 2rem;
     position:relative;
+    margin-left: auto;
+    margin-right: auto;
+    border-radius: 1rem;
 }
 .contenido-hero {
-    background-color: rgb(0 0 0 / 20%); /** Otra opción **/
+    background-color: rgb(0 0 0 / 25%); /** Otra opción **/
     /*background-color: rgba(0, 0, 0, .3);*/
     position: absolute;
     width: 100%;
     height: 100%;
     display: flex;
-    flex-direction: column;
+    flex-direction:column;
     align-items: center;
     justify-content: center;
+    border-radius: 1rem;
 }
 .contenido-hero p {
     color: var(--blanco);
 }
 .contenido-hero h2{
-    color: var(--blanco)
+    color: var(--blanco);
+    font-weight:bold;
+}
+.contenido-hero h2:hover{
+    color:var(--sexto);
+    font-weight:bold;
+    font-size: 1.8rem;
 }
 .boton {
     background-color: var(--secundario);
@@ -140,6 +157,9 @@ h3 {
     border:none;
     width: 100%;
     border-radius: 5px;
+}
+.boton:hover{
+    font-size: 1.4rem;
 }
 @media (min-width: 480px) {
     .boton {
@@ -156,8 +176,8 @@ h3 {
 @media (min-width:768px) {
     .servicios {
         display: grid;
-        grid-template-columns: 33.3% 33.3% 33.3%;
-        column-gap: 1rem;
+        grid-template-columns: 50% 50%;
+        column-gap: 2rem;
     }
 }
 .servicio {
@@ -172,11 +192,11 @@ h3 {
 
 .iconos {
     display: flex;
-    height: 150px;
-    width: 150px;
+    height: 120px;
+    width: 120px;
     justify-content: space-evenly;
     align-items: center;
-    background-color: var(--primario);
+    background-color: var(--gris);
     border-radius: 50%;
 }
 .iconos i {
