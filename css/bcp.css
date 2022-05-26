@@ -26,7 +26,7 @@ body {
     font-size: 1.2rem;
     font-family: 'Signika', sans-serif;
     background-image: linear-gradient(to top, #dfe9f3 0%, white 100%);
-    min-height: 100%;
+    min-height: 100%;  
 }
 .logotipo {
     display: flex;
@@ -117,21 +117,21 @@ h3 {
     }
 }
 .hero {
-    height: 400px;
+    height: 50px;
     max-width: 120rem;
-    background-image: url(../img_1/SB001.jpg);
-    background-color: #da54ad;
+    background-color: var(--quinto);
     background-size:cover;
     background-repeat: no-repeat;
     background-position:center;
     margin-bottom: 2rem;
     position:relative;
+    margin-top: 1rem;
     margin-left: auto;
     margin-right: auto;
     border-radius: 1rem;
 }
 .contenido-hero {
-    background-color: rgb(0 0 0 / 25%); /** Otra opción **/
+    background-color: rgb(0 0 0 / 50%); /** Otra opción **/
     /*background-color: rgba(0, 0, 0, .3);*/
     position: absolute;
     width: 100%;
@@ -178,134 +178,4 @@ h3 {
 }
 .boton:hover{
     cursor: pointer;
-}
-.servicios {
-    scroll-snap-align: center;
-    scroll-snap-stop: always;
-}
-@media (min-width:768px) {
-    .servicios {
-        display: grid;
-        grid-template-columns: 50% 50%;
-        column-gap: 1rem;
-    }
-}
-.servicio {
-    text-align:center;
-}
-.servicio {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-
-.iconos {
-    display: flex;
-    height: 120px;
-    width: 120px;
-    justify-content: space-evenly;
-    align-items: center;
-    background-color: var(--gris);
-    border-radius: 50%;
-}
-.iconos i {
-    font-size: 2rem;
-    color: var(--oscuro);
-}
-
-
-.formulario {
-    background-color: var(--gris);
-/*     width: min(60rem, 100%);
-    margin: 0 auto; */
-    padding: 2rem;
-    border-radius: 1rem;
-    scroll-snap-align: center;
-    scroll-snap-stop: always;
-}
-.formulario legend {
-    text-align: center;
-    font-size: 1.2rem;
-    color: var(--primario);
-    margin-bottom: 2rem;
-    display: block;
-    text-transform: uppercase;
-    font-weight: 700;
-}
-@media (min-width:768px) {
-    .formulario {
-        max-width: 800px;
-        margin: 0 auto;
-    }
-}
-.contenedor-campos {
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-}
-
-.campo {
-    margin-bottom: 1rem;
-    width: 100%;
-}
-@media (min-width:480px) {
-    .campo {
-        display: flex;
-        align-items: center;
-    }
-}
-@media (min-width: 768px) {
-    .campo{
-        flex: 0 0 calc(50% - .5rem)
-    }
-}
-.campo label {
-    color: var(--blanco);
-    font-weight: 700;
-    margin-bottom: .5rem;
-    display: block;
-}
-@media (min-width:480px) {
-    .campo label {
-        flex: 0 0 90px;
-    }
-}
-.campo input[type="text"],
-.campo input[type="tel"],
-.campo input[type="mail"],
-.campo textarea {
-    width: 100%;
-    padding: .5rem;
-    border: none;
-    border-radius: .5rem;
-}
-@media (min-width: 768px) {
-    :is(.campo) :is( 
-        input[type="text"], 
-        input[type="text"],  
-        input[type="tel"],  
-        input[type="mail"] , 
-        textarea ) {
-        flex: 1;
-    }
-}
-
-.w-100{
-    flex: 0 0 100%;
-}
-.campo textarea {
-    height: 4rem;
-}
-.enviar {
-    width: 100%; 
-}
-@media (min-width: 768px) {
-    .enviar {
-        display: flex;
-        justify-content: flex-end;
-    }
-}
-.footer {
-    text-align: center;
 }
