@@ -120,7 +120,7 @@ h3 {
     height: 400px;
     max-width: 120rem;
     background-image: url(../img_1/SB001.jpg);
-    background-color: #da54ad;
+    background-color: var(--blanco);
     background-size:cover;
     background-repeat: no-repeat;
     background-position:center;
