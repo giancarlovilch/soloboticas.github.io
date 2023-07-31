@@ -1,0 +1,73 @@
+<html><head><meta charset="UTF-8"><title>Registro&#x20;de&#x20;Colaboradores</title>
+<link href="css/form.css" rel="stylesheet" type="text/css"><script src="js/validation.js"></script>
+<script src="js/signature.js"></script>
+</head><body class="zf-backgroundBg"><!-- Change or deletion of the name attributes in the input tag will lead to empty values on record submission-->
+<div class="zf-templateWidth"><form action='https://forms.zohopublic.com/soloboticas/form/RegistrodeColaboradores1/formperma/oDTu5_P5wZoe0kRrq8nP9vHkfEvE0CCZLwDB1c4usc8/htmlRecords/submit' name='form' method='POST' onSubmit='javascript:document.charset="UTF-8"; return zf_ValidateAndSubmit();' accept-charset='UTF-8' enctype='multipart/form-data' id='form'><input type="hidden" name="zf_referrer_name" value=""><!-- To Track referrals , place the referrer name within the " " in the above hidden input field -->
+<input type="hidden" name="zf_redirect_url" value=""><!-- To redirect to a specific page after record submission , place the respective url within the " " in the above hidden input field -->
+<input type="hidden" name="zc_gad" value=""><!-- If GCLID is enabled in Zoho CRM Integration, click details of AdWords Ads will be pushed to Zoho CRM -->
+<div class="zf-templateWrapper"><!---------template Header Starts Here---------->
+<ul class="zf-tempHeadBdr"><li class="zf-tempHeadContBdr"><h2 class="zf-frmTitle"><em>Registro de Colaboradores</em></h2>
+<p class="zf-frmDesc"></p>
+<div class="zf-clearBoth"></div></li></ul><!---------template Header Ends Here---------->
+<!---------template Container Starts Here---------->
+<div class="zf-subContWrap zf-topAlign"><ul>
+<!---------Name Starts Here----------> 
+<li class="zf-tempFrmWrapper zf-name zf-namemedium"><label class="zf-labelName"> 
+Nombres Completos 
+<em class="zf-important">*</em>
+</label>
+<div 
+class="zf-tempContDiv zf-twoType"  
+>
+<div
+class="zf-nameWrapper"  
+>
+<span> <input type="text" maxlength="255" name="Name_First" fieldType=7 placeholder=""/> <label>Nombres</label>
+ </span> 
+ </span> </span>
+<span> <input type="text" maxlength="255" name="Name_Last" fieldType=7 placeholder=""/> <label>Apellidos</label>
+ </span> 
+ </span> </span>
+<div class="zf-clearBoth"></div></div><p id="Name_error" class="zf-errorMessage" style="display:none;">Invalid value</p>
+</div><div class="zf-clearBoth"></div></li><!---------Name Ends Here----------> 
+<!---------Number Starts Here---------->
+<li class="zf-tempFrmWrapper zf-small"><label class="zf-labelName"> 
+DNI 
+<em class="zf-important">*</em>
+</label>
+<div class="zf-tempContDiv">
+<span> <input type="text" name="Number" checktype="c2" value="" maxlength="18" placeholder="N&uacute;mero&#x20;de&#x20;DNI"/></span> <p id="Number_error" class="zf-errorMessage" style="display:none;">Invalid value</p>
+</div><div class="zf-clearBoth"></div></li><!---------Number Ends Here---------->
+<!---------Number Starts Here---------->
+<li class="zf-tempFrmWrapper zf-small"><label class="zf-labelName"> 
+Teléfono 
+<em class="zf-important">*</em>
+</label>
+<div class="zf-tempContDiv">
+<span> <input type="text" name="Number1" checktype="c2" value="" maxlength="18" placeholder="N&uacute;mero&#x20;de&#x20;Tel&eacute;fono"/></span> <p id="Number1_error" class="zf-errorMessage" style="display:none;">Invalid value</p>
+</div><div class="zf-clearBoth"></div></li><!---------Number Ends Here---------->
+<!---------Email Starts Here---------->  
+<li class="zf-tempFrmWrapper zf-small"><label class="zf-labelName"> 
+Email 
+</label>
+<div class="zf-tempContDiv">
+<span> <input fieldType=9  type="text" maxlength="255" name="Email" checktype="c5" value="" placeholder="Correo&#x20;Electr&oacute;nico"/></span> <p id="Email_error" class="zf-errorMessage" style="display:none;">Invalid value</p>
+</div><div class="zf-clearBoth"></div></li><!---------Email Ends Here---------->  
+<!---------Signature Starts Here---------->  
+<li class="zf-sign zf-tempFrmWrapper"><label class="zf-labelName">Firma 
+</label>
+<div class="zf-tempContDiv">
+<div class="zf-signContainer" id="signContainer-Signature"><object name="Signature_obj" checktype="c8" compname="Signature">						
+<canvas id="drawingCanvas-Signature" tabindex="-1"></canvas>  
+<input type="hidden" id="hiddenSignInput-Signature" name="Signature" value=""><div class="zf-signArea" id="sign-area-Signature" style="display:none"></div><a id="clearSign" href="javascript:void(0);" onClick="zf_ClearSignature('drawingCanvas-Signature');">LIMPIAR</a>
+</object></div><p id="Signature_error" class="zf-errorMessage" style="display:none;">Invalid value</p>
+</div><div class="zf-clearBoth"></div><script>zf_SetCanvasElemWidth("Signature");// No I18N
+var canvasElemEvntListener = document.getElementById("drawingCanvas-Signature"); // No I18N	   		
+zf_AddEventListenersToCanvas(canvasElemEvntListener);</script></li><!---------Signature Ends Here---------->  
+</ul></div><!---------template Container Starts Here---------->
+<ul><li class="zf-fmFooter"><button class="zf-submitColor" >ENVIAR</button></li></ul></div><!-- 'zf-templateWrapper' ends --></form></div><!-- 'zf-templateWidth' ends -->
+<script type="text/javascript">var zf_DateRegex = new RegExp("^(([0][1-9])|([1-2][0-9])|([3][0-1]))[-](Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[-](?:(?:19|20)[0-9]{2})$");
+var zf_MandArray = [ "Name_First", "Name_Last", "Number", "Number1"]; 
+var zf_FieldArray = [ "Name_First", "Name_Last", "Number", "Number1", "Email", "Signature_obj"]; 
+var isSalesIQIntegrationEnabled = false;
+var salesIQFieldsArray = [];</script></body></html>
