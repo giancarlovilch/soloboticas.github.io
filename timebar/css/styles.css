@@ -1,0 +1,34 @@
+.contenedor-horario {
+    display: flex;
+}
+
+.hora {
+    width: 40px;
+    text-align: center;
+    border-right: 1px solid #ccc;
+    padding: 5px;
+}
+
+.contenedor-personas {
+    display: flex;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.persona {
+    margin-right: 20px;
+}
+
+.barra {
+    height: 20px;
+    width: 400px;
+    background-color: #f2f2f2;
+    border-radius: 5px;
+    position: relative;
+}
+
+.progreso {
+    height: 100%;
+    border-radius: 5px;
+    background-color: #3498db;
+}

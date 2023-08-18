@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    
+    <title>GRUPO KGyR S.A.C</title>
+    <meta property="og:description" content="Salud y cuidado de familia a familia. ¡Bienvenidos a SoloBoticas!"/>
+    <link rel="icon" type="image/x-icon" href="../img_1/SB007.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resumen</title>
     <style>
         .iframe-container {
             display: flex;
@@ -21,15 +24,22 @@
         .announcement {
             background-color: #fff; /* Color de fondo del anuncio */
             border: 2px solid #377CB0; /* Borde del anuncio */
-            padding: 20px;
-            margin: 20px auto;
+            padding: 10px;
+            margin: 10px auto;
             max-width: 600px; /* Ancho máximo del anuncio */
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra ligera */
             text-align: center;
         }
 
-        .announcement h3 {
-            color: #FF0000; /* Color de texto del título */
+        .announcement h2 {
+            color: #377CB0; /* Color de texto del título */
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .announcement h4 {
+            color: #377CB0; /* Color de texto del título */
             font-weight: bold;
             text-align: center;
             margin-bottom: 10px;
@@ -56,6 +66,42 @@
         .button:hover {
             background-color: #285E8E; /* Color de fondo del botón al pasar el mouse */
         }
+
+        .tabla-profesional {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #377CB0;
+            background-color: #f7f7f7;
+        }
+
+        .tabla-profesional th, .tabla-profesional td {
+            padding: 15px;
+            text-align: center;
+            border: 1px solid #377CB0;
+        }
+
+        .tabla-profesional th {
+            background-color: #377CB0;
+            color: white;
+            font-weight: bold;
+        }
+
+        .tabla-profesional tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        .tabla-profesional tr:hover {
+            background-color: #d5eaf2;
+            transition: background-color 0.3s;
+        }
+
+        .tabla-profesional td:first-child {
+            border-right: none;
+        }
+
+        .tabla-profesional td:last-child {
+            border-left: none;
+        }
       </style>
 
 </head>
@@ -67,6 +113,47 @@ RESUMEN
 </body>
 <div class="iframe-container">
     <iframe frameborder="0" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vTLcp8epZv0sMfgF5TMYe65EvXHA_ZGwkxiuoyNHwTWfoLOvZbDAeuYbvmO2mF8fKpml6a57RU6NIIZ/pubhtml?gid=1157980001&amp;single=true&amp;widget=true&amp;headers=false"></iframe>
+</div>
+
+<div class="announcement">
+    <h2>Respecto a las Ventas:</h2>
+    <br>    
+        <table class="tabla-profesional">
+            <tr>
+                <th>Promedio Ventas</th>
+                <th>Categoría</th>
+                
+            </tr>
+            <tr>
+                <td>s/ 900.00 - 5000</td>
+                <td>Bonificación 3</td>
+                
+            </tr>
+            <tr>
+                <td>s/ 850.00 a 900</td>
+                <td>Bonificación 2</td>
+            </tr>
+            <tr>
+                <td>s/ 800.00 a 850</td>
+                <td>Bonificación 1</td>
+            </tr>
+            <tr>
+                <td>s/ 750.00 a 800</td>
+                <td>Normal</td>
+            </tr>
+            <tr>
+                <td>s/ 700.00 a 750</td>
+                <td>Penalización 1</td>
+            </tr>
+            <tr>
+                <td>s/ 650.00 a 700</td>
+                <td>Penalización 2</td>
+            </tr>
+            <tr>
+                <td>0 a s/ 650.00</td>
+                <td>Penalización 3</td>
+            </tr>
+        </table>
 </div>
 <div class="announcement">
     <h3>Importante:</h3>
