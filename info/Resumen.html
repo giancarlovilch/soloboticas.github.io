@@ -23,7 +23,7 @@
 
         .announcement {
             background-color: #fff; /* Color de fondo del anuncio */
-            border: 2px solid #377CB0; /* Borde del anuncio */
+            border: 2px solid #52AB4D; /* Borde del anuncio */
             padding: 10px;
             margin: 10px auto;
             max-width: 600px; /* Ancho máximo del anuncio */
@@ -32,7 +32,7 @@
         }
 
         .announcement h2 {
-            color: #377CB0; /* Color de texto del título */
+            color: #52AB4D; /* Color de texto del título */
             font-weight: bold;
             text-align: center;
             margin-bottom: 10px;
@@ -46,9 +46,29 @@
         }
 
         .announcement p {
-            text-align: center;
+            text-align:justify;
             font-size: 1rem;
+
+            
         }
+
+        .announcementt {
+            background-color: #fff; /* Color de fondo del anuncio */
+            border: 2px solid #0e7bbf; /* Borde del anuncio */
+            padding: 10px;
+            margin: 10px auto;
+            max-width: 600px; /* Ancho máximo del anuncio */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra ligera */
+            text-align: center;
+        }
+
+        .announcementt h2 {
+            color: #0e7bbf; /* Color de texto del título */
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
         .button {
             display: inline-block;
             padding: 5px 20px;
@@ -70,18 +90,18 @@
         .tabla-profesional {
             width: 100%;
             border-collapse: collapse;
-            border: 2px solid #377CB0;
+            border: 2px solid #52AB4D;
             background-color: #f7f7f7;
         }
 
         .tabla-profesional th, .tabla-profesional td {
             padding: 15px;
             text-align: center;
-            border: 1px solid #377CB0;
+            border: 1px solid #52AB4D;
         }
 
         .tabla-profesional th {
-            background-color: #377CB0;
+            background-color: #52AB4D;
             color: white;
             font-weight: bold;
         }
@@ -102,6 +122,43 @@
         .tabla-profesional td:last-child {
             border-left: none;
         }
+
+        .tabla-profesionall {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #0e7bbf;
+            background-color: #f7f7f7;
+        }
+
+        .tabla-profesionall th, .tabla-profesionall td {
+            padding: 15px;
+            text-align: center;
+            border: 1px solid #0e7bbf;
+        }
+
+        .tabla-profesionall th {
+            background-color: #0e7bbf;
+            color: white;
+            font-weight: bold;
+        }
+
+        .tabla-profesionall tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        .tabla-profesionall tr:hover {
+            background-color: #d5eaf2;
+            transition: background-color 0.3s;
+        }
+
+        .tabla-profesionall td:first-child {
+            border-right: none;
+        }
+
+        .tabla-profesionall td:last-child {
+            border-left: none;
+        }
+
       </style>
 
 </head>
@@ -113,6 +170,39 @@ RESUMEN
 </body>
 <div class="iframe-container">
     <iframe frameborder="0" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vTLcp8epZv0sMfgF5TMYe65EvXHA_ZGwkxiuoyNHwTWfoLOvZbDAeuYbvmO2mF8fKpml6a57RU6NIIZ/pubhtml?gid=1157980001&amp;single=true&amp;widget=true&amp;headers=false"></iframe>
+</div>
+
+<div class="announcementt">
+    <h2>Respecto al Agente BCP:</h2>
+    <br>    
+        <table class="tabla-profesionall">
+            <tr>
+                <th>Promedio Operaciones</th>
+                <th>Categoría</th>
+                
+            </tr>            
+            <tr>
+                <td>350 a 400</td>
+                <td>Bonificación 2</td>
+            </tr>
+            <tr>
+                <td>300 a 350</td>
+                <td>Bonificación 1</td>
+            </tr>
+            <tr>
+                <td>250 a 300</td>
+                <td>Normal</td>
+            </tr>
+            <tr>
+                <td>200 a 250</td>
+                <td>Penalización 1</td>
+            </tr>
+            <tr>
+                <td>150 a 200</td>
+                <td>Penalización 2</td>
+            </tr>
+            
+        </table>
 </div>
 
 <div class="announcement">
@@ -150,13 +240,20 @@ RESUMEN
                 <td>Penalización 2</td>
             </tr>
             <tr>
-                <td>0 a s/ 650.00</td>
+                <td>s/ 600.00 a 650</td>
                 <td>Penalización 3</td>
             </tr>
         </table>
 </div>
 <div class="announcement">
-    <h3>Importante:</h3>
+    <h3>Nota Importante:</h3>
+    <p>(*) Evitar el registro de ventas durante periodos en que la botica permanezca cerrada por una duración superior a una hora.</p>
+    <p>(*) No realizar registros en caja en caso de que el sistema del BCP experimente una interrupción de más de una hora.</p>
+
+</div>
+
+<div class="announcement">
+    <h3>Nota Importante:</h3>
     <p>Si tu nombre no aparece, por favor utiliza la cuenta "VENTAS VENTAS" o regístrate.</p>
     <button class="button" onclick="window.location.href='https://zfrmz.com/UN7izVUCr6VJU1XvB6PY'">Regístrate</button>
 
