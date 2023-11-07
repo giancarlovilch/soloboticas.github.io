@@ -87,7 +87,6 @@ blockquote > :first-child, li > :first-child { margin-top: 0px; }
 @media print {
   body, html { border: 1px solid transparent; height: 99%; break-after: avoid; break-before: avoid; font-variant-ligatures: no-common-ligatures; }
   #write { margin-top: 0px; padding-top: 0px; border-color: transparent !important; padding-bottom: 0px !important; }
-  .typora-export * { -webkit-print-color-adjust: exact; }
   .typora-export #write { break-after: avoid; }
   .typora-export #write::after { height: 0px; }
   .is-mac table { break-inside: avoid; }
@@ -230,7 +229,6 @@ mjx-container { break-inside: avoid; }
  * GitHub https://github.com/liangjingkanji/DrakeTyporaTheme
  */
 @import url();
-@include-when-export url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 
 :root {
     --text-color: #202124;
@@ -281,7 +279,7 @@ html {
 body {
     font-family: var(--text-font) !important;
     color: var(--text-color);
-    -webkit-font-feature-settings: "liga" on, "calt" on;
+    
     -webkit-font-smoothing: subpixel-antialiased;
     text-rendering: optimizeLegibility;
     letter-spacing: 0;
@@ -390,9 +388,7 @@ tspan {
 .md-diagram-panel-preview .labelText, .md-diagram-panel-preview .labelText > tspan { /*循环标记*/
     fill: var(--code-block-color) !important;
     font-family: var(--text-font) !important;
-    font-size: 1rem !important;
-    dominant-baseline: unset;
-    alignment-baseline: unset;
+    font-size: 1rem !important;    
 }
 .md-diagram-panel-preview .labelBox { /*循环标记背景*/
     stroke: var(--table-border-color) !important;
