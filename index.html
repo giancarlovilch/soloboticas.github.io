@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,8 +13,322 @@
     <link rel="preload" href="css/style.css" as="style">
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" type="image/x-icon" href="/img_1/SB007.ico">
-    <meta property="og:description" content="Salud y cuidado de familia a familia. ¡Bienvenidos a SoloBoticas!"/>
+    <meta property="og:description" content="Salud y cuidado de familia a familia. ¡Bienvenidos a SoloBoticas!" />
+    <style>
+        .zf_lB_Dimmer_464244 {
+            position: fixed;
+            top: 0px;
+            left: 0px;
+            right: 0px;
+            bottom: 0px;
+            background: rgb(0, 0, 0);
+            opacity: 0.8;
+            z-index: 10000000;
+        }
+
+        .zf_lB_Container_464244 {
+            position: fixed;
+            background-color: white;
+            margin: 0;
+            margin-right: 0px;
+            padding: 0;
+            height: 831px;
+            width: 900px;
+            top: 50%;
+            left: 50%;
+            margin-right: -50%;
+            transform: translate(-50%, -50%);
+            border: 7px solid #12243a;
+            max-height: calc(100% - 60px);
+            z-index: 999999;
+        }
+
+        p {
+            margin-bottom: 10px;
+        }
+
+        .zf_lB_Wrapper_464244 {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            margin-left: 0;
+            margin-top: -180px;
+            z-index: 10000001;
+        }
+
+        .zf_main_id_464244 {
+            height: calc(100% - 0px);
+            display: flex;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .zf_lb_closeform_464244 {
+            position: absolute;
+            right: -20px;
+            background: #2f2e2e;
+            padding: 0;
+            border-radius: 50%;
+            width: 34px;
+            height: 34px;
+            top: -15px;
+            cursor: pointer;
+            border: 2px solid #d9d9d9;
+        }
+
+        .zf_lb_closeform_464244:before,
+        .zf_lb_closeform_464244:after {
+            position: absolute;
+            left: 16px;
+            content: ' ';
+            height: 19px;
+            width: 2px;
+            top: 7px;
+            background-color: #f7f7f7;
+        }
+
+        .zf_lb_closeform_464244:before {
+            transform: rotate(45deg);
+        }
+
+        .zf_lb_closeform_464244:after {
+            transform: rotate(-45deg);
+        }
+
+        .fadeIn {
+            -webkit-animation-name: fadeIn;
+            animation-name: fadeIn;
+            -webkit-animation-duration: 1s;
+            animation-duration: 1s;
+            -webkit-animation-fill-mode: both;
+            animation-fill-mode: both;
+            display: block !important;
+        }
+
+        @-webkit-keyframes fadeIn {
+            0% {
+                opacity: 0;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+
+        @media screen and (min-device-width: 10px) and (max-device-width: 380px) {
+            .zf_lB_Container_464244 {
+                width: 270px !important;
+            }
+        }
+
+        @media screen and (min-device-width: 360px) and (max-device-width: 480px) {
+            .zf_lB_Container_464244 {
+                width: 300px !important;
+            }
+        }
+
+        @media screen and (min-device-width: 440px) and (max-device-width: 500px) {
+            .zf_lB_Container_464244 {
+                width: 380px !important;
+            }
+        }
+
+        @media only screen and (min-width:500px) and (max-width:600px) {
+            .zf_lB_Container_464244 {
+                width: 450px;
+            }
+        }
+
+        @media only screen and (min-width:601px) and (max-width:700px) {
+            .zf_lB_Container_464244 {
+                width: 540px;
+            }
+        }
+
+        @media only screen and (min-width:700px) and (max-width:800px) {
+            .zf_lB_Container_464244 {
+                width: 650px;
+            }
+        }
+
+        @media screen and (min-device-width: 801px) and (max-device-width: 1268px) {
+            .zf_lB_Container_464244 {
+                width: 750px !important;
+            }
+        }
+    </style>
+    <!-- <button id="zf_button_464244" style="display: none;">Form</button> -->
+
+
+
+    <script type="text/javascript">(function () {
+            try {
+
+                if (document.readyState == "complete") {
+                    onloadActions_464244();
+                } else {
+                    window.addEventListener('load', function () {
+                        onloadActions_464244();
+                    }, false);
+                }
+
+                function onloadActions_464244() {
+                    constructDiv_464244();
+                    showZForm_464244();
+                }
+
+                function constructDiv_464244() {
+                    var iframeDiv = document.createElement("div");
+                    iframeDiv.setAttribute('id', 'KemDm6UjXsbNLM5dOf2eQ64DzH6CoaV_XwFSsEBznNE_464244');
+                    iframeDiv.setAttribute('class', 'zf_main_id_464244');
+
+                    var closeFormDiv = document.createElement("div");
+                    closeFormDiv.setAttribute('id', 'deleteform_464244');
+                    closeFormDiv.setAttribute('class', 'zf_lb_closeform_464244');
+
+
+                    var containerDiv = document.createElement("div");
+                    containerDiv.setAttribute('id', 'containerDiv_464244');
+                    containerDiv.setAttribute('class', 'zf_lB_Container_464244 fadeIn');
+                    containerDiv.appendChild(iframeDiv);
+                    containerDiv.appendChild(closeFormDiv);
+
+                    var wrapperDiv = document.createElement("div");
+                    wrapperDiv.setAttribute('class', 'zf_lB_Wrapper_464244');
+                    wrapperDiv.appendChild(containerDiv);
+
+
+                    var dimmerDiv = document.createElement("div");
+                    dimmerDiv.setAttribute('class', 'zf_lB_Dimmer_464244');
+                    dimmerDiv.setAttribute('elname', 'popup_box');
+
+                    var mainDiv = document.createElement("div");
+                    mainDiv.setAttribute('id', 'formsLightBox_464244');
+                    mainDiv.style.display = "none";
+                    mainDiv.appendChild(wrapperDiv);
+                    mainDiv.appendChild(dimmerDiv);
+
+                    document.body.appendChild(mainDiv);
+
+                }
+
+                function showZForm_464244() {
+                    var iframe = document.getElementById("KemDm6UjXsbNLM5dOf2eQ64DzH6CoaV_XwFSsEBznNE_464244").getElementsByTagName("iframe")[0];
+                    if (iframe == undefined || iframe.length == 0) {
+                        loadZForm_464244();
+
+                    }
+                    document.getElementById("formsLightBox_464244").style.display = "block";
+                    document.body.style.overflow = "hidden";
+                }
+
+                function loadZForm_464244() {
+                    var iframe = document.getElementById("KemDm6UjXsbNLM5dOf2eQ64DzH6CoaV_XwFSsEBznNE_464244").getElementsByTagName("iframe")[0];
+                    if (iframe == undefined || iframe.length == 0) {
+                        var f = document.createElement("iframe");
+                        f.src = getsrcurlZForm_464244('https://forms.zohopublic.com/soloboticas/form/SOLICITUDESYRECLAMOS/formperma/KemDm6UjXsbNLM5dOf2eQ64DzH6CoaV_XwFSsEBznNE');
+
+                        f.style.border = "none";
+                        f.style.minWidth = "100%";
+                        f.style.overflow = "hidden";
+                        var d = document.getElementById("KemDm6UjXsbNLM5dOf2eQ64DzH6CoaV_XwFSsEBznNE_464244");
+                        d.appendChild(f);
+
+                        var deleteForm = document.getElementById("deleteform_464244");
+                        deleteForm.onclick = function deleteZForm_464244() {
+                            var divCont = document.getElementById("formsLightBox_464244");
+                            divCont.style.display = "none";
+                            document.body.style.overflow = "";
+
+                            var iframe = document.getElementById("KemDm6UjXsbNLM5dOf2eQ64DzH6CoaV_XwFSsEBznNE_464244").getElementsByTagName("iframe")[0];
+                            iframe.remove();
+                        }
+
+
+
+                        window.addEventListener('message', function () {
+                            var evntData = event.data;
+                            if (evntData && evntData.constructor == String) {
+                                var zf_ifrm_data = evntData.split("|");
+                                if (zf_ifrm_data.length == 2) {
+                                    var zf_perma = zf_ifrm_data[0];
+                                    var zf_ifrm_ht_nw = (parseInt(zf_ifrm_data[1], 10) + 15) + "px";
+                                    var iframe = document.getElementById("KemDm6UjXsbNLM5dOf2eQ64DzH6CoaV_XwFSsEBznNE_464244").getElementsByTagName("iframe")[0];
+                                    if ((iframe.src).indexOf('formperma') > 0 && (iframe.src).indexOf(zf_perma) > 0) {
+                                        var prevIframeHeight = iframe.style.height;
+                                        if (prevIframeHeight != zf_ifrm_ht_nw) {
+                                            iframe.style.minHeight = zf_ifrm_ht_nw;
+                                            var containerDiv = document.getElementById("containerDiv_464244");
+                                            containerDiv.style.height = zf_ifrm_ht_nw;
+                                        }
+                                    }
+                                }
+                            }
+
+                        }, false);
+                    }
+                }
+
+
+
+                function getsrcurlZForm_464244(zf_src) {
+                    try {
+
+                        if (typeof ZFAdvLead !== "undefined" && typeof zfutm_zfAdvLead !== "undefined") {
+                            for (var prmIdx = 0; prmIdx < ZFAdvLead.utmPNameArr.length; prmIdx++) {
+                                var utmPm = ZFAdvLead.utmPNameArr[prmIdx];
+                                var utmVal = zfutm_zfAdvLead.zfautm_gC_enc(ZFAdvLead.utmPNameArr[prmIdx]);
+                                if (typeof utmVal !== "undefined") {
+                                    if (utmVal != "") {
+                                        if (zf_src.indexOf('?') > 0) {
+                                            zf_src = zf_src + '&' + utmPm + '=' + utmVal;//No I18N
+                                        } else {
+                                            zf_src = zf_src + '?' + utmPm + '=' + utmVal;//No I18N
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (typeof ZFLead !== "undefined" && typeof zfutm_zfLead !== "undefined") {
+                            for (var prmIdx = 0; prmIdx < ZFLead.utmPNameArr.length; prmIdx++) {
+                                var utmPm = ZFLead.utmPNameArr[prmIdx];
+                                var utmVal = zfutm_zfLead.zfutm_gC_enc(ZFLead.utmPNameArr[prmIdx]);
+                                if (typeof utmVal !== "undefined") {
+                                    if (utmVal != "") {
+                                        if (zf_src.indexOf('?') > 0) {
+                                            zf_src = zf_src + '&' + utmPm + '=' + utmVal;//No I18N
+                                        } else {
+                                            zf_src = zf_src + '?' + utmPm + '=' + utmVal;//No I18N
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) { }
+                    return zf_src;
+                }
+                var buttonElem = document.getElementById("zf_button_464244");
+                buttonElem.style.display = "block";
+                buttonElem.addEventListener("click", showZForm_464244);
+
+
+            } catch (e) { }
+        })();
+    </script>
 </head>
+
 <body>
     <header class="logotipo">
         <h1>Solo Boticas <span>Para Su Buena Salud</span></h1>
@@ -36,16 +351,18 @@
     <div class="hero">
         <div class="contenido-hero">
             <h2>Bienvenido a Grupo KGyR S.A.C</h2>
-            <p><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-current-location" width="32" height="32" viewBox="0 0 24 24" stroke-width="2" stroke="#ffffff" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <circle cx="12" cy="12" r="3" />
-                <circle cx="12" cy="12" r="8" />
-                <line x1="12" y1="2" x2="12" y2="4" />
-                <line x1="12" y1="20" x2="12" y2="22" />
-                <line x1="20" y1="12" x2="22" y2="12" />
-                <line x1="2" y1="12" x2="4" y2="12" />
-              </svg> SJL, Lima, Peru</p>
-            
+            <p><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-current-location" width="32"
+                    height="32" viewBox="0 0 24 24" stroke-width="2" stroke="#ffffff" fill="none" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <circle cx="12" cy="12" r="3" />
+                    <circle cx="12" cy="12" r="8" />
+                    <line x1="12" y1="2" x2="12" y2="4" />
+                    <line x1="12" y1="20" x2="12" y2="22" />
+                    <line x1="20" y1="12" x2="22" y2="12" />
+                    <line x1="2" y1="12" x2="4" y2="12" />
+                </svg> SJL, Lima, Peru</p>
+
             <a class="boton" href="#contacto">Contactar</a>
         </div>
     </div>
@@ -53,45 +370,60 @@
     <div class="contenedor sombra">
         <h2>Información</h2>
         <main class="servicios">
-                <div class="servicio">
-                    <h3>Trabaja con Nosotros</h3>
-                    <div class="iconos">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-affiliate" width="52" height="52" viewBox="0 0 24 24" stroke-width="1.5" stroke="#ffffff" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                            <path d="M5.931 6.936l1.275 4.249m5.607 5.609l4.251 1.275" />
-                            <path d="M11.683 12.317l5.759 -5.759" />
-                            <circle cx="5.5" cy="5.5" r="1.5" />
-                            <circle cx="18.5" cy="5.5" r="1.5" />
-                            <circle cx="18.5" cy="18.5" r="1.5" />
-                            <circle cx="8.5" cy="15.5" r="4.5" />
-                          </svg>
-                    </div>
-                    <p>Debido a nuestro crecimiento constante, necesitamos nuevos colaboradores con vocación de servicio, que acepten nuevos retos y se propongan superar obstáculos. En Solo Boticas apostamos por el desarrollo de nuestros colaboradores en el aspecto laboral y personal. Creemos que el elemento más importante de nuestra empresa son sus colaboradores, los cuales son la razón de nuestro éxito. ¡Sé parte de nuestro gran equipo! 
-                        <strong>
-                            <a title="Revisa las posiciones que tenemos disponibles" href="/info/oportunidades-laborales.html" target="_blank" rel="noopener" style="text-decoration: none;color:cadetblue;">Revisa las posiciones que tenemos disponibles!</a>
-                        </strong>
-                    </p>
+            <div class="servicio">
+                <h3>Trabaja con Nosotros</h3>
+                <div class="iconos">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-affiliate" width="52"
+                        height="52" viewBox="0 0 24 24" stroke-width="1.5" stroke="#ffffff" fill="none"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M5.931 6.936l1.275 4.249m5.607 5.609l4.251 1.275" />
+                        <path d="M11.683 12.317l5.759 -5.759" />
+                        <circle cx="5.5" cy="5.5" r="1.5" />
+                        <circle cx="18.5" cy="5.5" r="1.5" />
+                        <circle cx="18.5" cy="18.5" r="1.5" />
+                        <circle cx="8.5" cy="15.5" r="4.5" />
+                    </svg>
                 </div>
-                <div class="servicio">
-                    <h3>Nuestros Locales</h3>
-                    <div class="iconos">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-building-skyscraper" width="52" height="52" viewBox="0 0 24 24" stroke-width="1.5" stroke="#ffffff" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                            <line x1="3" y1="21" x2="21" y2="21" />
-                            <path d="M5 21v-14l8 -4v18" />
-                            <path d="M19 21v-10l-6 -4" />
-                            <line x1="9" y1="9" x2="9" y2="9.01" />
-                            <line x1="9" y1="12" x2="9" y2="12.01" />
-                            <line x1="9" y1="15" x2="9" y2="15.01" />
-                            <line x1="9" y1="18" x2="9" y2="18.01" />
-                          </svg>
-                    </div>
-                    <p>¿Buscas las tiendas de Solo Boticas en Lima?<br>
-                        Encuentra todas las tiendas de Solo Boticas en SJL, Lima. <br> Entra en la que te interese para ver la dirección.<br><a href="#" style="text-decoration: none;color:cadetblue">SoloBoticas 1</a><br><a href="#" style="text-decoration: none;color:cadetblue">SoloBoticas 2</a><br><a href="#" style="text-decoration: none;color:cadetblue">SoloBoticas 3</a><br><a href="#" style="text-decoration: none;color:cadetblue">SoloBoticas 4</a></p>
+                <p>Debido a nuestro crecimiento constante, necesitamos nuevos colaboradores con vocación de servicio,
+                    que acepten nuevos retos y se propongan superar obstáculos. En Solo Boticas apostamos por el
+                    desarrollo de nuestros colaboradores en el aspecto laboral y personal. Creemos que el elemento más
+                    importante de nuestra empresa son sus colaboradores, los cuales son la razón de nuestro éxito. ¡Sé
+                    parte de nuestro gran equipo!
+                    <strong>
+                        <a title="Revisa las posiciones que tenemos disponibles"
+                            href="/info/oportunidades-laborales.html" target="_blank" rel="noopener"
+                            style="text-decoration: none;color:cadetblue;">Revisa las posiciones que tenemos
+                            disponibles!</a>
+                    </strong>
+                </p>
+            </div>
+            <div class="servicio">
+                <h3>Nuestros Locales</h3>
+                <div class="iconos">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-building-skyscraper"
+                        width="52" height="52" viewBox="0 0 24 24" stroke-width="1.5" stroke="#ffffff" fill="none"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <line x1="3" y1="21" x2="21" y2="21" />
+                        <path d="M5 21v-14l8 -4v18" />
+                        <path d="M19 21v-10l-6 -4" />
+                        <line x1="9" y1="9" x2="9" y2="9.01" />
+                        <line x1="9" y1="12" x2="9" y2="12.01" />
+                        <line x1="9" y1="15" x2="9" y2="15.01" />
+                        <line x1="9" y1="18" x2="9" y2="18.01" />
+                    </svg>
                 </div>
+                <p>¿Buscas las tiendas de Solo Boticas en Lima?<br>
+                    Encuentra todas las tiendas de Solo Boticas en SJL, Lima. <br> Entra en la que te interese para ver
+                    la dirección.<br><a href="#" style="text-decoration: none;color:cadetblue">SoloBoticas 1</a><br><a
+                        href="#" style="text-decoration: none;color:cadetblue">SoloBoticas 2</a><br><a href="#"
+                        style="text-decoration: none;color:cadetblue">SoloBoticas 3</a><br><a href="#"
+                        style="text-decoration: none;color:cadetblue">SoloBoticas 4</a></p>
+            </div>
         </main>
 
-        <div id="contacto" class="contacto">
+        <!-- <div id="contacto" class="contacto">
             <h2>Contacto</h2>
             <form class="formulario" action="#" method="POST">
                 <legend>Contactános llenando todos los campos</legend>
@@ -117,15 +449,52 @@
 
                         <textarea></textarea>
                     </div>
-                </div><!--.contenedor-campos-->
+                </div>
                 <div class="enviar">
                     <input class="boton" type="submit" value="Enviar">
                 </div>
             </form>
-        </div>
+        </div> -->
+        <div style="display: flex; justify-content: center;margin-top: 2rem;" id="zf_div_X1uOPhwtztJzB6DFRvXR8JuFErzvXruqrTGAav_3FjU"></div>
+        <script type="text/javascript">(function () {
+                try {
+                    var f = document.createElement("iframe");
+                    f.src = 'https://forms.zohopublic.com/soloboticas/form/CONTACTOSB/formperma/X1uOPhwtztJzB6DFRvXR8JuFErzvXruqrTGAav_3FjU?zf_rszfm=1';
+                    f.style.border = "none";
+                    f.style.height = "400px";
+                    f.style.maxHeight = "50%";
+                    f.style.width = "100%";
+                    f.style.maxWidth = "100%";
+                    f.style.transition = "all 0.5s ease";
+                    f.style.margin = "0 auto";
+                    
+                    f.setAttribute("aria-label", 'CONTACTO SB');
+
+                    var d = document.getElementById("zf_div_X1uOPhwtztJzB6DFRvXR8JuFErzvXruqrTGAav_3FjU");
+                    d.appendChild(f);
+                    window.addEventListener('message', function () {
+                        var evntData = event.data;
+                        if (evntData && evntData.constructor == String) {
+                            var zf_ifrm_data = evntData.split("|");
+                            if (zf_ifrm_data.length == 2) {
+                                var zf_perma = zf_ifrm_data[0];
+                                var zf_ifrm_ht_nw = (parseInt(zf_ifrm_data[1], 10) + 15) + "px";
+                                var iframe = document.getElementById("zf_div_X1uOPhwtztJzB6DFRvXR8JuFErzvXruqrTGAav_3FjU").getElementsByTagName("iframe")[0];
+                                if ((iframe.src).indexOf('formperma') > 0 && (iframe.src).indexOf(zf_perma) > 0) {
+                                    var prevIframeHeight = iframe.style.height;
+                                    if (prevIframeHeight != zf_ifrm_ht_nw) {
+                                        iframe.style.height = zf_ifrm_ht_nw;
+                                    }
+                                }
+                            }
+                        }
+                    }, false);
+                } catch (e) { }
+            })();</script>
     </div>
     <footer class="footer">
         <p>Todos los derechos reservados a GRUPO KGyR S.A.C</p>
-    </footer>    
+    </footer>
 </body>
+
 </html>
