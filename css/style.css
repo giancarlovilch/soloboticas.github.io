@@ -84,8 +84,8 @@ h3 {
     background-color: var(--secundario);
 }
 .navegacion {
-    scroll-snap-align: center;
-    scroll-snap-stop: always;
+    /* scroll-snap-align: center;
+    scroll-snap-stop: always; */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -179,10 +179,10 @@ h3 {
 .boton:hover{
     cursor: pointer;
 }
-.servicios {
+/* .servicios {
     scroll-snap-align: center;
     scroll-snap-stop: always;
-}
+} */
 @media (min-width:768px) {
     .servicios {
         display: grid;
@@ -221,8 +221,8 @@ h3 {
     margin: 0 auto; */
     padding: 2rem;
     border-radius: 1rem;
-    scroll-snap-align: center;
-    scroll-snap-stop: always;
+    /* scroll-snap-align: center;
+    scroll-snap-stop: always; */
 }
 .formulario legend {
     text-align: center;
