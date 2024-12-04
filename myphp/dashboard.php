@@ -37,11 +37,11 @@ $nombreCompleto = $userInfo ? $userInfo['nombre_completo'] : "Información no di
     <title>GRUPO KGyR S.A.C</title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Krub:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="preload" href="../../css/normalize.css" as="style">
-    <link href="../../css/normalize.css" rel="stylesheet">
+    <link rel="preload" href="../css/normalize.css" as="style">
+    <link href="../css/normalize.css" rel="stylesheet">
     <link rel="preload" href="../css/dashboard.css" as="style">
     <link rel="stylesheet" href="../css/dashboard.css">
-    <link rel="icon" type="image/x-icon" href="../../img_1/SB007.ico">
+    <link rel="icon" type="image/x-icon" href="../img/img_1/SB007.ico">
     <meta property="og:description" content="Salud y cuidado de familia a familia. ¡Bienvenidos a SoloBoticas!" />
 </head>
 
@@ -52,7 +52,7 @@ $nombreCompleto = $userInfo ? $userInfo['nombre_completo'] : "Información no di
             <span>Solo Boticas</span>
         </h1>
         <p class="user-info">
-            Bienvenido, <?php echo htmlspecialchars($nickname); ?><br>
+            ¡HOLA! <br>
             <?php echo htmlspecialchars($nombreCompleto); ?>
         </p>        
     </header>

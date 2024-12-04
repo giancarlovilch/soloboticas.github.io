@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="preload" href="../css/normalize.css" as="style">
+    <link href="../css/normalize.css" rel="stylesheet">
     <link rel="preload" href="../css/login.css" as="style">
     <link href="../css/login.css" rel="stylesheet" type="text/css" />
     <link rel="icon" type="image/x-icon" href="../img/img_1/SB007.ico">
@@ -56,7 +58,7 @@
 
             <form action="AuthController.php" method="post">
                 <h1>Iniciar Sesión</h1>
-                <br><br>
+                <br>
                 <input type="text" name="nickname" placeholder="Nombre de Usuario" required>
                 <input type="password" name="password" placeholder="Contraseña" required>
                 <input type="hidden" name="login" value="1"> <!-- Indica que es un login -->
