@@ -1,11 +1,23 @@
-<?php
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Usuario</title>
+</head>
+<body>
+    <h2>Registro de Usuario</h2>
+    <form action="AuthController.php" method="POST">
+        <label for="nickname">Nombre de Usuario:</label>
+        <input type="text" name="nickname" required><br>
 
-// Se asegura de que el archivo especificado sea incluido solo una vez
-require_once("config/db.php");
-require_once("classes/Registration.php");
+        <label for="nombre">Nombre:</label>
+        <input type="text" name="nombre" required><br>
 
-// Asignar la variable registro
-$registration = new Registration();
+        <label for="password">Contraseña:</label>
+        <input type="password" name="password" required><br>
 
-// mostrar la ventana de registro
-include("views/register.php");
+        <button type="submit" name="register">Registrar</button>
+    </form>
+</body>
+</html>

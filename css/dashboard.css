@@ -1,0 +1,306 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400&display=swap');
+
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Krub', sans-serif;
+}
+
+body{
+    background: #EAEBEF;
+    margin: auto;
+    /* font-family: 'Poppins', sans-serif; */
+}
+
+.titulo {
+    /*text-transform: uppercase;*/
+    color: #FFC107;
+    text-align: center;
+    padding: .5rem;
+}
+
+.titulo span {
+    font-size: 4rem;
+    padding: 0;
+    color: #0097A7;
+    text-transform: none;
+}
+@media (min-width: 768px){
+    .contenedor-grid {
+        display: grid;
+        margin-left: auto;  
+        margin-right: auto;              
+        grid-template-columns: 350px 2fr;        
+        max-width: 1000px;
+    }
+}
+
+.sidebar-1 {
+    padding: 0 3rem;
+    margin: auto; 
+}
+.sidebar-1 img {
+    width: 600px; /* Tamaño de la imagen en pantallas grandes */
+    height: auto;
+    filter: grayscale(25%); /* Aplica filtro en blanco y negro */
+    border: 2px solid #EAEBEF; /* Borde de color naranja (puedes cambiarlo) */
+    border-radius: 10px; /* Bordes redondeados (opcional) */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Sombra alrededor de la imagen */
+}
+@media (max-width: 1000px) {
+    .sidebar-1 img {
+        width: 100%; /* Hace la imagen más pequeña, ajustándola al 100% del contenedor */
+        max-width: 100%; /* Evita que se estire más allá de su tamaño original */
+        height: auto;
+        border: 2px solid #EAEBEF; /* Borde más delgado en dispositivos pequeños */
+    }
+}
+
+.sidebar-1 h2{    
+    padding: 0.5rem 0 ;
+    font-size: 1rem;
+}
+
+.sidebar-1 p{
+    text-align: justify;
+    margin-bottom: 2rem;
+}
+
+.nav{
+    width: 350px;
+    margin: auto; 
+    margin-bottom: 2rem;  
+}
+
+.nav__link{
+    color: #303440;
+    display: block;
+    padding: 15px 0;
+    text-decoration: none;
+}
+
+.nav__link--inside{
+    border-radius: 6px ;
+    padding-left: 20px;
+    text-align: left;
+}
+
+.nav__link--inside:hover{
+    background: #F6F8FA;
+}
+
+.list{
+    width: 100%;
+    height: auto;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    border-radius: 0 16px 16px 0;
+    background: #DFE9F3;
+}
+
+.list__item{
+    list-style: none;
+    width: 100%;
+    text-align: center;
+    overflow: hidden;
+}
+
+.list__item--click{
+    cursor: pointer;
+}
+
+.list__button{
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    width: 70%;
+    margin: 0 auto;
+}
+
+.arrow .list__arrow{
+    transform: rotate(90deg);
+}
+
+.list__arrow{
+    margin-left: auto;
+    transition: transform .3s;
+}
+
+.list__show{
+    width: 80%;
+    margin-left: auto;
+    border-left: 2px solid #303440;
+    list-style: none;
+    transition: height .4s;
+    height: 0;
+}
+
+.user-info {
+    font-family: 'Krub', sans-serif; /* Aplica la fuente importada */
+    color: #303440; /* Color plateado */
+    font-size: 1.2rem; /* Ajusta el tamaño de la letra */
+    font-weight: bold; /* Hace la letra más destacada */
+    text-align: center; /* Centra horizontalmente el texto */
+    margin: 10px auto; /* Centra automáticamente dentro de su contenedor */
+    padding: 10px; /* Espaciado interno */
+    border: 2px solid silver; /* Agrega un borde plateado */
+    border-radius: 2px; /* Redondea las esquinas */
+}
+.user-info a{
+    text-decoration: none; /* Elimina el subrayado */
+}
+
+.zf_lB_Dimmer_464244 {
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    right: 0px;
+    bottom: 0px;
+    background: rgb(0, 0, 0);
+    opacity: 0.8;
+    z-index: 10000000;
+}
+
+.zf_lB_Container_464244 {
+    position: fixed;
+    background-color: white;
+    margin: 0;
+    margin-right: 0px;
+    padding: 0;
+    height: 800px;
+    width: 900px;
+    top: 50%;
+    left: 50%;
+    margin-right: -50%;
+    transform: translate(-50%, -50%);
+    border: 7px solid #12243a;
+    max-height: calc(100% - 60px);
+    z-index: 999999;
+}
+
+p {
+    margin-bottom: 10px;
+}
+
+.zf_lB_Wrapper_464244 {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    margin-left: 0;
+    margin-top: -180px;
+    z-index: 10000001;
+}
+
+.zf_main_id_464244 {
+    height: calc(100% - 0px);
+    display: flex;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.zf_lb_closeform_464244 {
+    position: absolute;
+    right: -20px;
+    background: #2f2e2e;
+    padding: 0;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    top: -15px;
+    cursor: pointer;
+    border: 2px solid #d9d9d9;
+}
+
+.zf_lb_closeform_464244:before,
+.zf_lb_closeform_464244:after {
+    position: absolute;
+    left: 16px;
+    content: ' ';
+    height: 19px;
+    width: 2px;
+    top: 7px;
+    background-color: #f7f7f7;
+}
+
+.zf_lb_closeform_464244:before {
+    transform: rotate(45deg);
+}
+
+.zf_lb_closeform_464244:after {
+    transform: rotate(-45deg);
+}
+
+.fadeIn {
+    -webkit-animation-name: fadeIn;
+    animation-name: fadeIn;
+    -webkit-animation-duration: 1s;
+    animation-duration: 1s;
+    -webkit-animation-fill-mode: both;
+    animation-fill-mode: both;
+    display: block !important;
+}
+
+@-webkit-keyframes fadeIn {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+
+@media screen and (min-device-width: 10px) and (max-device-width: 380px) {
+    .zf_lB_Container_464244 {
+        width: 100% !important;
+    }
+}
+
+@media screen and (min-device-width: 360px) and (max-device-width: 480px) {
+    .zf_lB_Container_464244 {
+        width: 100% !important;
+    }
+}
+
+@media screen and (min-device-width: 440px) and (max-device-width: 500px) {
+    .zf_lB_Container_464244 {
+        width: 100% !important;
+    }
+}
+
+@media only screen and (min-width:500px) and (max-width:600px) {
+    .zf_lB_Container_464244 {
+        width: 450px;
+    }
+}
+
+@media only screen and (min-width:601px) and (max-width:700px) {
+    .zf_lB_Container_464244 {
+        width: 540px;
+    }
+}
+
+@media only screen and (min-width:700px) and (max-width:800px) {
+    .zf_lB_Container_464244 {
+        width: 650px;
+    }
+}
+
+@media screen and (min-device-width: 801px) and (max-device-width: 1268px) {
+    .zf_lB_Container_464244 {
+        width: 750px !important;
+    }
+}
