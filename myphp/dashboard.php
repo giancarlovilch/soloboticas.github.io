@@ -141,7 +141,7 @@ $nombreCompleto = $userInfo ? $userInfo['nombre_completo'] : "Información no di
                 <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/message.svg" class="list__img">
-                        <a href="../php/infograma.php" class="nav__link">Información</a>
+                        <a href="infograma.php" class="nav__link">Información</a>
                     </div>
                 </li>             
             </ul>
