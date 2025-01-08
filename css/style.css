@@ -188,7 +188,7 @@ h3 {
 .contenido-hero h2 {
     color: rgba(255, 255, 255, 0.1);
     font-weight: bold;
-    padding-top: 10rem;
+    /* padding-top: 3rem; */
 }
 
 @media (min-width:768px) {
@@ -201,7 +201,7 @@ h3 {
 .contenido-hero h2:hover {
     color: var(--sexto);
     font-weight: bold;
-    font-size: 1.8rem;
+    font-size: 2rem;
 }
 
 .boton {
