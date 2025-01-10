@@ -3,7 +3,7 @@ session_start();
 include('db_connection.php');
 include('session_manager.php');
 // Verificar si el usuario está logeado
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['nickname'])) {
+if (!isset($_SESSION['nickname'])) {
     header('Location: login.php'); // Redirigir al login si no hay sesión activa
     exit();
 }

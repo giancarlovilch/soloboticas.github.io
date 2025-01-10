@@ -2,13 +2,13 @@
 // session_manager.php
 
 // Verificar si el usuario está logeado
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['nickname'])) {
+if (!isset($_SESSION['nickname'])) {
     header('Location: login.php'); // Redirigir al login si no hay sesión activa
     exit();
 }
 
 // Tiempo de inactividad (en segundos)
-$inactividad = 120;  // 60 segundos de inactividad para cerrar sesión
+$inactividad = 10;  // 60 segundos de inactividad para cerrar sesión
 
 // Verificar si la última actividad fue hace más de $inactividad segundos
 if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $inactividad) {

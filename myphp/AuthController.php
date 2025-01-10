@@ -6,12 +6,12 @@ include('db_connection.php');
 if (isset($_POST['register'])) {
     $nickname = $_POST['nickname'];
     $password = password_hash($_POST['password'], PASSWORD_DEFAULT); // Hashear la contraseña    
-    
+
     // Verificar si el nickname ya está en uso
     $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE nickname = :nickname");
     $stmt->bindParam(':nickname', $nickname);
     $stmt->execute();
-    if ($stmt->rowCount() > 0) {        
+    if ($stmt->rowCount() > 0) {
         $_SESSION['error'] = "El nombre de usuario ya está en uso.";
         header("Location: login.php?registered=false");
     } else {
@@ -38,17 +38,26 @@ if (isset($_POST['login'])) {
     $stmt->execute();
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($user && password_verify($password, $user['password'])) {
-        // Iniciar sesión si la contraseña es correcta
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['nickname'] = $user['nickname'];
+    if ($user) {
+        // Si el usuario existe, verificar la contraseña
+        if (password_verify($password, $user['password'])) {
+            // Iniciar sesión si la contraseña es correcta        
+            $_SESSION['nickname'] = $user['nickname'];        
 
-        // Redirigir al usuario al área protegida
-        header('Location: dashboard.php');
-        exit();
+            // Redirigir al usuario al área protegida
+            header('Location: dashboard.php');
+            exit();
+        } else {
+            // Contraseña incorrecta
+            $_SESSION['error'] = "La contraseña es incorrecta.";
+            header("Location: login.php?registered=true");
+            exit();
+        }
     } else {
-        $_SESSION['error'] = "Nickname o contraseña incorrectos.";
-        header("Location: login.php?registered=false");  
+        // Usuario no registrado
+        $_SESSION['error'] = "El nickname no está registrado.";
+        header("Location: login.php?registered=false");
+        exit();
     }
 }
 ?>
