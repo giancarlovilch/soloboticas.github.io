@@ -8,7 +8,7 @@ if (!isset($_SESSION['nickname'])) {
 }
 
 // Tiempo de inactividad (en segundos)
-$inactividad = 10;  // 60 segundos de inactividad para cerrar sesión
+$inactividad = 300;  // 60 segundos de inactividad para cerrar sesión
 
 // Verificar si la última actividad fue hace más de $inactividad segundos
 if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $inactividad) {
