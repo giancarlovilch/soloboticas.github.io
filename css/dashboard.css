@@ -37,8 +37,7 @@ body{
 }
 
 .sidebar-1 {
-    padding: 0 3rem;
-    margin: auto; 
+    padding: 0 3rem;    
 }
 .sidebar-1 img {
     width: 600px; /* Tamaño de la imagen en pantallas grandes */

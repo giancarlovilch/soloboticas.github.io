@@ -19,6 +19,10 @@ $userInfo = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Establecer el nombre completo si está disponible
 $nombreCompleto = $userInfo ? $userInfo['nombre_completo'] : "Información no disponible";
+
+
+// Obtener la página solicitada
+$page = isset($_GET['page']) ? $_GET['page'] : 'home'; // 'home' será el valor predeterminado
 ?>
 
 <!DOCTYPE html>
@@ -57,9 +61,9 @@ $nombreCompleto = $userInfo ? $userInfo['nombre_completo'] : "Información no di
                 <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/homemedicine.svg" class="list__img">
-                        <a href="../index.php" class="nav__link">Home</a>
+                        <a href="dashboard.php" class="nav__link">Home</a>
                     </div>
-                </li>
+                </li>                             
                 <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/schedulee.svg" class="list__img">
@@ -113,12 +117,12 @@ $nombreCompleto = $userInfo ? $userInfo['nombre_completo'] : "Información no di
                         </li>
                     </ul>
                 </li>
-                <li class="list__item">
+                <!-- <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/staff.svg" class="list__img">
                         <a href="https://zfrmz.com/UN7izVUCr6VJU1XvB6PY" class="nav__link">Registro de Trabajadores</a>
                     </div>
-                </li>
+                </li> -->
                 <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/manual.svg" class="list__img">
@@ -134,14 +138,34 @@ $nombreCompleto = $userInfo ? $userInfo['nombre_completo'] : "Información no di
                 </li>
                 <li class="list__item">
                     <div class="list__button">
+                        <img src="../css/assets/staff.svg" class="list__img">
+                        <a href="?page=update" class="nav__link">Actualizar Contacto</a>
+                    </div>
+                </li>                     
+                <li class="list__item">
+                    <div class="list__button">
                         <img src="../css/assets/message.svg" class="list__img">
                         <a href="infograma.php" class="nav__link">Información</a>
                     </div>
-                </li>             
+                </li>
+                           
             </ul>
         </nav>
         <aside class="sidebar-1">
-            <img src="/img/img_1/SB006.jpg" alt="">
+        <?php
+            // Cargar contenido dinámico según la página
+            switch ($page) {
+                case 'update':
+                    include('dashboard/update.php');
+                    break;
+                case 'birthday':
+                    include('dashboard/birthday.php');
+                    break;
+                default:
+                    include('dashboard/home.php');
+                    break;
+            }
+            ?>            
         </aside>
     </div>
     <div class="user-info">

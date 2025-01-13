@@ -8,15 +8,9 @@ CREATE TABLE `informacion_personal` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `nickname` varchar(50) NOT NULL,
   `nombre_completo` varchar(255) DEFAULT NULL,
-  `edad` int(3) DEFAULT NULL,
-  `estudios` varchar(100) DEFAULT NULL,
-  `estudios_estado` enum('Concluidos','En proceso') DEFAULT NULL,
-  `titulo` tinyint(1) DEFAULT NULL,
-  `lugar_origen` varchar(255) DEFAULT NULL,
-  `numero_hijos` int(2) DEFAULT 0,
-  `estado_civil` enum('Casado','Soltero') DEFAULT NULL,
-  `tiempo_servicio` int(3) DEFAULT NULL,
-  `lugar_nacimiento` varchar(255) DEFAULT NULL,
+  `correo` varchar(255) DEFAULT NULL,
+  `telefono` varchar(15) DEFAULT NULL,
+  `rol` enum('Administrador','Usuario') DEFAULT 'Usuario',
   `fecha_nacimiento` date DEFAULT NULL,
   `fecha_creacion` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `fecha_actualizacion` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -34,7 +28,10 @@ CREATE TABLE `usuarios` (
   CONSTRAINT `fk_nickname` FOREIGN KEY (`nickname`) REFERENCES `informacion_personal` (`nickname`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE INDEX idx_edad ON `informacion_personal` (`edad`);
-
 COMMIT;
 
+
+ALTER TABLE `informacion_personal` 
+ADD COLUMN `correo` varchar(255) DEFAULT NULL AFTER `nombre_completo`,
+ADD COLUMN `telefono` varchar(15) DEFAULT NULL AFTER `correo`,
+ADD COLUMN `rol` enum('Administrador','Usuario') DEFAULT 'Usuario' AFTER `telefono`;
