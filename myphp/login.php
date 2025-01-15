@@ -79,7 +79,7 @@
                 <div class="toggle-panel toggle-right">
                     <h1>¡Hola, familia SB!</h1><br>
                     <p>¡Bienvenido a nuestra nueva plataforma!<br>Por favor, ingrese sus credenciales SICAR.</p>                    
-                    <button class="hidden" id="register">Registrarse</button>
+                    <!-- <button class="hidden" id="register">Registrarse</button> -->
                 </div>
             </div>
         </div>
