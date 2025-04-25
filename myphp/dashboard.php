@@ -17,10 +17,10 @@ $stmt->bindParam(':nickname', $nickname);
 $stmt->execute();
 $userInfo = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$userInfo || $userInfo['estado'] !== 'Activo') {
-    header("Location: login.php?error=not_active");
-    exit();
-}
+// if (!$userInfo || $userInfo['estado'] !== 'Activo') {
+//     header("Location: login.php?error=not_active");
+//     exit();
+// }
 
 // Establecer el nombre completo si está disponible
 $nombreCompleto = $userInfo ? $userInfo['nombre_completo'] : "Información no disponible";
