@@ -465,6 +465,42 @@ $tareas_completadas = $pdo->query("
             text-align: center;
             margin: 0 0 20px;
         }
+
+        .status-pendiente {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .status-asignada {
+            background-color: #cce5ff;
+            color: #004085;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .status-en-progreso {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .status-completada {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .status-vencida {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+    </style>
     </style>
 </head>
 
@@ -482,7 +518,7 @@ $tareas_completadas = $pdo->query("
 
         <div class="tab-container">
             <div class="tab active" onclick="showTab('tareas-disponibles')">Tareas Disponibles</div>
-            <div class="tab" onclick="showTab('mis-tareas')">Mis Tareas</div>
+            <div class="tab" onclick="showTab('mis-tareas')">Nuestras Tareas</div>
             <div class="tab" onclick="showTab('crear-tarea')">Crear Nueva Tarea</div>
         </div>
 
@@ -499,7 +535,7 @@ $tareas_completadas = $pdo->query("
                             <li class="task-item <?php echo $tarea['estado']; ?>">
                                 <div class="task-header">
                                     <h3 class="task-title"><?php echo htmlspecialchars($tarea['titulo']); ?></h3>
-                                    <span class="task-status status-<?php echo str_replace(' ', '-', $tarea['estado']); ?>">
+                                    <span class="task-status status-<?php echo strtolower(str_replace(' ', '-', $tarea['estado'])); ?>">
                                         <?php echo $tarea['estado']; ?>
                                     </span>
                                 </div>
@@ -512,7 +548,7 @@ $tareas_completadas = $pdo->query("
                                         <i class="fas fa-exclamation-circle"></i> <?php echo $tarea['prioridad']; ?>
                                     </span>
                                     <span><i class="fas fa-money-bill-wave"></i> S/ <?php echo number_format($tarea['presupuesto'], 2); ?></span>
-                                </div>                                
+                                </div>
 
                                 <?php if (!empty($tarea['descripcion'])): ?>
                                     <div class="task-description">
@@ -621,13 +657,27 @@ $tareas_completadas = $pdo->query("
                             <li class="task-item">
                                 <div class="task-header">
                                     <h3 class="task-title"><?php echo htmlspecialchars($tarea['titulo']); ?></h3>
-                                    <span class="task-code"><?php echo htmlspecialchars($tarea['estado']); ?></span>
+                                    <span class="task-code status-<?php echo strtolower(str_replace(' ', '-', $tarea['estado'])); ?>">
+                                        <?php echo htmlspecialchars($tarea['estado']); ?>
+                                    </span>
                                 </div>
 
                                 <div class="task-meta">
                                     <span><i class="fas fa-tag"></i> <?php echo htmlspecialchars($tarea['categoria']); ?></span>
                                     <span><i class="fas fa-store"></i> <?php echo htmlspecialchars($tarea['local_nombre']); ?></span>
                                     <span><i class="fas fa-calendar-alt"></i> Completada: <?php echo date('d/m/Y', strtotime($tarea['fecha_actualizacion'])); ?></span>
+                                    <span><i class="fas fa-user-check"></i> Completada por: <?php
+                                                                                            // Obtener el nombre de quien completó la tarea
+                                                                                            $stmt = $pdo->prepare("SELECT h.nickname, i.nombre_completo 
+                                      FROM historial_tareas h
+                                      JOIN informacion_personal i ON h.nickname = i.nickname
+                                      WHERE h.id_tarea = :id_tarea AND h.accion = 'Completación' 
+                                      ORDER BY h.fecha_registro DESC LIMIT 1");
+                                                                                            $stmt->bindParam(':id_tarea', $tarea['id']);
+                                                                                            $stmt->execute();
+                                                                                            $completado_por = $stmt->fetch(PDO::FETCH_ASSOC);
+                                                                                            echo $completado_por ? htmlspecialchars($completado_por['nombre_completo']) : 'Desconocido';
+                                                                                            ?></span>
                                     <span><i class="fas fa-money-bill-wave"></i> S/ <?php echo number_format($tarea['presupuesto'], 2); ?></span>
                                 </div>
 
