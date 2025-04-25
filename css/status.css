@@ -1,0 +1,62 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
+}
+.container {
+    background-color: white;
+    padding: 20px;            
+    width: 600px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    font-size: 14px;
+}
+h2 {
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th, td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #ccc;
+}
+select {
+    padding: 5px;
+    font-size: 14px;
+    width: 100%;
+}
+.save-btn {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    margin-top: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+    text-align: center;
+    font-size: 16px;
+    border-radius: 5px;
+}
+.save-btn:hover {
+    background-color: #0056b3;
+}
+.message {
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
+.success-message {
+    background-color: #d4edda;
+    color: #155724;
+}
+.error-message {
+    background-color: #f8d7da;
+    color: #721c24;
+}

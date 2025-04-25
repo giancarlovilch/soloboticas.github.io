@@ -37,8 +37,20 @@ body{
 }
 
 .sidebar-1 {
-    padding: 0 3rem;    
+    /* padding: 0 3rem;   */
+    padding: 0 0.5rem;
+    margin: 50px 0 auto;  
 }
+
+@media (max-width: 768px){
+    .sidebar-1 {
+        /* padding: 0 9rem; */
+        padding: 0 0.5rem;
+        margin: 50px auto;  /* Esto centrará el elemento */
+        
+    }
+}
+
 .sidebar-1 img {
     width: 600px; /* Tamaño de la imagen en pantallas grandes */
     height: auto;
@@ -68,7 +80,7 @@ body{
 
 .nav{
     width: 350px;
-    margin: auto; 
+    margin: 50px auto;
     margin-bottom: 2rem;  
 }
 

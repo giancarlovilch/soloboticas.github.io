@@ -14,12 +14,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $correo = $_POST['correo'] ?? null;
     $telefono = $_POST['telefono'] ?? null;
     $fechaNacimiento = $_POST['fecha_nacimiento'] ?? null;
+    $dni = $_POST['dni'] ?? null;
     $rol = $_POST['rol'] ?? null;
 
-    if (!empty($nombreCompleto) || !empty($correo) || !empty($telefono) || !empty($fechaNacimiento) || !empty($rol)) {
+    // Validar el DNI
+    if (!empty($dni) && !preg_match('/^\d{8}$/', $dni)) {
+        $mensaje = "El DNI debe tener exactamente 8 dígitos.";
+    } elseif (!empty($nombreCompleto) || !empty($correo) || !empty($telefono) || !empty($fechaNacimiento) || !empty($dni) || !empty($rol)) {
         try {
             // Verificar si ya tiene la información registrada
-            $stmt = $pdo->prepare("SELECT nombre_completo, correo, telefono, fecha_nacimiento, rol FROM informacion_personal WHERE nickname = :nickname");
+            $stmt = $pdo->prepare("SELECT nombre_completo, correo, telefono, fecha_nacimiento, dni, rol FROM informacion_personal WHERE nickname = :nickname");
             $stmt->bindParam(':nickname', $nickname);
             $stmt->execute();
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -55,6 +59,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt->execute();
                 }
 
+                if (empty($result['dni']) && !empty($dni)) {
+                    $stmt = $pdo->prepare("UPDATE informacion_personal SET dni = :dni, fecha_actualizacion = NOW() WHERE nickname = :nickname");
+                    $stmt->bindParam(':dni', $dni);
+                    $stmt->bindParam(':nickname', $nickname);
+                    $stmt->execute();
+                }
+
                 if (empty($result['rol']) && !empty($rol)) {
                     $stmt = $pdo->prepare("UPDATE informacion_personal SET rol = :rol, fecha_actualizacion = NOW() WHERE nickname = :nickname");
                     $stmt->bindParam(':rol', $rol);
@@ -75,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Consultar la información actual del usuario
-$stmt = $pdo->prepare("SELECT nombre_completo, correo, telefono, fecha_nacimiento, rol FROM informacion_personal WHERE nickname = :nickname");
+$stmt = $pdo->prepare("SELECT nombre_completo, correo, telefono, fecha_nacimiento, dni, rol FROM informacion_personal WHERE nickname = :nickname");
 $stmt->bindParam(':nickname', $nickname);
 $stmt->execute();
 $userInfo = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -83,6 +94,7 @@ $nombreCompleto = $userInfo['nombre_completo'] ?? null;
 $correo = $userInfo['correo'] ?? null;
 $telefono = $userInfo['telefono'] ?? null;
 $fechaNacimiento = $userInfo['fecha_nacimiento'] ?? null;
+$dni = $userInfo['dni'] ?? null;
 $rol = $userInfo['rol'] ?? null;
 ?>
 
@@ -104,9 +116,8 @@ $rol = $userInfo['rol'] ?? null;
 
         .update-container {
             background-color: white;
-            padding: 20px;
-            margin: 50px auto;
-            width: 350px;
+            padding: 20px;            
+            width: 600px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
@@ -209,6 +220,11 @@ $rol = $userInfo['rol'] ?? null;
                 <label for="fecha_nacimiento">Fecha de Nacimiento</label>
                 <input type="date" id="fecha_nacimiento" name="fecha_nacimiento" value="<?php echo htmlspecialchars($fechaNacimiento); ?>" <?php echo $fechaNacimiento ? 'readonly' : 'required'; ?>>
             </div>
+            <div class="form-group">
+                <label for="dni">DNI</label>
+                <input type="text" id="dni" name="dni" value="<?php echo htmlspecialchars($dni); ?>" <?php echo $dni ? 'readonly' : 'required'; ?>>
+            </div>
+            
             <div class="form-group">
                 <label for="rol">Rol</label>
                 <select id="rol" name="rol" <?php echo $rol ? 'disabled' : 'required'; ?>>

@@ -8,7 +8,7 @@ $nickname = $_SESSION['nickname'];
 
 // Consultar el nombre completo del usuario
 $stmt = $pdo->prepare("
-    SELECT ip.nombre_completo 
+    SELECT ip.nombre_completo, ip.estado 
     FROM usuarios u
     LEFT JOIN informacion_personal ip ON u.nickname = ip.nickname
     WHERE u.nickname = :nickname
@@ -16,6 +16,11 @@ $stmt = $pdo->prepare("
 $stmt->bindParam(':nickname', $nickname);
 $stmt->execute();
 $userInfo = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$userInfo || $userInfo['estado'] !== 'Activo') {
+    header("Location: login.php?error=not_active");
+    exit();
+}
 
 // Establecer el nombre completo si está disponible
 $nombreCompleto = $userInfo ? $userInfo['nombre_completo'] : "Información no disponible";
@@ -52,7 +57,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home'; // 'home' será el valor 
         <p class="user-info">
             ¡HOLA! <br>
             <?php echo htmlspecialchars($nombreCompleto); ?>
-        </p>        
+        </p>
     </header>
     <div class="contenedor contenedor-grid">
         <nav class="nav">
@@ -63,7 +68,25 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home'; // 'home' será el valor 
                         <img src="../css/assets/homemedicine.svg" class="list__img">
                         <a href="dashboard.php" class="nav__link">Home</a>
                     </div>
-                </li>                             
+                </li>
+                <li class="list__item">
+                    <div class="list__button">
+                        <img src="../css/assets/leave.svg" class="list__img">
+                        <a href="?page=documents" class="nav__link">Documentación SB</a>
+                    </div>
+                </li>
+                <li class="list__item">
+                    <div class="list__button">
+                        <img src="../css/assets/leave.svg" class="list__img">
+                        <a href="?page=predocuments" class="nav__link">Pre-Documentación</a>
+                    </div>
+                </li>
+                <li class="list__item">
+                    <div class="list__button">
+                        <img src="../css/assets/staff.svg" class="list__img">
+                        <a href="?page=update" class="nav__link">Actualizar Contacto</a>
+                    </div>
+                </li>
                 <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/schedulee.svg" class="list__img">
@@ -87,7 +110,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home'; // 'home' será el valor 
                         <img src="../css/assets/resumegeneral.svg" class="list__img">
                         <a href="#" class="nav__link">Resumen x Año</a>
                     </div>
-                </li>                
+                </li>
                 <li class="list__item list__item--click">
                     <div class="list__button list__button--click">
                         <img src="../css/assets/sales.svg" class="list__img">
@@ -95,7 +118,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home'; // 'home' será el valor 
                         <img src="../css/assets/arrow.svg" class="list__arrow">
                     </div>
 
-                    <ul class="list__show">                       
+                    <ul class="list__show">
                         <li class="list__inside">
                             <a href="#" class="nav__link nav__link--inside">Control
                                 de Ventas</a>
@@ -138,41 +161,50 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home'; // 'home' será el valor 
                 </li>
                 <li class="list__item">
                     <div class="list__button">
-                        <img src="../css/assets/staff.svg" class="list__img">
-                        <a href="?page=update" class="nav__link">Actualizar Contacto</a>
+                        <img src="../css/assets/status.svg" class="list__img">
+                        <a href="?page=status" class="nav__link">Actualizar Estado</a>
                     </div>
-                </li>                     
+                </li>
                 <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/message.svg" class="list__img">
                         <a href="infograma.php" class="nav__link">Información</a>
                     </div>
                 </li>
-                           
+
             </ul>
         </nav>
         <aside class="sidebar-1">
-        <?php
+            <?php
             // Cargar contenido dinámico según la página
             switch ($page) {
                 case 'update':
                     include('dashboard/update.php');
                     break;
+                case 'documents':
+                    include('dashboard/documents.php');
+                    break;
+                case 'predocuments':
+                    include('dashboard/predocuments.php');
+                    break;
                 case 'birthday':
                     include('dashboard/birthday.php');
+                    break;
+                case 'status':
+                    include('dashboard/status.php');
                     break;
                 default:
                     include('dashboard/home.php');
                     break;
             }
-            ?>            
+            ?>
         </aside>
     </div>
     <div class="user-info">
         <a href="logout.php">Cerrar Sesión</a>
     </div>
     <script src="../js/dashboard.js"></script>
-    
+
 </body>
 
 </html>
