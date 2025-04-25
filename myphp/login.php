@@ -73,7 +73,7 @@
             <div class="toggle">
                 <div class="toggle-panel toggle-left">
                     <h1>¡Bienvenido!</h1>
-                    <p>Aprovecha todas las funciones del sitio para ver los perfiles de los animales disponibles, leer sus historias y contactar con refugios. ¡Tu nuevo compañero te está esperando!</p>
+                    <p>Solo los miembros de la familia Solo Boticas pueden registrarse. ¡Valida tu ingreso y crea tu contraseña! 🎉🧪💊🚑💙</p>
                     <button class="hidden" id="login">Iniciar Sesión</button>
                 </div>
                 <div class="toggle-panel toggle-right">
