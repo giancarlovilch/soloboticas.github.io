@@ -33,7 +33,10 @@ if (isset($_POST['login'])) {
     $password = $_POST['password'];
 
     // Buscar el usuario por su nickname
-    $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE nickname = :nickname");
+    $stmt = $pdo->prepare("SELECT u.*, ip.estado 
+        FROM usuarios u
+        LEFT JOIN informacion_personal ip ON u.nickname = ip.nickname
+        WHERE u.nickname = :nickname");
     $stmt->bindParam(':nickname', $nickname);
     $stmt->execute();
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -41,10 +44,19 @@ if (isset($_POST['login'])) {
     if ($user) {
         // Si el usuario existe, verificar la contraseña
         if (password_verify($password, $user['password'])) {
-            // Iniciar sesión si la contraseña es correcta        
-            $_SESSION['nickname'] = $user['nickname'];        
+            // Verificar estado
+            if ($user['estado'] === 'Retirado') {
+                $_SESSION['error'] = "Tu está deshabilitada. Contacta al administrador.";
+                header("Location: login.php");
+                exit();
+            } elseif ($user['estado'] === 'Pendiente') {
+                $_SESSION['error'] = "Tu cuenta está pendiente de aprobación.";
+                header("Location: login.php");
+                exit();
+            }
 
-            // Redirigir al usuario al área protegida
+            // Iniciar sesión si todo es correcto
+            $_SESSION['nickname'] = $user['nickname'];
             header('Location: dashboard.php');
             exit();
         } else {
@@ -60,4 +72,3 @@ if (isset($_POST['login'])) {
         exit();
     }
 }
-?>
