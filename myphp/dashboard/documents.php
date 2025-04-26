@@ -221,7 +221,7 @@ $tareas_completadas = $pdo->query("
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
+            /* padding: 20px; */
         }
 
         .header {

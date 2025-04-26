@@ -266,22 +266,27 @@ function obtenerNombreDia($fecha)
     <!-- <link rel="stylesheet" href="../css/normalize.css"> -->
     <link rel="stylesheet" href="../css/asistencia.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         /* Estilos generales mejorados */
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
+            /* padding: 20px; */
         }
 
         /* Estilo para el título principal */
         .page-header {
             display: flex;
-            justify-content: space-between;
+            flex-wrap: wrap;
+            justify-content: flex-start;
             align-items: center;
             margin-bottom: 30px;
             padding-bottom: 15px;
             border-bottom: 1px solid #e0e0e0;
+            gap: 10px;
+            margin: 10px;
+            margin-top: 20px;
         }
 
         .page-title {
@@ -290,6 +295,7 @@ function obtenerNombreDia($fecha)
             margin: 0;
             position: relative;
             padding-left: 20px;
+            flex-grow: 1;
         }
 
         .page-title:before {
@@ -325,6 +331,14 @@ function obtenerNombreDia($fecha)
             flex-wrap: wrap;
         }
 
+        @media (max-width: 700px) {
+            .month-selector {
+                flex-direction: column;
+
+
+            }
+        }
+
         .month-selector select {
             padding: 8px 12px;
             border: 1px solid #ddd;
@@ -358,6 +372,20 @@ function obtenerNombreDia($fecha)
             display: flex;
             gap: 10px;
             margin-left: auto;
+        }
+
+        @media (max-width: 700px) {
+            .month-actions {
+                flex-direction: column;
+                align-items: stretch;
+                margin-left: 0;
+            }
+        }
+
+        .month-actions button {
+            background-color: rgb(141, 22, 81);
+            padding: 12px 20px;
+            text-transform: uppercase;
         }
 
         .btn-declare {
@@ -401,23 +429,26 @@ function obtenerNombreDia($fecha)
             color: white;
         }
 
-        .page-header {
-            display: flex;
-            justify-content: flex-start;
-            /* Cambiado de space-between a flex-start */
+        .btn-print {
+            background-color: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: inline-flex;
             align-items: center;
-            margin-bottom: 30px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #e0e0e0;
+            gap: 5px;
+            transition: background-color 0.2s;
         }
 
-        .page-title {
-            margin: 0;
-            position: relative;
-            padding-left: 20px;
-            flex-grow: 1;
-            /* Para que el título ocupe el espacio restante */
+        .btn-print:hover {
+            background-color: #5a6268;
         }
+
+        /* Para que el título ocupe el espacio restante */
+
 
         /* Resto de tus estilos existentes (attendance-list, summary-card, etc.) */
         /* ... (mantener los estilos existentes pero puedes aplicar mejoras similares) ... */
@@ -454,7 +485,7 @@ function obtenerNombreDia($fecha)
         <!-- Selector de mes/año mejorado -->
         <div class="month-selector-container">
             <form method="get" class="month-selector">
-                <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%; flex-wrap: wrap;justify-content: center;">
                     <i class="fas fa-calendar-alt" style="color: #3498db;"></i>
                     <select name="mes">
                         <?php for ($m = 1; $m <= 12; $m++): ?>
@@ -486,6 +517,10 @@ function obtenerNombreDia($fecha)
                             <i class="fas fa-info-circle"></i> Bloqueado
                         </div>
                     <?php endif; ?>
+
+                    <button onclick="generarPDF()" class="btn-print">
+                        <i class="fas fa-file-pdf"></i> Generar PDF
+                    </button>
                 </div>
             </form>
         </div>
@@ -509,6 +544,7 @@ function obtenerNombreDia($fecha)
                 </div>
             </div>
         </div>
+
 
         <!-- Resumen del mes -->
         <!-- Resumen del mes - diseño mejorado -->
@@ -603,7 +639,6 @@ function obtenerNombreDia($fecha)
                                 echo '<td colspan="5">'; // Aumentar el colspan a 5
                                 echo '<button class="add-btn" onclick="registrarAsistencia(\'' . $fecha . '\')">Registrar</button>';
                                 echo '</td>';
-                                
                             } else {
                                 echo '<td colspan="6">...' . ($esFuturo ? '...' : '') . '</td>'; // Aumentar el colspan a 6
                             }
@@ -808,6 +843,72 @@ function obtenerNombreDia($fecha)
                     });
             } else {
                 alert('Contraseña incorrecta');
+            }
+        }
+        // Agrega esto al final, con los otros scripts
+        function generarPDF() {
+            // Verificar si html2pdf está disponible
+            if (typeof html2pdf === 'undefined') {
+                alert('La biblioteca para generar PDF no se cargó correctamente. Por favor recarga la página.');
+                console.error('html2pdf no está definido');
+                return;
+            }
+
+            // Mostrar feedback al usuario
+            const btn = document.querySelector('.btn-print');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando PDF...';
+            btn.disabled = true;
+
+            try {
+                // Seleccionar el contenido a exportar
+                const element = document.querySelector('main.container');
+
+                // Opciones de configuración
+                const opt = {
+                    margin: [10, 10, 10, 10],
+                    filename: `asistencias_${<?= $mesSeleccionado ?>}_${<?= $anioSeleccionado ?>}.pdf`,
+                    image: {
+                        type: 'jpeg',
+                        quality: 1
+                    },
+                    html2canvas: {
+                        scale: 2,
+                        scrollY: 0,
+                        useCORS: true,
+                        allowTaint: true,
+                        logging: true
+                    },
+                    jsPDF: {
+                        unit: 'mm',
+                        format: 'a3',
+                        orientation: 'portrait',
+                        compressPDF: true
+                    }
+                };
+
+                // Generar y descargar el PDF
+                html2pdf()
+                    .set(opt)
+                    .from(element)
+                    .save()
+                    .then(() => {
+                        console.log('PDF generado con éxito');
+                    })
+                    .catch(err => {
+                        console.error('Error al generar PDF:', err);
+                        alert('Error al generar el PDF: ' + err.message);
+                    })
+                    .finally(() => {
+                        btn.innerHTML = originalHTML;
+                        btn.disabled = false;
+                    });
+
+            } catch (error) {
+                console.error('Error en generarPDF:', error);
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                alert('Error inesperado: ' + error.message);
             }
         }
     </script>

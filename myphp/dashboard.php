@@ -93,24 +93,24 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home'; // 'home' será el valor 
                         <a href="asistencias.php" class="nav__link">Asistencias</a>
                     </div>
                 </li>
-                <li class="list__item">
+                <!-- <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/win-svgrepo-com.svg" class="list__img">
                         <a href="#" class="nav__link">Ranking Ventas</a>
                     </div>
-                </li>
-                <li class="list__item">
+                </li> -->
+                <!-- <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/reportt.svg" class="list__img">
                         <a href="#" class="nav__link">Ranking Cajeras</a>
                     </div>
-                </li>
-                <li class="list__item">
+                </li> -->
+                <!-- <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/resumegeneral.svg" class="list__img">
                         <a href="#" class="nav__link">Resumen x Año</a>
                     </div>
-                </li>
+                </li> -->
                 <li class="list__item list__item--click">
                     <div class="list__button list__button--click">
                         <img src="../css/assets/sales.svg" class="list__img">
@@ -146,13 +146,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home'; // 'home' será el valor 
                         <a href="https://zfrmz.com/UN7izVUCr6VJU1XvB6PY" class="nav__link">Registro de Trabajadores</a>
                     </div>
                 </li> -->
-                <li class="list__item">
-                    <div class="list__button">
-                        <img src="../css/assets/manual.svg" class="list__img">
-                        <a href="https://mega.nz/folder/2YIzVawS#2KvgBy7oW9nuoF0ZMLy8bA" class="nav__link">Manuales y
-                            Formatos</a>
-                    </div>
-                </li>
+
                 <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/security.svg" class="list__img">
@@ -163,6 +157,13 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home'; // 'home' será el valor 
                     <div class="list__button">
                         <img src="../css/assets/status.svg" class="list__img">
                         <a href="?page=status" class="nav__link">Actualizar Estado</a>
+                    </div>
+                </li>
+                <li class="list__item">
+                    <div class="list__button">
+                        <img src="../css/assets/manual.svg" class="list__img">
+                        <a href="https://mega.nz/folder/2YIzVawS#2KvgBy7oW9nuoF0ZMLy8bA" class="nav__link">Manuales y
+                            Formatos</a>
                     </div>
                 </li>
                 <li class="list__item">

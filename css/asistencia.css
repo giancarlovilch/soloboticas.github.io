@@ -1,7 +1,7 @@
 /* Estilos para la tabla de asistencias */
 .attendance-list {
     width: 100%;
-    margin: 20px auto;
+    margin: auto;
     border-collapse: separate;
     border-spacing: 0;
     font-size: 0.9em;
@@ -9,18 +9,24 @@
     border-radius: 8px;
     overflow: hidden;
 }
+@media (max-width: 700px) {
+    .attendance-list {
+        font-size: 0.5em;        
+    }
+}
 
 .attendance-list th {
     background-color: #2c3e50;
     color: white;
-    padding: 12px 8px;
+    padding: 12px 0px;
     text-align: center;
     font-weight: 500;
     border: none;
 }
 
+
 .attendance-list td {
-    padding: 10px 8px;
+    padding: 3px 0px;
     text-align: center;
     border-bottom: 1px solid #e0e0e0;
     background-color: white;
@@ -47,7 +53,7 @@
 /* Estilos para los inputs */
 .editable-time, .editable-number {
     width: 80px;
-    padding: 6px;
+    /* padding: 6px; */
     border: 1px solid #ddd;
     border-radius: 4px;
     text-align: center;
