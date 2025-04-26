@@ -90,7 +90,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home'; // 'home' será el valor 
                 <li class="list__item">
                     <div class="list__button">
                         <img src="../css/assets/schedulee.svg" class="list__img">
-                        <a href="#" class="nav__link">Horarios</a>
+                        <a href="asistencias.php" class="nav__link">Asistencias</a>
                     </div>
                 </li>
                 <li class="list__item">

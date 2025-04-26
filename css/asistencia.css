@@ -1,0 +1,105 @@
+/* Estilos para la tabla de asistencias */
+.attendance-list {
+    width: 100%;
+    margin: 20px auto;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9em;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.attendance-list th {
+    background-color: #2c3e50;
+    color: white;
+    padding: 12px 8px;
+    text-align: center;
+    font-weight: 500;
+    border: none;
+}
+
+.attendance-list td {
+    padding: 10px 8px;
+    text-align: center;
+    border-bottom: 1px solid #e0e0e0;
+    background-color: white;
+}
+
+.attendance-list tr:last-child td {
+    border-bottom: none;
+}
+
+.attendance-list tr:hover td {
+    background-color: #f5f7fa;
+}
+
+.attendance-list .locked-row td {
+    background-color: #f8f9fa;
+    color: #95a5a6;
+}
+
+.attendance-list .current-day td {
+    background-color: #e8f4fc;
+    font-weight: 500;
+}
+
+/* Estilos para los inputs */
+.editable-time, .editable-number {
+    width: 80px;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.9em;
+    font-family: inherit;
+}
+
+.editable-number {
+    width: 60px;
+}
+
+/* Estilos para los botones */
+.add-btn, .delete-btn {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.add-btn {
+    background-color: #3498db;
+    color: white;
+}
+
+.add-btn:hover {
+    background-color: #2980b9;
+}
+
+.delete-btn {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.delete-btn:hover {
+    background-color: #c0392b;
+}
+
+/* Estilo para la columna de modificación */
+.modification-date {
+    font-size: 0.85em;
+    color: #7f8c8d;
+}
+
+.action-buttons {
+    min-width: 100px;
+}
+
+/* Estilo para días futuros */
+.future-day {
+    color: #bdc3c7;
+    font-style: italic;
+}
