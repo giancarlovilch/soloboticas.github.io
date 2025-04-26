@@ -262,11 +262,13 @@ function obtenerNombreDia($fecha)
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Asistencias - <?= htmlspecialchars($usuario['nombre_completo']) ?></title>
+    <title>GRUPO KGyR S.A.C - <?= htmlspecialchars($usuario['nombre_completo']) ?></title>
     <!-- <link rel="stylesheet" href="../css/normalize.css"> -->
     <link rel="stylesheet" href="../css/asistencia.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="icon" type="image/x-icon" href="../img/img_1/SB007.ico">
+    <meta property="og:description" content="Salud y cuidado de familia a familia. ¡Bienvenidos a SoloBoticas!" />
     <style>
         /* Estilos generales mejorados */
         .container {
@@ -614,7 +616,7 @@ function obtenerNombreDia($fecha)
                         }
 
                         echo '<tr class="' . trim($claseFila) . '">';
-                        echo '<td>' . $fecha . '</td>';
+                        echo '<td>' . date('d-m', strtotime($fecha)) . '</td>';
                         echo '<td>' . $nombreDia . '</td>';
 
                         if ($asistenciaDia) {
