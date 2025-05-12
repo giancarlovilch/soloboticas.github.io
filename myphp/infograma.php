@@ -82,6 +82,13 @@ if (!isset($_SESSION['nickname'])) {
                     <td></td>
                     <td></td>
                 </tr>
+                <tr>
+                    <td>SB7</td>
+                    <td>1917136746041</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
             </tbody>
         </table>
 
