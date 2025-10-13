@@ -1,5 +1,5 @@
 <?php
-// $host = 'localhost'; // o la dirección de tu servidor
+// $host = '127.0.0.1:3308'; // o la dirección de tu servidor
 // $dbname = 'soloboticas';
 // $username = 'root'; // tu usuario de base de datos
 // $password = ''; // tu contraseña de base de datos

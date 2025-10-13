@@ -1,0 +1,44 @@
+{
+  "respuestas": [
+    {
+      "usuario": "empleado01",
+      "respuestas": ["B","A","B","C","C","A","B","A","B","A","C","A","B","A","A","D","B","C","A","A"]
+    },
+    {
+      "usuario": "empleado02",
+      "respuestas": ["B","A","C","C","C","A","B","B","B","A","C","A","B","A","A","D","B","C","A","A"]
+    },
+    {
+      "usuario": "empleado03",
+      "respuestas": ["B","B","B","D","C","B","B","A","C","B","C","A","B","A","B","D","B","C","A","B"]
+    },
+    {
+      "usuario": "empleado04",
+      "respuestas": ["B","A","B","C","C","B","B","A","B","A","C","A","B","A","A","D","B","C","A","A"]
+    },
+    {
+      "usuario": "empleado05",
+      "respuestas": ["B","A","C","C","C","B","B","A","B","B","C","A","B","A","A","D","B","C","A","A"]
+    },
+    {
+      "usuario": "empleado06",
+      "respuestas": ["B","A","B","C","C","A","B","A","B","A","C","A","B","A","A","D","B","C","A","A"]
+    },
+    {
+      "usuario": "empleado07",
+      "respuestas": ["B","B","B","C","C","B","B","A","B","A","C","A","B","A","A","D","B","C","A","A"]
+    },
+    {
+      "usuario": "empleado08",
+      "respuestas": ["B","A","B","C","C","A","B","B","B","A","C","A","B","A","A","D","B","C","A","A"]
+    },
+    {
+      "usuario": "empleado09",
+      "respuestas": ["B","A","C","C","C","A","B","A","B","A","C","A","B","A","A","D","B","C","A","A"]
+    },
+    {
+      "usuario": "empleado10",
+      "respuestas": ["B","A","B","C","C","A","B","A","B","A","C","A","B","A","A","D","B","C","A","A"]
+    }
+  ]
+}

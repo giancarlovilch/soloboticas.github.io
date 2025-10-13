@@ -1,0 +1,106 @@
+{
+  "titulo": "Encuesta sobre el Control Económico en la Cadena SOLO BOTICAS",
+  "descripcion": "Responde las siguientes preguntas relacionadas con los procesos diarios de registro y control del flujo económico.",
+  "preguntas": [
+    {
+      "id": 1,
+      "texto": "¿Con qué frecuencia realiza el registro de ingresos y egresos en su botica?",
+      "opciones": ["Varias veces al día", "Una vez al final del día", "Solo cuando hay cambios importantes", "No llevo un registro regular"]
+    },
+    {
+      "id": 2,
+      "texto": "¿Dónde se registran actualmente los movimientos económicos?",
+      "opciones": ["En hojas de cálculo (Excel o similares)", "En cuadernos físicos", "En un sistema interno propio", "No se registran formalmente"]
+    },
+    {
+      "id": 3,
+      "texto": "¿Qué tan confiables considera los registros manuales realizados actualmente?",
+      "opciones": ["Muy confiables", "Medianamente confiables", "Poco confiables", "Nada confiables"]
+    },
+    {
+      "id": 4,
+      "texto": "¿Con qué frecuencia se detectan diferencias entre el dinero físico y los registros de caja?",
+      "opciones": ["Nunca", "Rara vez", "A veces", "Con frecuencia"]
+    },
+    {
+      "id": 5,
+      "texto": "¿Cuánto tiempo demora el arqueo diario de caja en promedio?",
+      "opciones": ["Menos de 10 minutos", "Entre 10 y 30 minutos", "Entre 30 minutos y 1 hora", "Más de 1 hora"]
+    },
+    {
+      "id": 6,
+      "texto": "¿Quién realiza la verificación del arqueo diario?",
+      "opciones": ["El mismo encargado de caja", "Un supervisor o administrador", "Un auditor interno o contador", "No se realiza verificación formal"]
+    },
+    {
+      "id": 7,
+      "texto": "¿Cómo se lleva el control del dinero de los agentes BCP?",
+      "opciones": ["Manual (anotado por día)", "En hoja o registro aparte", "Integrado al flujo de caja", "No se controla directamente"]
+    },
+    {
+      "id": 8,
+      "texto": "¿Qué tipo de errores ocurren con más frecuencia en el proceso financiero diario?",
+      "opciones": ["Omisión de registros", "Cálculos erróneos", "Pérdida de comprobantes", "Duplicidad de ingresos o egresos"]
+    },
+    {
+      "id": 9,
+      "texto": "¿Existen procedimientos para conciliar el dinero disponible con los depósitos bancarios?",
+      "opciones": ["Sí, diariamente", "Sí, semanalmente", "Solo al cierre del mes", "No existen procedimientos definidos"]
+    },
+    {
+      "id": 10,
+      "texto": "¿Quién realiza actualmente la conciliación de los montos de caja?",
+      "opciones": ["Encargado de la botica", "Administrador zonal", "Área contable central", "No se realiza conciliación regular"]
+    },
+    {
+      "id": 11,
+      "texto": "¿Cómo se clasifica la información económica actualmente?",
+      "opciones": ["Por tipo (ingreso/egreso)", "Por sucursal", "Por fecha únicamente", "No existe clasificación definida"]
+    },
+    {
+      "id": 12,
+      "texto": "¿Qué información considera más importante en un reporte financiero diario?",
+      "opciones": ["Total de ingresos y egresos", "Saldo final en caja", "Operaciones por agente BCP", "Balance general por sucursal"]
+    },
+    {
+      "id": 13,
+      "texto": "¿Qué formato de visualización le resulta más útil para interpretar la información económica?",
+      "opciones": ["Tablas detalladas", "Gráficos comparativos", "Reportes resumidos con totales", "Alertas o indicadores visuales"]
+    },
+    {
+      "id": 14,
+      "texto": "¿Le gustaría que el sistema muestre alertas automáticas en caso de faltantes o sobrantes?",
+      "opciones": ["Sí, inmediatamente", "Sí, al cierre del día", "No es necesario", "No estoy seguro"]
+    },
+    {
+      "id": 15,
+      "texto": "¿Qué frecuencia de generación de reportes considera más adecuada?",
+      "opciones": ["Diaria", "Semanal", "Mensual", "Según necesidad"]
+    },
+    {
+      "id": 16,
+      "texto": "¿Cuáles serían los beneficios más importantes de automatizar el control financiero?",
+      "opciones": ["Ahorro de tiempo", "Reducción de errores", "Transparencia", "Todos los anteriores"]
+    },
+    {
+      "id": 17,
+      "texto": "¿Qué nivel de acceso debería tener cada usuario?",
+      "opciones": ["Todos pueden editar", "Solo encargados registran", "Solo gerencia accede a reportes", "No lo tengo claro"]
+    },
+    {
+      "id": 18,
+      "texto": "¿Con qué frecuencia la gerencia solicita reportes consolidados?",
+      "opciones": ["A diario", "Semanalmente", "Mensualmente", "Solo cuando se requiere"]
+    },
+    {
+      "id": 19,
+      "texto": "¿Considera que un sistema centralizado mejoraría el control económico?",
+      "opciones": ["Sí, significativamente", "Sí, en algunos aspectos", "No tendría mucho impacto", "No lo sé"]
+    },
+    {
+      "id": 20,
+      "texto": "¿Estaría dispuesto a capacitarse para usar una nueva plataforma digital?",
+      "opciones": ["Sí, totalmente", "Sí, con orientación inicial", "Solo si es necesario", "Prefiero métodos actuales"]
+    }
+  ]
+}
