@@ -19,7 +19,7 @@
     <?php
     $menu = [
         'PRINCIPAL' => '/',
-        'INTRANET' => '/myphp/login.php'        
+        'INTRANET' => '/myphp/login_temp.php'        
     ];
 
     $locations = [
