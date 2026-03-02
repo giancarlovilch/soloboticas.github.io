@@ -1,8 +1,7 @@
 <?php
-session_start();
+include('session_config.php');
 include('db_connection.php');
-include('session_temp.php');
-// include('session_manager.php');
+include('session_manager.php');
 
 // Obtener el nickname del usuario logeado
 $nickname = $_SESSION['nickname'];

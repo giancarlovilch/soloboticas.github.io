@@ -1,5 +1,6 @@
 <?php
 // session_manager.php
+include('session_config.php');
 
 // Verificar si el usuario está logeado
 if (!isset($_SESSION['nickname'])) {

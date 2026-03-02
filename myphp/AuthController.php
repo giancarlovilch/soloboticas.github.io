@@ -1,5 +1,5 @@
 <?php
-session_start();
+include('session_config.php');
 include('db_connection.php');
 
 // Verificar si el formulario es de registro
@@ -57,6 +57,7 @@ if (isset($_POST['login'])) {
 
             // Iniciar sesión si todo es correcto
             $_SESSION['nickname'] = $user['nickname'];
+            $_SESSION['last_activity'] = time();
             header('Location: dashboard.php');
             exit();
         } else {
