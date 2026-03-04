@@ -1,5 +1,5 @@
 <?php
-session_start();
+include('session_config.php');
 include('db_connection.php');
 include('session_manager.php');
 // Verificar si el usuario está logeado
