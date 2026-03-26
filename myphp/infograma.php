@@ -40,24 +40,24 @@ if (!isset($_SESSION['nickname'])) {
                     <td>1732831</td>
                     <td>5197733</td>
                 </tr>
-                <tr>
+                <!-- <tr>
                     <td>SB1</td>
                     <td>1911987150021</td>
                     <td>&nbsp;</td>
                     <td>&nbsp;</td>
                     <td>&nbsp;</td>
-                </tr>
+                </tr> -->
                 <tr>
                     <td>SB2</td>
                     <td>1919412206086</td>
-                    <td>016078323 (Claro)</td>
+                    <td>10472389144 (FiberPro)</td>                    
                     <td>&nbsp;</td>
                     <td>&nbsp;</td>
                 </tr>
                 <tr>
                     <td>SB3</td>
                     <td>1919284055031</td>
-                    <td>016275223 (Claro)</td>
+                    <td>10472389144 (WIN)</td>
                     <td>0966235</td>
                     <td>&nbsp;</td>
                 </tr>
