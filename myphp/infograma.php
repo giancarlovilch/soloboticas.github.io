@@ -50,7 +50,7 @@ if (!isset($_SESSION['nickname'])) {
                 <tr>
                     <td>SB2</td>
                     <td>1919412206086</td>
-                    <td>10472389144 (FiberPro)</td>                    
+                    <td>47238914 (FiberPro)</td>                    
                     <td>&nbsp;</td>
                     <td>&nbsp;</td>
                 </tr>
