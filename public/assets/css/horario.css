@@ -1,0 +1,372 @@
+/* Horarios Semanales tipo Cine — Solo Boticas */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --hor-dark:   #1e293b;
+    --hor-bg:     #f1f5f9;
+    --hor-card:   #ffffff;
+    --hor-border: #e2e8f0;
+    --hor-muted:  #64748b;
+    --hor-teal:   #0097A7;
+    --hor-ok:     #059669;
+    --hor-red:    #dc2626;
+    --hor-warn:   #d97706;
+    --sala-color: #0097A7; /* override per sala */
+}
+
+body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg); color: var(--hor-dark); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+/* ── HEADER ─────────────────────────────────────────── */
+.hor-header {
+    background: var(--hor-dark); color: #fff;
+    height: 60px; padding: 0 1.5rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    position: sticky; top: 0; z-index: 200;
+}
+.hor-header__brand { display: flex; align-items: center; gap: 12px; }
+.hor-header__logo  {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--hor-teal), #00BCD4);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.85rem; color: #fff; flex-shrink: 0;
+}
+.hor-header__company { font-size: 0.6rem; color: #94a3b8; text-transform: uppercase; letter-spacing: .07em; }
+.hor-header__app     { font-size: 0.95rem; font-weight: 700; color: #fff; }
+.hor-header__right   { display: flex; align-items: center; gap: .65rem; }
+.hor-header__user    { font-size: 0.78rem; color: #94a3b8; }
+.hor-btn-back {
+    padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 500;
+    border: 1px solid rgba(255,255,255,0.25); color: #fff; text-decoration: none;
+    transition: background .15s;
+}
+.hor-btn-back:hover { background: rgba(255,255,255,0.1); }
+
+/* ── MAIN ─────────────────────────────────────────── */
+.hor-main {
+    max-width: 1100px; margin: 1.5rem auto;
+    padding: 0 1rem 4rem;
+    display: flex; flex-direction: column; gap: 1.5rem;
+}
+
+/* ── BOTONES ─────────────────────────────────────────── */
+.hor-btn { display: inline-flex; align-items: center; gap: .35rem; padding: .45rem 1rem; border-radius: 7px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; text-decoration: none; transition: all .15s; }
+.hor-btn--primary  { background: var(--hor-teal); color: #fff; }
+.hor-btn--primary:hover  { background: #007b8a; }
+.hor-btn--outline  { background: transparent; color: rgba(255,255,255,0.85); border-color: rgba(255,255,255,0.3); }
+.hor-btn--outline:hover  { background: rgba(255,255,255,0.1); }
+.hor-btn--danger   { background: transparent; color: #fca5a5; border-color: rgba(252,165,165,0.4); font-size: 0.78rem; }
+.hor-btn--danger:hover   { background: rgba(252,165,165,0.1); }
+
+/* ── SEMANA HEADER ─────────────────────────────────── */
+.hor-semana-header {
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    background: var(--hor-card); border: 1px solid var(--hor-border);
+    border-radius: 12px; padding: 1.1rem 1.4rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+.hor-semana-info { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; flex: 1; }
+.hor-semana-titulo { font-size: 1.1rem; font-weight: 700; color: var(--hor-dark); }
+.hor-semana-estado { padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+.estado-abierta { background: #d1fae5; color: #065f46; }
+.estado-cerrada { background: #f1f5f9; color: var(--hor-muted); }
+.hor-cierre-info { font-size: 0.75rem; color: var(--hor-muted); }
+
+.hor-semana-nav { display: flex; gap: .4rem; flex-wrap: wrap; }
+.hor-semana-pill {
+    padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 500;
+    border: 1px solid var(--hor-border); color: var(--hor-muted); text-decoration: none;
+    transition: all .15s;
+}
+.hor-semana-pill:hover { border-color: var(--hor-teal); color: var(--hor-teal); }
+.hor-semana-pill.active { background: var(--hor-teal); color: #fff; border-color: var(--hor-teal); }
+
+/* ── SALA (local) ─────────────────────────────────── */
+.hor-sala {
+    background: var(--hor-card);
+    border: 1px solid var(--hor-border);
+    border-top: 4px solid var(--sala-color);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.hor-sala__titulo {
+    padding: 1rem 1.4rem;
+    font-size: 1.05rem; font-weight: 700; color: var(--sala-color);
+    display: flex; align-items: center; gap: .5rem;
+    border-bottom: 1px solid var(--hor-border);
+    background: color-mix(in srgb, var(--sala-color) 5%, white);
+}
+.hor-sala__icono { font-size: 1.2rem; }
+
+/* ── TURNO ─────────────────────────────────────────── */
+.hor-turno-block { padding: 1rem 1.4rem 1.25rem; }
+.hor-turno-block + .hor-turno-block { border-top: 1px dashed var(--hor-border); padding-top: 1.25rem; }
+.hor-turno-label {
+    font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--hor-muted); margin-bottom: .75rem;
+    display: flex; align-items: center; gap: .4rem;
+}
+
+/* ── GRILLA ─────────────────────────────────────────── */
+.hor-grid { display: flex; flex-direction: column; gap: .35rem; }
+
+.hor-grid__header,
+.hor-grid__row {
+    display: grid;
+    grid-template-columns: minmax(60px, 110px) repeat(7, minmax(0, 1fr));
+    gap: .25rem;
+}
+
+.hor-grid__dia-header {
+    display: flex; flex-direction: column; align-items: center;
+    padding: .3rem .2rem;
+}
+.hor-dia-nombre { font-size: 0.72rem; font-weight: 700; color: var(--hor-dark); }
+.hor-dia-fecha  { font-size: 0.62rem; color: var(--hor-muted); }
+
+
+.hor-grid__rol-label {
+    display: flex; align-items: center; gap: .35rem;
+    font-size: 0.76rem; font-weight: 600;
+    color: var(--rol-color, var(--hor-dark));
+    padding: .3rem .5rem .3rem 0;
+    white-space: nowrap;
+}
+
+.hor-grid__row--opcional .hor-grid__rol-label { opacity: .7; }
+
+.hor-slot-num {
+    background: #e2e8f0; color: var(--hor-muted);
+    border-radius: 50%; width: 16px; height: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.62rem; font-weight: 700; flex-shrink: 0;
+}
+
+.hor-opcional-badge {
+    font-size: 0.58rem; background: #fef3c7; color: #92400e;
+    border-radius: 4px; padding: 1px 4px; font-weight: 600;
+}
+
+/* ── ASIENTOS ─────────────────────────────────────── */
+.hor-asiento {
+    height: 44px;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(0.55rem, 1.3vw, 0.72rem); font-weight: 600;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s, background .12s, border-color .12s;
+    text-align: center; padding: .15rem .2rem;
+    position: relative; overflow: visible;
+    word-break: break-word; line-height: 1.2;
+    /* El borde usa el color del rol heredado del row padre */
+    border: 2px solid var(--rol-color, #e2e8f0);
+    user-select: none;
+}
+.hor-asiento__nombre { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.hor-asiento--mio    .hor-asiento__nombre { font-weight: 700; color: var(--hor-dark); }
+.hor-asiento--ocupado .hor-asiento__nombre { font-weight: 350; color: #94a3b8; }
+
+/* Botón de asignación para admins (aparece en hover del slot libre) */
+.hor-asiento__btn-picker {
+    position: absolute;
+    top: -4px; right: -4px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--hor-teal);
+    color: #fff;
+    font-size: 0.55rem;
+    line-height: 16px; text-align: center;
+    border: none; cursor: pointer; padding: 0;
+    opacity: 0;
+    transition: opacity .15s, transform .15s;
+    z-index: 10;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.hor-asiento--libre:hover .hor-asiento__btn-picker {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* Libre: fondo claro con el color del rol visible */
+.hor-asiento--libre {
+    background: color-mix(in srgb, var(--rol-color, #e2e8f0) 8%, white);
+    color: var(--rol-color, #94a3b8);
+    opacity: .75;
+}
+.hor-asiento--libre:hover {
+    background: color-mix(in srgb, var(--rol-color, #e2e8f0) 18%, white);
+    opacity: 1;
+    transform: scale(1.04);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--rol-color, #94a3b8) 30%, transparent);
+}
+
+/* Mío: borde del rol, fondo suave del local */
+.hor-asiento--mio {
+    background: color-mix(in srgb, var(--sala-color) 12%, white);
+    border-color: var(--rol-color, var(--sala-color));
+    color: var(--hor-dark);
+    font-weight: 700;
+    opacity: 1;
+}
+.hor-asiento--mio:hover {
+    background: color-mix(in srgb, var(--sala-color) 20%, white);
+    transform: scale(1.04);
+}
+
+/* Ocupado por otro: borde del rol visible, pointer bloqueado */
+.hor-asiento--ocupado {
+    background: color-mix(in srgb, var(--rol-color, #e2e8f0) 6%, white);
+    border-color: var(--rol-color, #cbd5e1);
+    color: var(--hor-dark);
+    cursor: default;
+    pointer-events: none;
+    opacity: 1;
+}
+.hor-asiento--ocupado:hover { transform: none; }
+
+/* Admin: puede interactuar con slots ocupados */
+body.es-admin .hor-asiento--ocupado {
+    pointer-events: auto;
+    cursor: pointer;
+}
+body.es-admin .hor-asiento--ocupado:hover {
+    border-color: var(--hor-red);
+    color: var(--hor-red);
+    transform: scale(1.04);
+}
+
+/* Loading */
+.hor-asiento--loading {
+    opacity: .5; pointer-events: none;
+    animation: pulse .6s ease-in-out infinite alternate;
+}
+@keyframes pulse { from { opacity: .3; } to { opacity: .7; } }
+
+/* Demos en leyenda */
+.hor-asiento--demo {
+    width: 42px; height: 32px; cursor: default; font-size: 0;
+    border-radius: 6px; flex-shrink: 0;
+}
+.hor-asiento--demo:hover { transform: none !important; }
+
+/* ── LEYENDA ─────────────────────────────────────────── */
+.hor-leyenda {
+    display: flex; gap: 1.5rem; flex-wrap: wrap;
+    padding: .85rem 1.25rem;
+    background: var(--hor-card); border: 1px solid var(--hor-border);
+    border-radius: 10px; font-size: 0.78rem; color: var(--hor-muted);
+}
+.hor-leyenda__item { display: flex; align-items: center; gap: .5rem; }
+
+/* ── ALERTAS ─────────────────────────────────────────── */
+.hor-alert { padding: .65rem 1rem; border-radius: 8px; font-size: 0.82rem; font-weight: 500; }
+.hor-alert--error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.hor-alert--ok    { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+.hor-alert--info  { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+
+/* ── EMPTY STATE ─────────────────────────────────────── */
+.hor-empty {
+    text-align: center; padding: 4rem 2rem;
+    background: var(--hor-card); border: 1px solid var(--hor-border);
+    border-radius: 14px;
+}
+.hor-empty__icon { font-size: 3rem; margin-bottom: 1rem; }
+.hor-empty h2    { font-size: 1.2rem; color: var(--hor-dark); margin-bottom: .5rem; }
+.hor-empty p     { color: var(--hor-muted); margin-bottom: 1.25rem; }
+
+/* ── RESUMEN DISPONIBLES ────────────────────────────── */
+.hor-resumen {
+    display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;
+    padding: .65rem 1.2rem;
+    background: var(--hor-card); border: 1px solid var(--hor-border);
+    border-radius: 10px; font-size: 0.82rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.hor-resumen__label { font-size: 0.72rem; font-weight: 700; color: var(--hor-muted); text-transform: uppercase; letter-spacing: .06em; }
+.hor-resumen__item  { display: flex; align-items: center; gap: .4rem; font-weight: 600; color: var(--hor-dark); }
+.hor-resumen__badge {
+    padding: 2px 9px; border-radius: 20px; font-weight: 700; font-size: 0.72rem;
+}
+.hor-resumen__badge--ok    { background: #d1fae5; color: #065f46; }
+.hor-resumen__badge--lleno { background: #f1f5f9; color: #94a3b8; }
+
+/* ── ADMIN PICKER MODAL ─────────────────────────────── */
+.hor-picker-overlay[hidden],
+.hor-resumen[hidden] { display: none !important; }
+
+.hor-picker-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15,23,42,0.5);
+    z-index: 500;
+    display: flex; align-items: center; justify-content: center;
+}
+.hor-picker {
+    background: #fff; border-radius: 14px;
+    padding: 1.5rem; width: 300px; max-width: 90vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    display: flex; flex-direction: column; gap: 1rem;
+}
+.hor-picker__header {
+    display: flex; align-items: center; justify-content: space-between;
+}
+.hor-picker__header h3  { font-size: 1rem; font-weight: 700; color: var(--hor-dark); }
+.hor-picker__header button {
+    background: none; border: none; cursor: pointer;
+    font-size: 1.1rem; color: var(--hor-muted); line-height: 1; padding: 0;
+}
+.hor-picker__current {
+    font-size: 0.78rem; color: var(--hor-muted);
+    background: #f8fafc; border-radius: 8px; padding: .45rem .75rem;
+    border-left: 3px solid var(--hor-border);
+}
+.hor-picker__select {
+    width: 100%; padding: .55rem .75rem; border-radius: 8px;
+    border: 1.5px solid var(--hor-border); font-size: 0.85rem;
+    color: var(--hor-dark); background: #fff; outline: none; cursor: pointer;
+}
+.hor-picker__select:focus { border-color: var(--hor-teal); }
+.hor-picker__footer { display: flex; gap: .6rem; justify-content: flex-end; flex-wrap: wrap; }
+
+/* ── TOAST CENTRAL ──────────────────────────────────── */
+.hor-toast {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.85);
+    padding: .9rem 1.75rem;
+    border-radius: 12px;
+    font-size: 0.88rem; font-weight: 600;
+    color: #fff;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease;
+    z-index: 9999;
+    text-align: center;
+    max-width: 80vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+    line-height: 1.4;
+}
+.hor-toast--visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+.hor-toast--error { background: #991b1b; }
+.hor-toast--ok    { background: #065f46; }
+.hor-toast--info  { background: #0369a1; }
+
+/* ── RESPONSIVE ─────────────────────────────────────── */
+@media (max-width: 640px) {
+    .hor-main { padding: 0 .5rem 3rem; }
+    .hor-turno-block { padding: .6rem .5rem; }
+    .hor-semana-header { flex-direction: column; align-items: flex-start; }
+    .hor-sala__titulo { padding: .7rem .9rem; font-size: .9rem; }
+    .hor-grid__rol-label { font-size: 0.65rem; padding: .2rem .3rem .2rem 0; }
+    .hor-asiento { height: 36px; border-radius: 5px; }
+    .hor-dia-nombre { font-size: 0.65rem; }
+    .hor-dia-fecha  { font-size: 0.55rem; }
+}
+
+@media (max-width: 380px) {
+    .hor-asiento { height: 30px; }
+    .hor-grid__header,
+    .hor-grid__row { gap: .15rem; }
+}

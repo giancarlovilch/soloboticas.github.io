@@ -1,0 +1,297 @@
+.acceso-hero {
+    min-height: 20rem;
+    background:
+        linear-gradient(rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0.38)),
+        url('../img/home/sb02.jpg');
+    background-size: cover;
+    background-position: center 35%;
+    
+    display: flex;
+    align-items: center;
+}
+
+.acceso-hero-overlay {
+    width: 100%;
+}
+
+.acceso-hero-content {
+    color: var(--blanco);
+    padding: 5rem 0;
+    text-align: left;
+}
+
+.acceso-kicker {
+    text-transform: uppercase;
+    letter-spacing: 0.14rem;
+    font-weight: 700;
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
+}
+
+.acceso-hero-content h1 {
+    font-size: clamp(3.4rem, 6vw, 5.6rem);
+    margin-bottom: 1.4rem;
+    line-height: 1.08;
+}
+
+.acceso-hero-text {
+    max-width: 72rem;
+    font-size: 1.9rem;
+    margin: 0;
+}
+
+.acceso-main {
+    padding: 5rem 0 6rem;
+}
+
+.acceso-layout {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 2.4rem;
+    align-items: start;
+}
+
+.acceso-heading {
+    text-align: left;
+    max-width: none;
+    margin-bottom: 2.4rem;
+}
+
+.vacantes-panel {
+    background: transparent;
+}
+
+.vacantes-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+}
+
+.vacante-card {
+    background: var(--blanco);
+    border-radius: var(--radius);
+    box-shadow: var(--sombra);
+    padding: 2.4rem;
+    border: 1px solid #e7edf2;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vacante-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 42px rgba(13, 38, 59, 0.14);
+}
+
+.vacante-tag {
+    display: inline-block;
+    margin-bottom: 1rem;
+    padding: 0.6rem 1rem;
+    border-radius: 999px;
+    background: rgba(0, 151, 167, 0.12);
+    color: var(--secundario);
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08rem;
+}
+
+.vacante-card h3 {
+    margin-bottom: 1rem;
+    color: var(--secundario);
+    font-size: 2.2rem;
+}
+
+.acceso-sidebar {
+    display: grid;
+    gap: 2rem;
+    position: sticky;
+    top: 14rem;
+}
+
+.acceso-card {
+    background: var(--blanco);
+    border-radius: 2rem;
+    box-shadow: var(--sombra);
+    padding: 2.6rem;
+    border: 1px solid #e8eef3;
+}
+
+.acceso-card-header h2 {
+    margin-bottom: 1rem;
+    font-size: 3rem;
+    color: var(--secundario);
+}
+
+.access-form {
+    display: grid;
+    gap: 1.8rem;
+    margin-top: 2rem;
+}
+
+.input-group {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.input-group label {
+    font-weight: 700;
+    color: var(--oscuro);
+}
+
+.input-group input {
+    width: 100%;
+    min-height: 5.2rem;
+    padding: 1.2rem 1.4rem;
+    border: 1px solid #ccd8e2;
+    border-radius: 1.2rem;
+    background: #fbfdff;
+    font-size: 1.6rem;
+    color: var(--oscuro);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: var(--tercero);
+    box-shadow: 0 0 0 4px rgba(0, 152, 218, 0.14);
+    background: var(--blanco);
+}
+
+.input-group.input-focus label {
+    color: var(--secundario);
+}
+
+.input-help {
+    color: var(--gris);
+    font-size: 1.3rem;
+}
+
+.input-group-hidden {
+    display: none;
+}
+
+.input-group-visible {
+    display: grid;
+    animation: fadeSlideDown 0.28s ease;
+}
+
+.boton-acceso {
+    min-height: 5.2rem;
+    border: none;
+    border-radius: 1.2rem;
+    background: linear-gradient(135deg, var(--tercero), var(--secundario));
+    color: var(--blanco);
+    font-weight: 700;
+    font-size: 1.6rem;
+    cursor: pointer;
+    transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 10px 24px rgba(0, 151, 167, 0.22);
+}
+
+.boton-acceso:hover {
+    transform: translateY(-2px);
+}
+
+.boton-acceso:disabled {
+    opacity: 0.75;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.message-box {
+    margin-top: 1.8rem;
+    min-height: 2.4rem;
+    font-weight: 600;
+    font-size: 1.45rem;
+    padding: 0.2rem 0;
+}
+
+.message-box.is-error {
+    color: var(--quinto);
+}
+
+.message-box.is-success {
+    color: var(--secundario);
+}
+
+.check-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.4rem 0 0;
+    display: grid;
+    gap: 1rem;
+}
+
+.check-list li {
+    position: relative;
+    padding-left: 2.4rem;
+}
+
+.check-list li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: var(--cuarto);
+    font-weight: 700;
+}
+
+.acceso-card-info h3 {
+    color: var(--secundario);
+    margin-bottom: 1rem;
+    font-size: 2.1rem;
+}
+
+@keyframes fadeSlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 991px) {
+    .acceso-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .acceso-sidebar {
+        position: static;
+    }
+}
+
+@media (max-width: 767px) {
+    .acceso-main {
+        padding: 4rem 0 5rem;
+    }
+
+    .vacantes-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .acceso-card {
+        padding: 2rem;
+    }
+
+    .acceso-hero {
+        min-height: 28rem;
+    }
+
+    .acceso-hero-content {
+        text-align: center;
+    }
+}
+/* ── Mensajes de feedback ────────────────────────────────── */
+.message-box {
+    padding: 1.2rem 1.6rem;
+    border-radius: 1rem;
+    font-size: 1.5rem;
+    font-weight: 500;
+    margin-top: 1.2rem;
+}
+
+.message-error   { background: rgba(169,50,38,0.1);  color: #7b1d13; border: 1px solid rgba(169,50,38,0.22); }
+.message-success { background: rgba(0,151,167,0.1);  color: #00636f; border: 1px solid rgba(0,151,167,0.2); }
+.message-info    { background: rgba(0,152,218,0.08); color: #0a5a7c; border: 1px solid rgba(0,152,218,0.18); }

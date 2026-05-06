@@ -1,0 +1,217 @@
+/* VARIABLES CORPORATIVAS - SOLO BOTICAS */
+:root {
+    --exp-primary: #1e293b;      /* Azul pizarra oscuro */
+    --exp-accent: #3b82f6;       /* Azul acción */
+    --exp-success: #10b981;      /* Verde esmeralda */
+    --exp-warning: #f59e0b;      /* Ámbar */
+    --exp-danger: #ef4444;       /* Rojo alerta */
+    --exp-bg: #f1f5f9;           /* Gris azulado muy claro */
+    --exp-card: #ffffff;
+    --exp-border: #e2e8f0;
+    --exp-text: #334155;
+    --exp-text-light: #64748b;
+    --exp-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+/* RESET Y BASE */
+.expediente-container {
+    background-color: var(--exp-bg);
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--exp-text);
+    padding: 1.5rem;
+    min-height: 100vh;
+    font-size: 13px; /* Letra pequeña y profesional */
+}
+
+/* BLOQUE CABECERA */
+.exp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding: 3rem 1.5rem;
+    background: var(--exp-card);
+    border-radius: 8px;
+    box-shadow: var(--exp-shadow);
+    border-left: 4px solid var(--exp-primary);
+}
+
+.exp-header__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0.2rem 0;
+    color: var(--exp-primary);
+}
+
+.exp-header__kicker {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--exp-text-light);
+}
+
+/* LAYOUT PRINCIPAL */
+.exp-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+/* TARJETAS DE SECCIÓN */
+.exp-section {
+    background: var(--exp-card);
+    border-radius: 8px;
+    border: 1px solid var(--exp-border);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--exp-shadow);
+}
+
+.exp-section__title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--exp-primary);
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* FORMULARIOS Y CAMPOS */
+.exp-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.exp-field__label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--exp-text-light);
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+}
+
+.exp-field__input, 
+.exp-field__select,
+.exp-sidebar__select {
+    width: 100%;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--exp-border);
+    border-radius: 5px;
+    background: #f8fafc;
+    color: var(--exp-text);
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.exp-field__input:focus, .exp-field__select:focus {
+    outline: none;
+    border-color: var(--exp-accent);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.exp-field--readonly .exp-field__input {
+    background: #f1f5f9;
+    cursor: not-allowed;
+    color: var(--exp-text-light);
+}
+
+.exp-field--full { grid-column: 1 / -1; }
+
+/* FILAS DINÁMICAS (PUESTOS/SKILLS) */
+.exp-list--grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+}
+
+.exp-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: #f8fafc;
+    border: 1px solid var(--exp-border);
+    border-radius: 6px;
+}
+
+/* STACKS (EXPERIENCIA/ESTUDIOS) */
+.exp-stack-row {
+    padding: 1rem;
+    border: 1px solid var(--exp-border);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    position: relative;
+    background: #fbfcfd;
+}
+
+.exp-stack-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.2fr;
+    gap: 1rem;
+    padding-right: 2.5rem;
+}
+
+.exp-dual-inputs {
+    display: flex;
+    gap: 0.4rem;
+}
+
+/* BOTONES */
+.btn {
+    padding: 0.5rem 1.2rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    font-size: 0.8rem;
+}
+
+.btn--primary { background: var(--exp-primary); color: white; }
+.btn--secondary { background: var(--exp-bg); color: var(--exp-text); border: 1px solid var(--exp-border); }
+
+.exp-btn--add {
+    background: #ecfdf5;
+    color: var(--exp-success);
+    border: 1px solid #d1fae5;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    border-radius: 4px;
+}
+
+.exp-btn--remove { color: var(--exp-danger); background: none; border: none; font-size: 1.1rem; cursor: pointer; }
+.exp-btn--remove-circle { 
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: #fff1f2; color: var(--exp-danger); border-radius: 50%; 
+    width: 24px; height: 24px; border: none; cursor: pointer;
+}
+
+/* SIDEBAR */
+.exp-sidebar__card--sticky { position: sticky; top: 1.5rem; }
+.exp-sidebar__title { font-size: 0.85rem; color: var(--exp-text-light); text-transform: uppercase; margin-bottom: 1.2rem; border-bottom: 1px solid var(--exp-border); padding-bottom: 0.5rem; }
+.exp-sidebar__group { margin-bottom: 1.2rem; }
+.exp-sidebar__label { font-size: 0.7rem; font-weight: 700; display: block; margin-bottom: 0.5rem; color: var(--exp-primary); }
+
+/* ESTADOS SELECT */
+.exp-sidebar__select--status-active { border-left: 3px solid var(--exp-success); }
+.exp-sidebar__select--status-suspended { border-left: 3px solid var(--exp-danger); }
+
+/* ANIMACIONES */
+.animate-in { animation: expFadeIn 0.3s ease-out; }
+@keyframes expFadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Feedback visual inmediato para el estado de cuenta */
+.exp-sidebar__select--status-active { 
+    background-color: #f0fdf4 !important; /* Fondo verde muy tenue */
+    color: #166534 !important;
+}
+
+.exp-sidebar__select--status-suspended { 
+    background-color: #fef2f2 !important; /* Fondo rojo muy tenue */
+    color: #991b1b !important;
+}

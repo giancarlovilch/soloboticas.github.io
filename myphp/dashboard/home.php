@@ -1,1 +1,0 @@
-<img src="/img/img_1/SB006.jpg" alt="">

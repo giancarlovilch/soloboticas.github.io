@@ -1,0 +1,83 @@
+.update-container {
+    animation: slideUp 0.4s ease-out;
+}
+
+.status-banner {
+    padding: 1.2rem;
+    border-radius: 8px;
+    background: #f8f9fa;
+    margin-bottom: 2rem;
+    font-weight: 700;
+    text-align: center;
+    border-left: 5px solid var(--tercero);
+}
+
+.form-section {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: var(--sombra);
+    margin-bottom: 1.5rem;
+}
+
+.form-section h3 {
+    color: var(--secundario);
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.input-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.input-group input, .input-group select {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-family: 'Krub', sans-serif;
+}
+
+.readonly-input {
+    background: #f4f4f4;
+    color: #777;
+    cursor: not-allowed;
+}
+
+.highlight-section {
+    border: 2px solid var(--primario);
+}
+
+.btn-save {
+    background: var(--tercero);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn-save:hover {
+    background: var(--oscuro);
+    transform: scale(1.02);
+}
+
+.btn-back {
+    text-decoration: none;
+    color: var(--oscuro);
+    font-weight: 600;
+    font-size: 0.9rem;
+}

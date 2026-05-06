@@ -1,0 +1,148 @@
+<?php
+
+date_default_timezone_set('America/Lima');
+
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(200);
+    exit;
+}
+
+// Carga de dependencias del Core y Helpers
+require_once __DIR__ . '/../src/Helpers/Response.php';
+require_once __DIR__ . '/../src/Core/Controller.php';
+require_once __DIR__ . '/../src/Core/Router.php';
+require_once __DIR__ . '/../src/Core/Database.php';
+
+// Inclusión de Controladores
+require_once __DIR__ . '/../src/Controllers/PostulanteController.php';
+require_once __DIR__ . '/../src/Controllers/CatalogoController.php';
+require_once __DIR__ . '/../src/Controllers/HomeController.php';
+require_once __DIR__ . '/../src/Controllers/AuthController.php';
+require_once __DIR__ . '/../src/Controllers/AsistenciaController.php';
+require_once __DIR__ . '/../src/Controllers/AdminController.php';
+require_once __DIR__ . '/../src/Controllers/StaffController.php';
+require_once __DIR__ . '/../src/Controllers/CajaController.php';
+require_once __DIR__ . '/../src/Controllers/HorarioController.php';
+
+/**
+ * Lógica para detección de rutas y Base Path
+ */
+$scriptName = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+$basePath = rtrim(str_replace('/index.php', '', $scriptName), '/');
+
+$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+$requestPath = parse_url($requestUri, PHP_URL_PATH) ?? '/';
+
+if ($basePath !== '' && strpos($requestPath, $basePath) === 0) {
+    $requestPath = substr($requestPath, strlen($basePath));
+}
+
+// --- MEJORA: Normalizar barras finales para evitar errores 404 en el Router ---
+$requestPath = ($requestPath !== '/') ? rtrim($requestPath, '/') : '/';
+$requestPath = ($requestPath === '') ? '/' : $requestPath;
+
+define('APP_BASE_PATH', $basePath);
+
+// Instancia del Router[cite: 8]
+$router = new Router();
+
+// --- RUTAS PÚBLICAS Y VISTAS ---
+$router->get('/', [HomeController::class, 'index']);
+$router->get('/login', [HomeController::class, 'loginView']);
+$router->get('/postulacion/acceso', [PostulanteController::class, 'accessView']);
+$router->get('/postulacion/formulario', [PostulanteController::class, 'formView']);
+$router->get('/catalogos/postulacion', [CatalogoController::class, 'getAll']);
+
+// --- RUTAS DE PROCESO DE POSTULANTE ---
+$router->post('/postulantes/check-dni', [PostulanteController::class, 'checkDni']);
+$router->post('/postulantes/validate-access', [PostulanteController::class, 'validateAccess']);
+$router->post('/postulaciones',        [PostulanteController::class, 'apply']);
+$router->get('/postulaciones/{dni}',   [PostulanteController::class, 'getApplicationView']);
+$router->post('/postulantes/foto',     [PostulanteController::class, 'uploadFoto']);
+
+// --- AUTENTICACIÓN ---
+$router->post('/login',          [AuthController::class, 'login']);
+$router->post('/logout',         [AuthController::class, 'logout']);
+$router->get('/logout',          [AuthController::class, 'logout']);
+$router->get('/api/auth/verify', [AuthController::class, 'verifyToken']);
+
+// --- MÓDULO DE HORARIOS ---
+$router->get('/horario',                        [HorarioController::class, 'index']);
+$router->get('/horario/siguiente',              [HorarioController::class, 'siguiente']);
+$router->get('/horario/historial',              [HorarioController::class, 'historial']);
+$router->get('/horario/solicitudes',            [HorarioController::class, 'solicitudes']);
+$router->post('/horario/api/solicitud/cubrir',  [HorarioController::class, 'cubrir']);
+$router->get('/horario/informacion',            [HorarioController::class, 'informacion']);
+$router->post('/admin/api/penalidad/{id}',      [HorarioController::class, 'actualizarPenalidad']);
+$router->get('/horario/api/semana/{id}',        [HorarioController::class, 'getSlots']);
+$router->post('/horario/api/semana/crear',      [HorarioController::class, 'crearSemana']);
+$router->post('/horario/api/semana/{id}/cerrar',[HorarioController::class, 'cerrarSemana']);
+$router->post('/horario/api/slot/asignar',      [HorarioController::class, 'asignarSlot']);
+$router->post('/horario/api/slot/liberar',      [HorarioController::class, 'liberarSlot']);
+$router->get('/horario/api/trabajadores',       [HorarioController::class, 'getTrabajadores']);
+
+// --- MÓDULO DE CAJA ---
+$router->get('/caja',                          [CajaController::class, 'index']);
+$router->get('/caja/sesion/nueva',             [CajaController::class, 'nueva']);
+$router->get('/caja/sesion/{id}',              [CajaController::class, 'editarSesion']);
+$router->get('/caja/{id}/ventas',              [CajaController::class, 'ventasView']);
+$router->get('/caja/reporte/{id}',             [CajaController::class, 'reporte']);
+$router->post('/caja/api/sesion/crear',        [CajaController::class, 'crearSesion']);
+$router->post('/caja/api/sesion/guardar',      [CajaController::class, 'guardarSesion']);
+$router->post('/caja/api/{id}/ventas',         [CajaController::class, 'submitVentas']);
+$router->post('/caja/api/reporte/{id}/rectificar', [CajaController::class, 'rectificar']);
+$router->post('/caja/api/sesion/{id}/eliminar',        [CajaController::class, 'eliminarSesion']);
+$router->post('/caja/api/sesion/{id}/sincronizar-base', [CajaController::class, 'sincronizarBase']);
+$router->get('/caja/pagos-digitales',                    [CajaController::class, 'pagosDigitalesView']);
+$router->get('/caja/api/sesion/{id}/pagos-digitales',    [CajaController::class, 'getPagosDigitales']);
+$router->post('/caja/api/sesion/{id}/pago-digital',      [CajaController::class, 'addPagoDigital']);
+$router->post('/caja/api/pago-digital/{id}/confirmar',   [CajaController::class, 'confirmarPago']);
+$router->post('/caja/api/pago-digital/{id}/eliminar',    [CajaController::class, 'deletePagoDigitalRoute']);
+$router->get('/caja/api/catalogos',                      [CajaController::class, 'apiCatalogos']);
+$router->get('/caja/api/cajas/{id}',                     [CajaController::class, 'apiCajasByLocal']);
+$router->get('/caja/api/saldo/{id}',                     [CajaController::class, 'apiSaldoBase']);
+
+// --- PORTAL STAFF (colaboradores) ---
+$router->get('/staff',                    [StaffController::class,       'index']);
+$router->get('/staff/info',               [StaffController::class,       'info']);
+$router->get('/staff/api/historial',      [StaffController::class,       'historial']);
+$router->get('/staff/api/checklist',      [StaffController::class,       'getChecklist']);
+$router->post('/staff/asistencia/marcar', [StaffController::class,       'marcar']);
+
+// --- ASISTENCIA (legado + admin) ---
+$router->post('/asistencia/marcar',           [AsistenciaController::class, 'marcar']);
+$router->get('/admin/api/asistencias',                    [AsistenciaController::class, 'adminListar']);
+$router->get('/admin/api/asistencia/checklist',           [AsistenciaController::class, 'adminGetChecklist']);
+$router->post('/admin/asistencia/checklist/actualizar',   [AsistenciaController::class, 'adminActualizarChecklist']);
+$router->post('/admin/asistencia/actualizar',  [AsistenciaController::class, 'adminActualizar']);
+$router->post('/admin/asistencia/crear',       [AsistenciaController::class, 'adminCrear']);
+$router->post('/admin/asistencia/eliminar',    [AsistenciaController::class, 'adminEliminar']);
+
+// --- MÓDULO DE REPORTES ---
+require_once __DIR__ . '/../src/Controllers/ReporteController.php';
+$router->get('/admin/reportes',         [ReporteController::class, 'index']);
+$router->get('/admin/reportes/arqueos', [ReporteController::class, 'arqueos']);
+
+// --- RUTAS DE ADMINISTRACIÓN (INTRANET) ---
+// Registramos las rutas de API antes del dispatch
+$router->get('/admin/dashboard', [AdminController::class, 'index']); 
+$router->get('/admin/postulantes', [AdminController::class, 'listarPostulantes']);
+$router->post('/admin/contratar', [AdminController::class, 'contratar']);
+$router->get('/admin/buscar-postulante', [AdminController::class, 'buscar']);
+$router->post('/admin/usuario/estado',    [AdminController::class, 'cambiarEstadoUsuario']);
+$router->post('/admin/usuario/password',  [AdminController::class, 'cambiarPassword']);
+$router->post('/admin/usuario/username',  [AdminController::class, 'cambiarUsername']);
+$router->post('/admin/postulante/eliminar',[AdminController::class, 'eliminarPostulante']);
+
+// APIS
+$router->get('/admin/api/postulante-detalle', [AdminController::class, 'apiDetallePostulante']);
+$router->post('/admin/postulante/actualizar', [AdminController::class, 'actualizarPostulante']);
+/**
+ * EJECUCIÓN: El dispatch DEBE ir siempre AL FINAL[cite: 3, 8]
+ */
+$router->dispatch($_SERVER['REQUEST_METHOD'], $requestPath);

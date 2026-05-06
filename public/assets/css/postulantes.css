@@ -1,0 +1,447 @@
+/* ============================================================
+   EXPEDIENTE — PRODUCTIVITY UI
+   Filosofía: Densidad con claridad. Cada pixel trabaja.
+   Tipografía: DM Sans (display) + JetBrains Mono (datos)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── VARIABLES ─────────────────────────────────────────────── */
+:root {
+    /* Paleta base: carbón + porcelana */
+    --exp-primary:      #1a1f2e;
+    --exp-accent:       #4f6ef7;        /* Índigo eléctrico — acción */
+    --exp-accent-soft:  #eef1fe;        /* Tinte acento */
+    --exp-success:      #0ea472;
+    --exp-success-soft: #e6f7f1;
+    --exp-warning:      #d97706;
+    --exp-warning-soft: #fef3e2;
+    --exp-danger:       #dc3545;
+    --exp-danger-soft:  #fdf0f0;
+
+    /* Superficies */
+    --exp-bg:           #f4f5f7;        /* Fondo de página: gris piedra */
+    --exp-card:         #ffffff;
+    --exp-card-alt:     #fafafa;        /* Filas alternas */
+
+    /* Tipografía */
+    --exp-text:         #1a1f2e;
+    --exp-text-muted:   #6b7280;
+    --exp-text-faint:   #9ca3af;
+
+    /* Bordes */
+    --exp-border:       #e5e7eb;
+    --exp-border-focus: #4f6ef7;
+
+    /* Sombras funcionales (no decorativas) */
+    --exp-shadow-card:  0 1px 2px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+    --exp-shadow-focus: 0 0 0 3px rgba(79,110,247,0.15);
+
+    /* Espaciado base */
+    --exp-radius:       6px;
+    --exp-radius-lg:    10px;
+}
+
+/* ── RESET BASE ─────────────────────────────────────────────── */
+.expediente-container *,
+.expediente-container *::before,
+.expediente-container *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+.expediente-container {
+    background-color: var(--exp-bg);
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--exp-text);
+    line-height: 1.5;
+    padding: 1.5rem 2rem;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── CABECERA ────────────────────────────────────────────────── */
+.exp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    background: var(--exp-card);
+    border-radius: var(--exp-radius-lg);
+    box-shadow: var(--exp-shadow-card);
+    border-top: 3px solid var(--exp-accent);    /* Acento superior = identidad */
+    margin-bottom: 1.5rem;
+}
+
+.exp-header__kicker {
+    font-size: 0.68rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--exp-accent);
+    margin-bottom: 0.2rem;
+}
+
+.exp-header__title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--exp-primary);
+    letter-spacing: -0.02em;
+}
+
+/* ── LAYOUT ──────────────────────────────────────────────────── */
+.exp-layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+/* ── SECCIONES ───────────────────────────────────────────────── */
+.exp-section {
+    background: var(--exp-card);
+    border-radius: var(--exp-radius-lg);
+    border: 1px solid var(--exp-border);
+    box-shadow: var(--exp-shadow-card);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.exp-section__title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--exp-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--exp-border);
+}
+
+/* ── GRID DE FORMULARIO ──────────────────────────────────────── */
+.exp-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 0.85rem;
+}
+
+/* ── ETIQUETAS Y CAMPOS ──────────────────────────────────────── */
+.exp-field__label {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--exp-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.3rem;
+}
+
+.exp-field__input,
+.exp-field__select,
+.exp-sidebar__select {
+    width: 100%;
+    padding: 0.45rem 0.65rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 400;
+    color: var(--exp-text);
+    background: var(--exp-card-alt);
+    border: 1px solid var(--exp-border);
+    border-radius: var(--exp-radius);
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+}
+
+/* Flecha para selects */
+.exp-field__select,
+.exp-sidebar__select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    padding-right: 2rem;
+}
+
+.exp-field__input:hover,
+.exp-field__select:hover {
+    border-color: #d1d5db;
+    background: #fff;
+}
+
+.exp-field__input:focus,
+.exp-field__select:focus {
+    border-color: var(--exp-border-focus);
+    background: #fff;
+    box-shadow: var(--exp-shadow-focus);
+}
+
+/* Readonly: usa fuente mono para DNI/IDs */
+.exp-field--readonly .exp-field__input {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    background: var(--exp-bg);
+    color: var(--exp-text-muted);
+    cursor: not-allowed;
+    border-style: dashed;
+}
+
+.exp-field--full {
+    grid-column: 1 / -1;
+}
+
+/* ── LISTA EN GRID (puestos / skills) ────────────────────────── */
+.exp-list--grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.6rem;
+}
+
+.exp-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    background: var(--exp-card-alt);
+    border: 1px solid var(--exp-border);
+    border-radius: var(--exp-radius);
+    transition: border-color 0.15s;
+}
+
+.exp-row:hover {
+    border-color: #d1d5db;
+}
+
+/* ── FILAS APILADAS (experiencia / estudios) ─────────────────── */
+.exp-stack-row {
+    position: relative;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--exp-border);
+    border-radius: var(--exp-radius);
+    margin-bottom: 0.75rem;
+    background: var(--exp-card-alt);
+    transition: border-color 0.15s;
+}
+
+.exp-stack-row:hover {
+    border-color: #d1d5db;
+}
+
+.exp-stack-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.2fr;
+    gap: 0.85rem;
+    padding-right: 2rem;
+}
+
+.exp-dual-inputs {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.exp-dual-inputs .exp-field__input {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+}
+
+/* ── BOTONES ─────────────────────────────────────────────────── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.5rem 1.1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: var(--exp-radius);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+}
+
+.btn--primary {
+    background: var(--exp-accent);
+    color: #fff;
+    border-color: var(--exp-accent);
+}
+
+.btn--primary:hover {
+    background: #3d5ce6;
+    border-color: #3d5ce6;
+}
+
+.btn--secondary {
+    background: transparent;
+    color: var(--exp-text-muted);
+    border-color: var(--exp-border);
+}
+
+.btn--secondary:hover {
+    background: var(--exp-bg);
+    color: var(--exp-text);
+}
+
+/* Botón "Agregar fila" */
+.exp-btn--add {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: var(--exp-radius);
+    cursor: pointer;
+    background: var(--exp-accent-soft);
+    color: var(--exp-accent);
+    border: 1px solid #c7d2fd;
+    transition: all 0.15s;
+    letter-spacing: 0.01em;
+}
+
+.exp-btn--add:hover {
+    background: #dde5fd;
+    border-color: var(--exp-accent);
+}
+
+/* Botón eliminar inline */
+.exp-btn--remove {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    font-size: 0.7rem;
+    line-height: 1;
+    background: transparent;
+    color: var(--exp-text-faint);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.exp-btn--remove:hover {
+    background: var(--exp-danger-soft);
+    color: var(--exp-danger);
+}
+
+/* Botón eliminar en tarjeta (círculo posicionado) */
+.exp-btn--remove-circle {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    font-size: 0.7rem;
+    background: transparent;
+    color: var(--exp-text-faint);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.exp-btn--remove-circle:hover {
+    background: var(--exp-danger-soft);
+    color: var(--exp-danger);
+}
+
+/* ── SIDEBAR ─────────────────────────────────────────────────── */
+.exp-sidebar__card--sticky {
+    position: sticky;
+    top: 1.5rem;
+}
+
+.exp-sidebar__title {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--exp-text-muted);
+    margin-bottom: 1.1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--exp-border);
+}
+
+.exp-sidebar__group {
+    margin-bottom: 1.1rem;
+}
+
+.exp-sidebar__label {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--exp-text-muted);
+    margin-bottom: 0.45rem;
+}
+
+.exp-sidebar__select {
+    font-size: 0.8rem;
+}
+
+.exp-sidebar__select:focus {
+    border-color: var(--exp-border-focus);
+    box-shadow: var(--exp-shadow-focus);
+}
+
+/* ── ESTADO DE CUENTA (colores semánticos) ──────────────────── */
+.exp-sidebar__select--status-active {
+    background-color: var(--exp-success-soft) !important;
+    color: #065f46 !important;
+    border-color: #a7f3d0 !important;
+    font-weight: 500 !important;
+}
+
+.exp-sidebar__select--status-suspended {
+    background-color: var(--exp-danger-soft) !important;
+    color: #991b1b !important;
+    border-color: #fecaca !important;
+    font-weight: 500 !important;
+}
+
+/* ── ANIMACIÓN DE ENTRADA ────────────────────────────────────── */
+.animate-in {
+    animation: expSlideIn 0.18s ease-out both;
+}
+
+@keyframes expSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── CHECKBOXES CUSTOM ───────────────────────────────────────── */
+.expediente-container input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--exp-accent);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* ── SCROLLBAR DISCRETA ──────────────────────────────────────── */
+.expediente-container ::-webkit-scrollbar { width: 4px; height: 4px; }
+.expediente-container ::-webkit-scrollbar-track { background: transparent; }
+.expediente-container ::-webkit-scrollbar-thumb { background: var(--exp-border); border-radius: 2px; }
