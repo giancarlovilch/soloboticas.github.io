@@ -126,7 +126,7 @@ $act = [
 
         <div class="caja-activos-grid">
             <div class="caja-activo-item">
-                <label>Caja Exterior</label>
+                <label>Caja</label>
                 <div class="caja-input-money">
                     <span>S/</span>
                     <input type="number" id="act_caja_exterior" class="caja-input caja-input--money"
@@ -142,7 +142,7 @@ $act = [
                 </div>
             </div>
             <div class="caja-activo-item">
-                <label>Billetes (caja)</label>
+                <label>Billetes</label>
                 <div class="caja-input-money">
                     <span>S/</span>
                     <input type="number" id="act_billetes" class="caja-input caja-input--money"

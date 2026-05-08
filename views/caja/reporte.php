@@ -147,7 +147,7 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
             <div class="caja-cuadre-col caja-cuadre-col--real">
                 <h3 class="caja-cuadre-col__title">🪙 ARQUEO DE CAJA</h3>
                 <div class="caja-linea">
-                    <span>Caja exterior</span>
+                    <span>Caja</span>
                     <strong><?= $f2($detalle['monto_caja_exterior'] ?? 0) ?></strong>
                 </div>
                 <div class="caja-linea">
@@ -155,7 +155,7 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
                     <strong><?= $f2($detalle['monto_monedas'] ?? 0) ?></strong>
                 </div>
                 <div class="caja-linea">
-                    <span>+ Billetes (caja)</span>
+                    <span>+ Billetes</span>
                     <strong><?= $f2($detalle['monto_billetes_caja'] ?? 0) ?></strong>
                 </div>
                 <div class="caja-linea">
