@@ -263,6 +263,7 @@ const ES_ADMIN      = <?= $esAdmin ? 'true' : 'false' ?>;
 const SEMANA_ID     = <?= $semana ? $semana['id_semana'] : 'null' ?>;
 const EDITABLE      = <?= $editable ? 'true' : 'false' ?>;
 </script>
+<script src="<?= $basePath ?>/assets/js/session-guard.js"></script>
 <script src="<?= $basePath ?>/assets/js/horario.js"></script>
 </body>
 </html>

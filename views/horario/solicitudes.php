@@ -64,6 +64,7 @@
 </head>
 <body>
 <?php
+$basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
 $hoy     = new DateTime('now', new DateTimeZone('America/Lima'));
 $fechaDt = new DateTime($fecha, new DateTimeZone('America/Lima'));
 $esPasado = $fechaDt < $hoy->setTime(0, 0);
@@ -93,6 +94,13 @@ $turnosLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
         <h3 id="solModalTitulo">Confirmar acción</h3>
         <p id="solModalDesc"></p>
         <div id="solMsg" class="sol-msg"></div>
+        <textarea id="solComentario"
+                  placeholder="Comentario / Motivo (opcional)"
+                  maxlength="300"
+                  style="width:100%;padding:.55rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;
+                         font-size:0.82rem;margin-bottom:.6rem;box-sizing:border-box;
+                         resize:vertical;min-height:60px;font-family:inherit;outline:none;"
+                  onfocus="this.style.borderColor='#0097A7'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
         <input type="password" id="solPassword" placeholder="Tu contraseña" autocomplete="current-password">
         <div class="sol-modal__footer">
             <button onclick="cerrarModal()"
@@ -173,7 +181,7 @@ $turnosLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
                     <span class="sol-row__name"><?= htmlspecialchars($s['trabajador_nombre']) ?></span>
                 <?php endif; ?>
             </div>
-            <div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
                 <?php if ($bloqueado || $esPropio): ?>
                     <button class="sol-btn sol-btn--lock" disabled>
                         <?= $bloqueado ? '🔒' : '✓ Tuyo' ?>
@@ -184,6 +192,13 @@ $turnosLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
                                 '<?= addslashes($s['local_desc']) ?> — <?= addslashes($turnosLabel[$s['turno_id']] ?? '') ?>',
                                 '<?= $esLibre ? '' : addslashes($s['trabajador_nombre']) ?>')">
                         <?= $esLibre ? '+ Tomar turno' : '⇄ Cubrir' ?>
+                    </button>
+                <?php endif; ?>
+                <?php if ($esAdmin && !$esLibre && !$bloqueado): ?>
+                    <button onclick="abrirModalEliminar(<?= $s['id_slot'] ?>, '<?= addslashes($s['trabajador_nombre']) ?>')"
+                        style="padding:5px 10px;border-radius:7px;font-size:.73rem;font-weight:700;
+                               border:1px solid #fca5a5;background:transparent;color:#dc2626;cursor:pointer;">
+                        ✕
                     </button>
                 <?php endif; ?>
             </div>
@@ -207,6 +222,9 @@ $turnosLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
                         <th style="text-align:left;padding:6px 8px;color:#64748b;font-size:0.72rem;text-transform:uppercase;">Quién cubrió</th>
                         <th style="text-align:left;padding:6px 8px;color:#64748b;font-size:0.72rem;text-transform:uppercase;">Reemplazó a</th>
                         <th style="text-align:left;padding:6px 8px;color:#64748b;font-size:0.72rem;text-transform:uppercase;">Registrado</th>
+                        <?php if ($esAdmin): ?>
+                        <th style="padding:6px 8px;"></th>
+                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
@@ -223,7 +241,20 @@ $turnosLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
                         <td style="padding:7px 8px;color:#64748b;"><?= $h['original_nombre'] ? htmlspecialchars($h['original_nombre']) : '<span style="color:#cbd5e1">—</span>' ?></td>
                         <td style="padding:7px 8px;color:#94a3b8;font-size:0.72rem;">
                             <?= date('d/m H:i', strtotime($h['fecha_solicitud'])) ?>
+                            <?php if (($h['sol_estado'] ?? '') === 'REVERTIDA'): ?>
+                                <br><span style="color:#dc2626;font-weight:700;font-size:.68rem;">REVERTIDA</span>
+                            <?php endif; ?>
                         </td>
+                        <?php if ($esAdmin): ?>
+                        <td style="padding:7px 8px;">
+                            <?php if ($h['tipo'] === 'COBERTURA' && ($h['sol_estado'] ?? 'ACTIVA') === 'ACTIVA'): ?>
+                                <button onclick="abrirModalRevertir(<?= $h['id_solicitud'] ?>, '<?= addslashes($h['solicitante_nombre']) ?>', '<?= addslashes($h['original_nombre'] ?? '') ?>')"
+                                    style="background:transparent;border:1px solid #fca5a5;color:#dc2626;border-radius:5px;padding:2px 9px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap;">
+                                    ↩ Revertir
+                                </button>
+                            <?php endif; ?>
+                        </td>
+                        <?php endif; ?>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -234,21 +265,63 @@ $turnosLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
 
 </main>
 
+<!-- Modal eliminar del horario -->
+<div id="modalEliminarSlot" class="sol-modal-overlay" hidden>
+    <div class="sol-modal">
+        <h3>Eliminar del horario</h3>
+        <p id="modalEliminarSlotDesc"></p>
+        <div id="eliminarSlotMsg" class="sol-msg"></div>
+        <input type="password" id="eliminarSlotPassword" placeholder="Contraseña de administrador" autocomplete="current-password">
+        <div class="sol-modal__footer">
+            <button onclick="cerrarModalEliminar()"
+                style="background:#f1f5f9;border:none;border-radius:7px;padding:.5rem 1rem;font-size:.82rem;cursor:pointer;color:#475569;">
+                Cancelar
+            </button>
+            <button onclick="confirmarEliminarSlot()"
+                style="background:#dc2626;border:none;border-radius:7px;padding:.5rem 1rem;font-size:.82rem;font-weight:700;color:#fff;cursor:pointer;">
+                Eliminar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal revertir cobertura -->
+<div id="modalRevertir" class="sol-modal-overlay" hidden>
+    <div class="sol-modal">
+        <h3>Revertir cobertura</h3>
+        <p id="modalRevertirDesc"></p>
+        <div id="revertirMsg" class="sol-msg"></div>
+        <input type="password" id="revertirPassword" placeholder="Contraseña de administrador" autocomplete="current-password">
+        <div class="sol-modal__footer">
+            <button onclick="cerrarModalRevertir()"
+                style="background:#f1f5f9;border:none;border-radius:7px;padding:.5rem 1rem;font-size:.82rem;cursor:pointer;color:#475569;">
+                Cancelar
+            </button>
+            <button onclick="confirmarRevertir()"
+                style="background:#dc2626;border:none;border-radius:7px;padding:.5rem 1rem;font-size:.82rem;font-weight:700;color:#fff;cursor:pointer;">
+                Revertir
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 const BASE = '<?= $basePath ?>';
 let _slotId = null;
+let _solicitudId = null;
 
 function abrirModal(slotId, ubicacion, nombreOriginal) {
     _slotId = slotId;
     const esCobertura = nombreOriginal !== '';
     document.getElementById('solModalTitulo').textContent = esCobertura ? 'Confirmar cobertura' : 'Tomar turno libre';
     document.getElementById('solModalDesc').textContent   = esCobertura
-        ? `Vas a cubrir el turno de "${nombreOriginal}" en ${ubicacion}. Confirma con tu contraseña.`
-        : `Vas a asignarte el turno libre en ${ubicacion}. Confirma con tu contraseña.`;
-    document.getElementById('solPassword').value = '';
+        ? `Vas a cubrir el turno de "${nombreOriginal}" en ${ubicacion}.`
+        : `Vas a asignarte el turno libre en ${ubicacion}.`;
+    document.getElementById('solComentario').value = '';
+    document.getElementById('solPassword').value   = '';
     document.getElementById('solMsg').style.display = 'none';
     document.getElementById('solModal').removeAttribute('hidden');
-    setTimeout(() => document.getElementById('solPassword').focus(), 50);
+    setTimeout(() => document.getElementById('solComentario').focus(), 50);
 }
 
 function cerrarModal() {
@@ -256,15 +329,80 @@ function cerrarModal() {
     _slotId = null;
 }
 
+let _slotEliminarId = null;
+
+function abrirModalEliminar(slotId, nombre) {
+    _slotEliminarId = slotId;
+    document.getElementById('modalEliminarSlotDesc').textContent =
+        `Se eliminará a "${nombre}" de este turno. El slot quedará libre. Confirma con tu contraseña.`;
+    document.getElementById('eliminarSlotPassword').value = '';
+    document.getElementById('eliminarSlotMsg').style.display = 'none';
+    document.getElementById('modalEliminarSlot').removeAttribute('hidden');
+    setTimeout(() => document.getElementById('eliminarSlotPassword').focus(), 50);
+}
+
+function cerrarModalEliminar() {
+    document.getElementById('modalEliminarSlot').setAttribute('hidden', '');
+    _slotEliminarId = null;
+}
+
+async function confirmarEliminarSlot() {
+    const password = document.getElementById('eliminarSlotPassword').value.trim();
+    const msgEl    = document.getElementById('eliminarSlotMsg');
+    if (!password) { msgEl.textContent = 'Ingresa tu contraseña.'; msgEl.style.display = 'block'; return; }
+    try {
+        const r   = await fetch(`${BASE}/horario/api/slot/${_slotEliminarId}/liberar-admin`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+        });
+        const res = await r.json();
+        if (res.success) { cerrarModalEliminar(); location.reload(); }
+        else { msgEl.textContent = res.message || 'Error.'; msgEl.style.display = 'block'; }
+    } catch { msgEl.textContent = 'Error de conexión.'; msgEl.style.display = 'block'; }
+}
+
+function abrirModalRevertir(solicitudId, quienCubrio, original) {
+    _solicitudId = solicitudId;
+    const desc = original
+        ? `Se restaurará el turno a "${original}". "${quienCubrio}" dejará de cubrir. Confirma con tu contraseña.`
+        : `Se liberará el slot (era un turno libre que tomó "${quienCubrio}"). Confirma con tu contraseña.`;
+    document.getElementById('modalRevertirDesc').textContent = desc;
+    document.getElementById('revertirPassword').value = '';
+    document.getElementById('revertirMsg').style.display = 'none';
+    document.getElementById('modalRevertir').removeAttribute('hidden');
+    setTimeout(() => document.getElementById('revertirPassword').focus(), 50);
+}
+
+function cerrarModalRevertir() {
+    document.getElementById('modalRevertir').setAttribute('hidden', '');
+    _solicitudId = null;
+}
+
+async function confirmarRevertir() {
+    const password = document.getElementById('revertirPassword').value.trim();
+    const msgEl    = document.getElementById('revertirMsg');
+    if (!password) { msgEl.textContent = 'Ingresa tu contraseña.'; msgEl.style.display = 'block'; return; }
+    try {
+        const r   = await fetch(`${BASE}/horario/api/solicitud/${_solicitudId}/revertir`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+        });
+        const res = await r.json();
+        if (res.success) { cerrarModalRevertir(); location.reload(); }
+        else { msgEl.textContent = res.message || 'Error.'; msgEl.style.display = 'block'; }
+    } catch { msgEl.textContent = 'Error de conexión.'; msgEl.style.display = 'block'; }
+}
+
 async function confirmarCubrir() {
-    const password = document.getElementById('solPassword').value.trim();
-    const msgEl    = document.getElementById('solMsg');
+    const password    = document.getElementById('solPassword').value.trim();
+    const comentario  = document.getElementById('solComentario').value.trim();
+    const msgEl       = document.getElementById('solMsg');
     if (!password) { msgEl.textContent = 'Ingresa tu contraseña.'; msgEl.style.display = 'block'; return; }
 
     try {
         const r   = await fetch(`${BASE}/horario/api/solicitud/cubrir`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slot_id: _slotId, password }),
+            body: JSON.stringify({ slot_id: _slotId, password, comentario }),
         });
         const res = await r.json();
         if (res.success) {

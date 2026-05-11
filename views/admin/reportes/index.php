@@ -39,6 +39,7 @@
     </style>
 </head>
 <body style="background:#f1f5f9;min-height:100vh;">
+<?php $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : ''; ?>
 
 <header class="caja-header">
     <div class="caja-header__brand">
@@ -77,6 +78,39 @@
                 cajera, vendedor, caja, turno y fecha.
             </div>
             <span class="rep-card__badge">Caja</span>
+        </a>
+
+        <!-- ── Resumen por trabajador ─── -->
+        <a href="<?= $basePath ?>/admin/reportes/resumen-trabajadores" class="rep-card">
+            <div class="rep-card__icon">👥</div>
+            <div class="rep-card__title">Resumen por Trabajador</div>
+            <div class="rep-card__desc">
+                Vista consolidada mensual: asistencias (faltas, tardanzas), ventas acumuladas
+                como vendedor/a y operaciones BCP realizadas como cajera.
+            </div>
+            <span class="rep-card__badge">RRHH · Caja</span>
+        </a>
+
+        <!-- ── Asistencias ─── -->
+        <a href="<?= $basePath ?>/admin/reportes/asistencias" class="rep-card">
+            <div class="rep-card__icon">📋</div>
+            <div class="rep-card__title">Asistencias</div>
+            <div class="rep-card__desc">
+                Registro mensual de entradas, salidas, horas trabajadas, estado y checklist
+                de cada trabajador. Filtrable por mes y persona.
+            </div>
+            <span class="rep-card__badge">RRHH</span>
+        </a>
+
+        <!-- ── Coberturas de horario ─── -->
+        <a href="<?= $basePath ?>/admin/reportes/coberturas" class="rep-card">
+            <div class="rep-card__icon">🔄</div>
+            <div class="rep-card__title">Coberturas de Horario</div>
+            <div class="rep-card__desc">
+                Quién cubrió a quién, cuántas veces cada trabajador cubrió (status 3)
+                o fue reemplazado (status 2) en el mes. Incluye comentarios del motivo.
+            </div>
+            <span class="rep-card__badge" style="background:#e0f7fa;color:#0097A7;">Horario</span>
         </a>
 
         <!-- ── Próximos reportes (pronto) ─── -->

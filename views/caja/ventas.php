@@ -46,6 +46,18 @@ $userName = $userName ?? $_SESSION['user_name'] ?? 'Usuario';
         </div>
     </section>
 
+    <!-- Aviso importante -->
+    <section class="caja-card" style="border-left:4px solid #dc2626;background:#fff5f5;">
+        <p style="color:#dc2626;font-weight:700;font-size:.95rem;margin:0 0 .35rem;">
+            ⚠ IMPORTANTE — Lee esto antes de ingresar las ventas
+        </p>
+        <p style="color:#7f1d1d;font-size:.85rem;margin:0;line-height:1.6;">
+            Está <strong>prohibido</strong> solicitar el reporte de ventas al vendedor/a sin que la cajera
+            haya cerrado previamente su turno con todos los datos de caja correctamente registrados
+            (arqueo de efectivo, cobros electrónicos y egresos).
+        </p>
+    </section>
+
     <!-- Input de ventas -->
     <section class="caja-card">
         <h2 class="caja-card__title">Total de ventas del día (ERP)</h2>

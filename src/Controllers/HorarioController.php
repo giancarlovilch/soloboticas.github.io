@@ -76,16 +76,29 @@ class HorarioController extends Controller
         $this->repo->cerrarSemanasVencidas();
         $this->repo->asegurarSemanasRolling();
 
-        $semana      = $this->repo->getSemanaProxima();
-        $semanas     = $this->repo->getSemanasRecientes();
         $slotsConfig = $this->repo->getSlotsConfig();
         $roles       = $this->repo->getRoles();
 
+        // Solo semanas futuras (que aún no han empezado)
+        $db = \Database::getConnection();
+        $stmtF = $db->query(
+            "SELECT * FROM semana WHERE fecha_inicio > CURDATE() ORDER BY fecha_inicio ASC LIMIT 2"
+        );
+        $semanas = $stmtF->fetchAll();
+
+        // Si viene ?semana= y es futura, cargarla; si no, la próxima por defecto
+        $semana = null;
+        if (!empty($_GET['semana'])) {
+            $candidata = $this->repo->getSemanaById((int)$_GET['semana']);
+            if ($candidata && $candidata['fecha_inicio'] > date('Y-m-d')) {
+                $semana = $candidata;
+            }
+        }
+        if (!$semana) $semana = $this->repo->getSemanaProxima();
+
         $editable = false;
         if ($semana) {
-            $hoy      = new DateTime('now', new DateTimeZone('America/Lima'));
-            $fin      = new DateTime($semana['fecha_fin'] . ' 23:59:59');
-            $editable = ($semana['estado'] === 'ABIERTA' && $hoy <= $fin) || $esAdmin;
+            $editable = ($semana['estado'] === 'ABIERTA') || $esAdmin;
         }
 
         require_once __DIR__ . '/../../views/horario/index.php';
@@ -113,8 +126,9 @@ class HorarioController extends Controller
         $postulanteId = $this->requireAuth();
         $data         = $this->getAllInput();
 
-        $slotId   = (int)($data['slot_id']  ?? 0);
-        $password = trim($data['password']  ?? '');
+        $slotId    = (int)($data['slot_id']   ?? 0);
+        $password  = trim($data['password']   ?? '');
+        $comentario = trim($data['comentario'] ?? '');
 
         if (!$slotId || !$password) $this->error('slot_id y contraseña requeridos', 400);
 
@@ -128,7 +142,7 @@ class HorarioController extends Controller
             $this->error('Contraseña incorrecta', 401);
         }
 
-        $result = $this->repo->cubrirSlot($slotId, $postulanteId);
+        $result = $this->repo->cubrirSlot($slotId, $postulanteId, $comentario ?: null);
         if ($result !== 'ok') $this->error($result, 409);
 
         $this->success('Turno asignado correctamente');
@@ -210,6 +224,34 @@ class HorarioController extends Controller
         $this->success('OK', $this->repo->getTrabajadores());
     }
 
+    // ── POST /horario/api/slot/{id}/liberar-admin ─────────
+    public function liberarSlotAdmin(int $slotId): void
+    {
+        $postulanteId = $this->requireAuth();
+        if (!$this->isAdmin()) $this->error('Solo administradores', 403);
+
+        $password = trim($this->getAllInput()['password'] ?? '');
+        if (empty($password)) $this->error('La contraseña es requerida', 400);
+
+        $result = $this->repo->liberarSlotAdmin($slotId, $postulanteId, $password);
+        if ($result === 'ok') $this->success('Trabajador removido del horario.');
+        else $this->error($result, 401);
+    }
+
+    // ── POST /horario/api/solicitud/{id}/revertir ─────────
+    public function revertirCobertura(int $id): void
+    {
+        $postulanteId = $this->requireAuth();
+        if (!$this->isAdmin()) $this->error('Solo administradores pueden revertir coberturas', 403);
+
+        $password = trim($this->getAllInput()['password'] ?? '');
+        if (empty($password)) $this->error('La contraseña es requerida', 400);
+
+        $result = $this->repo->revertirCobertura($id, $postulanteId, $password);
+        if ($result === 'ok') $this->success('Cobertura revertida. Slot restaurado al trabajador original.');
+        else $this->error($result, 401);
+    }
+
     // ── POST /horario/api/slot/asignar ─────────────────────
     public function asignarSlot(): void
     {
@@ -234,7 +276,11 @@ class HorarioController extends Controller
         $hoy = new DateTime('now', new DateTimeZone('America/Lima'));
         $fin = new DateTime($semana['fecha_fin'] . ' 23:59:59');
 
-        if (!$this->isAdmin() && ($semana['estado'] === 'CERRADA' || $hoy > $fin)) {
+        // LIMPIEZA es siempre editable (cualquier día, semana abierta o cerrada)
+        $slotInfo   = $this->repo->getSlotById($slotId);
+        $esLimpieza = ($slotInfo['rol_puesto'] ?? '') === 'LIMPIEZA';
+
+        if (!$esLimpieza && !$this->isAdmin() && ($semana['estado'] === 'CERRADA' || $hoy > $fin)) {
             $this->error('La semana está cerrada. Solo el administrador puede modificarla.', 403);
         }
 
@@ -254,11 +300,13 @@ class HorarioController extends Controller
 
         if (!$slotId) $this->error('slot_id requerido', 400);
 
-        $semana = $this->repo->getSemanaById($semanaId);
-        $hoy    = new DateTime('now', new DateTimeZone('America/Lima'));
-        $fin    = new DateTime($semana['fecha_fin'] . ' 23:59:59');
+        $semana     = $this->repo->getSemanaById($semanaId);
+        $hoy        = new DateTime('now', new DateTimeZone('America/Lima'));
+        $fin        = new DateTime($semana['fecha_fin'] . ' 23:59:59');
+        $slotInfo   = $this->repo->getSlotById($slotId);
+        $esLimpieza = ($slotInfo['rol_puesto'] ?? '') === 'LIMPIEZA';
 
-        if (!$this->isAdmin() && ($semana['estado'] === 'CERRADA' || $hoy > $fin)) {
+        if (!$esLimpieza && !$this->isAdmin() && ($semana['estado'] === 'CERRADA' || $hoy > $fin)) {
             $this->error('La semana está cerrada. Solo el administrador puede modificarla.', 403);
         }
 

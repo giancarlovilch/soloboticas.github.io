@@ -42,6 +42,31 @@ class CajaRepository
         )->fetchAll();
     }
 
+    public function getModosPago(): array
+    {
+        // id_modo = 1 es EFECTIVO (uso interno), no se muestra al usuario
+        return $this->db->query(
+            "SELECT id_modo, descripcion FROM modo WHERE activo = 1 AND id_modo != 1 ORDER BY id_modo"
+        )->fetchAll();
+    }
+
+    public function getTiposEgreso(): array
+    {
+        try {
+            return $this->db->query(
+                "SELECT id_tipo_egreso, etiqueta, modo_ref FROM tipo_egreso WHERE activo = 1 ORDER BY orden"
+            )->fetchAll();
+        } catch (\PDOException) {
+            // Fallback mientras no se ejecute la migración tipo_egreso
+            return [
+                ['id_tipo_egreso' => 1, 'etiqueta' => 'Pago de Personal', 'modo_ref' => 'PERSONAL'],
+                ['id_tipo_egreso' => 2, 'etiqueta' => 'Pago de Local',    'modo_ref' => 'CONCEPTO'],
+                ['id_tipo_egreso' => 3, 'etiqueta' => 'Pago de Facturas', 'modo_ref' => 'CONCEPTO'],
+                ['id_tipo_egreso' => 4, 'etiqueta' => 'Otro',             'modo_ref' => 'LIBRE'],
+            ];
+        }
+    }
+
     public function getStaffActivo(): array
     {
         return $this->db->query(
@@ -362,69 +387,170 @@ class CajaRepository
                  ->execute(['sid' => $sesionId]);
         $this->db->prepare("DELETE FROM pago_local WHERE sesion_id = :sid")
                  ->execute(['sid' => $sesionId]);
+        $this->db->prepare("DELETE FROM pago_factura  WHERE sesion_id = :sid")
+                 ->execute(['sid' => $sesionId]);
+        $this->db->prepare("DELETE FROM pago_deposito WHERE sesion_id = :sid")
+                 ->execute(['sid' => $sesionId]);
     }
 
-    public function insertGastoPersonal(int $sesionId, int $emisorId, int $beneficiarioId, float $monto, ?string $comprobante): void
+    public function insertGastoPersonal(int $sesionId, int $emisorId, int $beneficiarioId, float $monto, ?string $tipoPago): void
     {
         $this->db->prepare(
-            "INSERT INTO pago_personal (sesion_id, postulante_emisor_id, postulante_beneficiario_id, monto, numero_operacion, estado)
-             VALUES (:sid, :emi, :ben, :mon, :comp, 'PAGADO')"
-        )->execute(['sid' => $sesionId, 'emi' => $emisorId, 'ben' => $beneficiarioId, 'mon' => $monto, 'comp' => $comprobante]);
+            "INSERT INTO pago_personal (sesion_id, postulante_emisor_id, postulante_beneficiario_id, monto, tipo_pago, estado)
+             VALUES (:sid, :emi, :ben, :mon, :tp, 'PAGADO')"
+        )->execute(['sid' => $sesionId, 'emi' => $emisorId, 'ben' => $beneficiarioId, 'mon' => $monto, 'tp' => $tipoPago ?? 'PAGO_TOTAL']);
     }
 
-    public function insertGastoLocal(int $sesionId, int $localId, int $emisorId, int $conceptoId, float $monto, ?string $comprobante): void
+    public function insertGastoLocal(int $sesionId, int $localId, int $emisorId, float $monto, ?string $comprobante, int $tipoEgresoId = 0, ?int $conceptoId = null): void
     {
         $this->db->prepare(
-            "INSERT INTO pago_local (sesion_id, local_id, postulante_emisor_id, concepto_id, monto, numero_operacion, estado)
-             VALUES (:sid, :loc, :emi, :con, :mon, :comp, 'APROBADO')"
-        )->execute(['sid' => $sesionId, 'loc' => $localId, 'emi' => $emisorId, 'con' => $conceptoId, 'mon' => $monto, 'comp' => $comprobante]);
+            "INSERT INTO pago_local (sesion_id, tipo_egreso_id, local_id, postulante_emisor_id, concepto_id, monto, numero_operacion, estado)
+             VALUES (:sid, :teid, :loc, :emi, :con, :mon, :comp, 'APROBADO')"
+        )->execute(['sid' => $sesionId, 'teid' => $tipoEgresoId ?: null, 'loc' => $localId, 'emi' => $emisorId, 'con' => $conceptoId, 'mon' => $monto, 'comp' => $comprobante]);
     }
 
-    public function insertGastoOtro(int $sesionId, int $registradorId, string $descripcion, float $monto, ?string $comprobante): void
+    public function insertGastoOtro(int $sesionId, int $registradorId, string $descripcion, float $monto): void
     {
-        // Otros gastos van a movimiento_sesion como EGRESO en modo EFECTIVO
         $this->db->prepare(
-            "INSERT INTO movimiento_sesion (sesion_id, tipo_movimiento_id, modo_id, postulante_registro_id, descripcion, monto, numero_operacion, estado)
-             VALUES (:sid, 2, 1, :reg, :desc, :mon, :comp, 'APROBADO')"
-        )->execute(['sid' => $sesionId, 'reg' => $registradorId, 'desc' => $descripcion, 'mon' => $monto, 'comp' => $comprobante]);
+            "INSERT INTO movimiento_sesion (sesion_id, tipo_movimiento_id, modo_id, postulante_registro_id, descripcion, monto, estado)
+             VALUES (:sid, 2, 1, :reg, :desc, :mon, 'APROBADO')"
+        )->execute(['sid' => $sesionId, 'reg' => $registradorId, 'desc' => $descripcion, 'mon' => $monto]);
+    }
+
+    public function insertGastoDeposito(int $sesionId, int $emisorId, float $monto, ?string $comprobante): void
+    {
+        $this->db->prepare(
+            "INSERT INTO pago_deposito (sesion_id, postulante_emisor_id, monto, numero_comprobante)
+             VALUES (:sid, :emi, :mon, :comp)"
+        )->execute(['sid' => $sesionId, 'emi' => $emisorId, 'mon' => $monto, 'comp' => $comprobante]);
+    }
+
+    public function insertGastoFactura(int $sesionId, int $emisorId, string $tipoDoc, float $monto, ?string $comprobante): void
+    {
+        $this->db->prepare(
+            "INSERT INTO pago_factura (sesion_id, postulante_emisor_id, tipo_documento, monto, numero_comprobante)
+             VALUES (:sid, :emi, :tdoc, :mon, :comp)"
+        )->execute(['sid' => $sesionId, 'emi' => $emisorId, 'tdoc' => $tipoDoc, 'mon' => $monto, 'comp' => $comprobante]);
     }
 
     // ── Resumen de gastos de la sesión ─────────────────────
     public function getGastosSesion(int $sesionId): array
     {
+        // Cargar catálogo de tipos para enriquecer cada fila
+        $teByMode = [];
+        $teById   = [];
+        try {
+            foreach ($this->db->query("SELECT * FROM tipo_egreso ORDER BY orden")->fetchAll() as $te) {
+                $teById[$te['id_tipo_egreso']] = $te;
+                if ($te['activo'] && !isset($teByMode[$te['modo_ref']])) {
+                    $teByMode[$te['modo_ref']] = $te;
+                }
+            }
+        } catch (\PDOException) { /* tabla aún no migrada */ }
+
+        $fallback = fn(string $modo, string $label) => [
+            'id_tipo_egreso' => 0, 'etiqueta' => $label, 'modo_ref' => $modo,
+        ];
+
         $gastos = [];
 
         // Pagos personal
         $stmt = $this->db->prepare(
-            "SELECT 'PERSONAL' AS tipo, pp.id_pago_personal AS id, pp.monto, pp.numero_operacion AS comprobante,
+            "SELECT pp.id_pago_personal AS id, pp.monto,
+                    pp.tipo_pago, NULL AS comprobante,
                     pb.nombres AS descripcion, pp.postulante_beneficiario_id AS ref_id
              FROM pago_personal pp
              INNER JOIN postulante pb ON pp.postulante_beneficiario_id = pb.id_postulante
              WHERE pp.sesion_id = :sid"
         );
         $stmt->execute(['sid' => $sesionId]);
-        $gastos = array_merge($gastos, $stmt->fetchAll());
+        $te = $teByMode['PERSONAL'] ?? $fallback('PERSONAL', 'Pago de Personal');
+        foreach ($stmt->fetchAll() as $row) {
+            $gastos[] = $row + [
+                'tipo_egreso_id' => $te['id_tipo_egreso'],
+                'etiqueta'       => $te['etiqueta'],
+                'modo_ref'       => 'PERSONAL',
+                'tipo_css'       => 'personal',
+            ];
+        }
 
         // Pagos local
         $stmt = $this->db->prepare(
-            "SELECT 'LOCAL' AS tipo, pl.id_pago_local AS id, pl.monto, pl.numero_operacion AS comprobante,
-                    cg.descripcion, pl.concepto_id AS ref_id
+            "SELECT pl.id_pago_local AS id, pl.monto, pl.numero_operacion AS comprobante,
+                    l.descripcion, pl.local_id AS ref_id, pl.tipo_egreso_id,
+                    pl.concepto_id, cg.descripcion AS concepto_desc
              FROM pago_local pl
-             INNER JOIN concepto_gastos_local cg ON pl.concepto_id = cg.id_concepto
+             INNER JOIN local l ON pl.local_id = l.id_local
+             LEFT JOIN concepto_gastos_local cg ON pl.concepto_id = cg.id_concepto
              WHERE pl.sesion_id = :sid"
         );
         $stmt->execute(['sid' => $sesionId]);
-        $gastos = array_merge($gastos, $stmt->fetchAll());
+        $teLocal = $teByMode['LOCAL'] ?? $teByMode['CONCEPTO'] ?? $fallback('LOCAL', 'Pago de Local');
+        foreach ($stmt->fetchAll() as $row) {
+            $gastos[] = array_merge($row, [
+                'tipo_egreso_id' => $teLocal['id_tipo_egreso'],
+                'etiqueta'       => $teLocal['etiqueta'],
+                'modo_ref'       => 'LOCAL',
+                'tipo_css'       => 'concepto',
+                'tipo_pago'      => null,
+            ]);
+        }
 
-        // Otros movimientos EGRESO
+        // Otros pagos (movimiento_sesion EGRESO libre)
         $stmt = $this->db->prepare(
-            "SELECT 'OTRO' AS tipo, ms.id_movimiento AS id, ms.monto, ms.numero_operacion AS comprobante,
-                    ms.descripcion, NULL AS ref_id
+            "SELECT ms.id_movimiento AS id, ms.monto, NULL AS comprobante,
+                    ms.descripcion, NULL AS ref_id, NULL AS tipo_pago,
+                    NULL AS concepto_id, NULL AS concepto_desc, NULL AS tipo_documento
              FROM movimiento_sesion ms
              WHERE ms.sesion_id = :sid AND ms.tipo_movimiento_id = 2"
         );
         $stmt->execute(['sid' => $sesionId]);
-        $gastos = array_merge($gastos, $stmt->fetchAll());
+        $teLibre = $teByMode['LIBRE'] ?? $fallback('LIBRE', 'Otros pagos');
+        foreach ($stmt->fetchAll() as $row) {
+            $gastos[] = $row + [
+                'tipo_egreso_id' => $teLibre['id_tipo_egreso'],
+                'etiqueta'       => $teLibre['etiqueta'],
+                'modo_ref'       => 'LIBRE',
+                'tipo_css'       => 'libre',
+            ];
+        }
+
+        // Depósitos a KGyR
+        $stmt = $this->db->prepare(
+            "SELECT pd.id_pago_deposito AS id, pd.monto, pd.numero_comprobante AS comprobante,
+                    NULL AS descripcion, NULL AS ref_id, NULL AS tipo_pago,
+                    NULL AS concepto_id, NULL AS concepto_desc, NULL AS tipo_documento
+             FROM pago_deposito pd WHERE pd.sesion_id = :sid"
+        );
+        $stmt->execute(['sid' => $sesionId]);
+        $teDeposito = $teByMode['DEPOSITO'] ?? $fallback('DEPOSITO', 'Depósito a KGyR');
+        foreach ($stmt->fetchAll() as $row) {
+            $gastos[] = $row + [
+                'tipo_egreso_id' => $teDeposito['id_tipo_egreso'],
+                'etiqueta'       => $teDeposito['etiqueta'],
+                'modo_ref'       => 'DEPOSITO',
+                'tipo_css'       => 'personal',
+            ];
+        }
+
+        // Pagos factura/compras
+        $stmt = $this->db->prepare(
+            "SELECT pf.id_pago_factura AS id, pf.monto, pf.numero_comprobante AS comprobante,
+                    pf.tipo_documento, pf.tipo_documento AS descripcion, NULL AS ref_id
+             FROM pago_factura pf
+             WHERE pf.sesion_id = :sid"
+        );
+        $stmt->execute(['sid' => $sesionId]);
+        $teFactura = $teByMode['FACTURA'] ?? $fallback('FACTURA', 'Pago de Facturas');
+        foreach ($stmt->fetchAll() as $row) {
+            $gastos[] = $row + [
+                'tipo_egreso_id' => $teFactura['id_tipo_egreso'],
+                'etiqueta'       => $teFactura['etiqueta'],
+                'modo_ref'       => 'FACTURA',
+                'tipo_css'       => 'concepto',
+                'tipo_pago'      => null,
+            ];
+        }
 
         return $gastos;
     }
@@ -484,11 +610,11 @@ class CajaRepository
         // LO QUE SE DICE: base + ventas - gastos - digitales aprobados
         // Los pagos digitales (yape/plin/visa/pos/trans) restan porque no son efectivo físico.
         $digital_aprobado = $this->sumDigitalDeclarado($sesionId);
-        $total_esperado   = $saldo_inicial + $ventas - $total_gastos - $digital_aprobado;
+        $total_esperado   = round($saldo_inicial + $ventas - $total_gastos - $digital_aprobado, 2);
 
         // Diferencia: LO QUE ES − LO QUE SE DICE
-        $total_contado = $efectivo_fisico; // solo lo físico
-        $diferencia    = $total_contado - $total_esperado;
+        $total_contado = $efectivo_fisico;
+        $diferencia    = round($total_contado - $total_esperado, 2);
 
         $resultado = abs($diferencia) < 0.01 ? 'CONSISTENTE'
                    : ($diferencia > 0 ? 'SOBRANTE' : 'FALTANTE');
@@ -571,7 +697,14 @@ class CajaRepository
         $vStmt->execute(['sid' => $sesionId]);
         $vendedor = $vStmt->fetchColumn() ?: null;
 
-        return compact('sesion', 'detalle', 'venta', 'gastos', 'rectifs', 'digitales', 'digital_aprobado', 'vendedor');
+        $tiposRect       = $this->getTiposRectificacion();
+        $ajustesEsperado = $this->getAjustesEsperado($sesionId);
+        $modos           = $this->getModosPago();
+        $staff           = $this->getStaffActivo();
+        $locales         = $this->getLocales();
+        $conceptos       = $this->getConceptosGasto();
+
+        return compact('sesion', 'detalle', 'venta', 'gastos', 'rectifs', 'tiposRect', 'digitales', 'digital_aprobado', 'vendedor', 'ajustesEsperado', 'modos', 'staff', 'locales', 'conceptos');
     }
 
     // ── Eliminar sesión y todos sus hijos ──────────────────
@@ -580,10 +713,13 @@ class CajaRepository
         // Orden de borrado respetando FKs
         $tablas = [
             "DELETE FROM rectificacion_cuadre  WHERE sesion_id = :sid",
+            "DELETE FROM ajuste_esperado       WHERE sesion_id = :sid",
             "DELETE FROM detalle_cuadre        WHERE sesion_id = :sid",
             "DELETE FROM movimiento_sesion     WHERE sesion_id = :sid",
             "DELETE FROM pago_personal         WHERE sesion_id = :sid",
             "DELETE FROM pago_local            WHERE sesion_id = :sid",
+            "DELETE FROM pago_factura          WHERE sesion_id = :sid",
+            "DELETE FROM pago_deposito         WHERE sesion_id = :sid",
             "DELETE FROM reporte_venta         WHERE sesion_id = :sid",
             "DELETE FROM sesion_participante   WHERE sesion_id = :sid",
             "DELETE FROM sesion_caja           WHERE id_sesion = :sid",
@@ -604,13 +740,40 @@ class CajaRepository
     }
 
     // ── Rectificaciones ────────────────────────────────────
-    public function addRectificacion(int $sesionId, int $registraId, string $tipo, float $monto, string $descripcion): void
+    public function getTiposRectificacion(): array
     {
+        try {
+            return $this->db->query(
+                "SELECT id_tipo_rect, etiqueta, signo FROM tipo_rectificacion WHERE activo = 1 ORDER BY orden"
+            )->fetchAll();
+        } catch (\PDOException) {
+            return [
+                ['id_tipo_rect' => 1, 'etiqueta' => 'Efectivo encontrado',    'signo' =>  1],
+                ['id_tipo_rect' => 2, 'etiqueta' => 'Devolución de efectivo', 'signo' => -1],
+            ];
+        }
+    }
+
+    public function addRectificacion(int $sesionId, int $registraId, int $tipoRectId, float $monto, string $descripcion): void
+    {
+        // Obtener signo del tipo para calcular monto firmado
+        $signoStmt = $this->db->prepare("SELECT signo FROM tipo_rectificacion WHERE id_tipo_rect = :id");
+        $signoStmt->execute(['id' => $tipoRectId]);
+        $signo = (int)($signoStmt->fetchColumn() ?? 1);
+        $montoFirmado = abs($monto) * $signo;
+
+        // Mapa de compatibilidad con el enum heredado
+        $tipoEnum = match($tipoRectId) {
+            1 => 'DINERO_ENCONTRADO',
+            2 => 'DEVOLUCION_DINERO',
+            default => null,
+        };
+
         $this->db->prepare(
             "INSERT INTO rectificacion_cuadre
-                (sesion_id, postulante_registra_id, tipo_rectificacion, monto, descripcion_contexto, estado)
-             VALUES (:sid, :reg, :tipo, :mon, :desc, 'APROBADA')"
-        )->execute(['sid' => $sesionId, 'reg' => $registraId, 'tipo' => $tipo, 'mon' => $monto, 'desc' => $descripcion]);
+                (sesion_id, postulante_registra_id, tipo_rectificacion, tipo_rect_id, monto, descripcion_contexto, estado)
+             VALUES (:sid, :reg, :tipo, :trid, :mon, :desc, 'APROBADA')"
+        )->execute(['sid' => $sesionId, 'reg' => $registraId, 'tipo' => $tipoEnum, 'trid' => $tipoRectId, 'mon' => $montoFirmado, 'desc' => $descripcion]);
 
         // Actualizar saldo_proximo_dia de este arqueo
         $this->db->prepare(
@@ -618,30 +781,37 @@ class CajaRepository
              SET saldo_proximo_dia      = saldo_proximo_dia + :mon,
                  saldo_proxima_efectivo = saldo_proxima_efectivo + :mon2
              WHERE sesion_id = :sid"
-        )->execute(['mon' => $monto, 'mon2' => $monto, 'sid' => $sesionId]);
+        )->execute(['mon' => $montoFirmado, 'mon2' => $montoFirmado, 'sid' => $sesionId]);
 
-        // Propagar el nuevo saldo como base del siguiente turno de la misma caja
-        // (si ya fue creado mientras este arqueo aún estaba abierto o siendo ajustado)
-        $cajaStmt = $this->db->prepare("SELECT caja_id FROM sesion_caja WHERE id_sesion = :sid");
-        $cajaStmt->execute(['sid' => $sesionId]);
-        $cajaId = $cajaStmt->fetchColumn();
+        $this->propagarBase($sesionId);
+    }
 
-        $nuevoSaldo = $this->db->prepare(
-            "SELECT saldo_proximo_dia FROM detalle_cuadre WHERE sesion_id = :sid"
-        );
-        $nuevoSaldo->execute(['sid' => $sesionId]);
-        $saldoFinal = (float)$nuevoSaldo->fetchColumn();
+    public function deleteRectificacion(int $rectId, int $adminId, string $password): bool|string
+    {
+        if (!$this->verificarPasswordAdmin($adminId, $password)) {
+            return 'Contraseña incorrecta';
+        }
 
-        // Actualizar el saldo_inicial del siguiente turno abierto o pendiente
+        $stmt = $this->db->prepare("SELECT * FROM rectificacion_cuadre WHERE id_rectificacion = :id");
+        $stmt->execute(['id' => $rectId]);
+        $rect = $stmt->fetch();
+        if (!$rect) return 'Rectificación no encontrada';
+
+        // Revertir el ajuste en saldo_proximo_dia
+        $montoInverso = -(float)$rect['monto'];
         $this->db->prepare(
-            "UPDATE sesion_caja
-             SET saldo_inicial = :sal
-             WHERE caja_id = :cid
-               AND id_sesion > :sid
-               AND estado IN ('ABIERTA', 'PENDIENTE_VENTA')
-             ORDER BY id_sesion ASC
-             LIMIT 1"
-        )->execute(['sal' => $saldoFinal, 'cid' => $cajaId, 'sid' => $sesionId]);
+            "UPDATE detalle_cuadre
+             SET saldo_proximo_dia      = saldo_proximo_dia + :mon,
+                 saldo_proxima_efectivo = saldo_proxima_efectivo + :mon2
+             WHERE sesion_id = :sid"
+        )->execute(['mon' => $montoInverso, 'mon2' => $montoInverso, 'sid' => $rect['sesion_id']]);
+
+        $this->db->prepare("DELETE FROM rectificacion_cuadre WHERE id_rectificacion = :id")
+            ->execute(['id' => $rectId]);
+
+        $this->propagarBase((int)$rect['sesion_id']);
+
+        return true;
     }
 
     /** Propaga saldo_proximo_dia al siguiente turno abierto de la misma caja */
@@ -670,12 +840,69 @@ class CajaRepository
         return $saldo;
     }
 
+    // ── Ajustes al saldo esperado ──────────────────────────
+    public function getAjustesEsperado(int $sesionId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT ae.*,
+                    m.descripcion  AS modo_desc,
+                    p.nombres      AS staff_desc,
+                    l.descripcion  AS local_desc,
+                    cg.descripcion AS concepto_desc
+             FROM ajuste_esperado ae
+             LEFT JOIN modo m                ON ae.modo_id = m.id_modo
+             LEFT JOIN postulante p          ON ae.ref_id  = p.id_postulante  AND ae.tipo = 'PERSONAL'
+             LEFT JOIN local l               ON ae.ref_id  = l.id_local        AND ae.tipo = 'LOCAL'
+             LEFT JOIN concepto_gastos_local cg ON ae.ref2_id = cg.id_concepto AND ae.tipo = 'LOCAL'
+             WHERE ae.sesion_id = :sid ORDER BY ae.fecha ASC"
+        );
+        $stmt->execute(['sid' => $sesionId]);
+        return $stmt->fetchAll();
+    }
+
+    public function addAjusteEsperado(int $sesionId, string $tipo, string $accion, string $desc, float $monto, int $userId, array $extra = []): void
+    {
+        $this->db->prepare(
+            "INSERT INTO ajuste_esperado
+                (sesion_id, tipo, modo_id, ref_id, ref2_id, tipo_documento, tipo_pago, accion, descripcion, monto, postulante_id)
+             VALUES (:sid, :tipo, :mid, :rid, :r2id, :tdoc, :tp, :acc, :desc, :mon, :uid)"
+        )->execute([
+            'sid'  => $sesionId,
+            'tipo' => $tipo,
+            'mid'  => $extra['modo_id']        ?? null,
+            'rid'  => $extra['ref_id']         ?? null,
+            'r2id' => $extra['ref2_id']        ?? null,
+            'tdoc' => $extra['tipo_documento'] ?? null,
+            'tp'   => $extra['tipo_pago']      ?? null,
+            'acc'  => $accion,
+            'desc' => $desc,
+            'mon'  => abs($monto),
+            'uid'  => $userId,
+        ]);
+    }
+
+    public function deleteAjusteEsperado(int $ajusteId, int $adminId, string $password): bool|string
+    {
+        if (!$this->verificarPasswordAdmin($adminId, $password)) return 'Contraseña incorrecta';
+
+        $stmt = $this->db->prepare("SELECT id_ajuste FROM ajuste_esperado WHERE id_ajuste = :id");
+        $stmt->execute(['id' => $ajusteId]);
+        if (!$stmt->fetch()) return 'Ajuste no encontrado';
+
+        $this->db->prepare("DELETE FROM ajuste_esperado WHERE id_ajuste = :id")->execute(['id' => $ajusteId]);
+        return true;
+    }
+
     public function getRectificaciones(int $sesionId): array
     {
         $stmt = $this->db->prepare(
-            "SELECT rc.*, p.nombres AS registrado_por
+            "SELECT rc.*,
+                    p.nombres AS registrado_por,
+                    COALESCE(tr.etiqueta, rc.tipo_rectificacion) AS etiqueta,
+                    COALESCE(tr.signo, IF(rc.monto >= 0, 1, -1)) AS signo
              FROM rectificacion_cuadre rc
              INNER JOIN postulante p ON rc.postulante_registra_id = p.id_postulante
+             LEFT JOIN tipo_rectificacion tr ON rc.tipo_rect_id = tr.id_tipo_rect
              WHERE rc.sesion_id = :sid ORDER BY rc.fecha_rectificacion DESC"
         );
         $stmt->execute(['sid' => $sesionId]);

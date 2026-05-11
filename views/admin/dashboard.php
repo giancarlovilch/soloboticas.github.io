@@ -43,6 +43,10 @@ $navActive = [
             </div>
         </div>
 
+        <button class="nav-toggle" id="navToggle" onclick="toggleNav()" aria-label="Menú">
+            <span></span><span></span><span></span>
+        </button>
+
         <div class="header-user">
             <div class="user-details">
                 <span class="user-name"><?= htmlspecialchars($nombreUsuario); ?></span>
@@ -54,8 +58,10 @@ $navActive = [
         </div>
     </header>
 
+    <div id="navOverlay" class="nav-overlay" onclick="toggleNav()"></div>
+
     <div class="contenedor contenedor-grid">
-        <nav class="nav">
+        <nav class="nav" id="sideNav">
             <ul class="list">
                 <li class="list__item <?= $navActive['home'] ? 'list__item--active' : '' ?>">
                     <a href="<?= $basePath ?>/admin/dashboard" class="list__button">
@@ -110,6 +116,15 @@ $navActive = [
                     </a>
                 </li>
 
+                <p class="nav__section">Sistema</p>
+
+                <li class="list__item">
+                    <a href="<?= $basePath ?>/admin/database" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Base de Datos</span>
+                    </a>
+                </li>
+
                 <li class="list__item--bottom">
                     <a href="<?= $basePath ?>/logout" class="list__button list__button--logout">
                         <img src="<?= $basePath ?>/assets/img/icons/logout.svg" class="list__img">
@@ -150,6 +165,17 @@ $navActive = [
         </aside>
     </div>
 
+    <script>
+const BASE = '<?= $basePath ?>';
+function toggleNav() {
+    const nav     = document.getElementById('sideNav');
+    const overlay = document.getElementById('navOverlay');
+    const open    = nav.classList.toggle('nav--open');
+    overlay.classList.toggle('nav-overlay--visible', open);
+    document.body.classList.toggle('nav-body-lock', open);
+}
+</script>
+    <script src="<?= $basePath ?>/assets/js/session-guard.js"></script>
     <script src="<?= $basePath ?>/assets/js/dashboard.js"></script>
 
     <?php if ($page === 'postulantes' || $page === 'update'): ?>

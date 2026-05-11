@@ -14,16 +14,24 @@ $loQueEsFisico = (float)($detalle['monto_caja_exterior']        ?? 0)
                + (float)($detalle['monto_agente_bcp']           ?? 0);
 
 $sum_rectifs = array_sum(array_column($rectifs ?? [], 'monto'));
-$loQueEs     = $loQueEsFisico + $sum_rectifs;
+$loQueEs     = round($loQueEsFisico + $sum_rectifs, 2);
 
-// LO QUE SE DICE = base + ventas - gastos - digitales declarados
+// LO QUE SE DICE = base + ventas - gastos - digitales declarados ± ajustes esperado
 $saldo_ini        = (float)($sesion['saldo_inicial']         ?? 0);
 $total_ventas     = (float)($detalle['total_ventas_sistema'] ?? ($venta['monto'] ?? 0));
 $total_gastos     = (float)($detalle['total_gastos_sistema'] ?? 0);
 $digital_aprobado = $digital_aprobado ?? 0;
-$loQueSeDice      = $saldo_ini + $total_ventas - $total_gastos - $digital_aprobado;
 
-$diferencia = $loQueEs - $loQueSeDice;
+// AGREGAR un cobro/egreso omitido → RESTA del saldo esperado (era un pago digital/gasto real)
+// QUITAR un cobro/egreso erróneo → SUMA al saldo esperado (ese movimiento no existió)
+$sum_ajustes_esp = 0.0;
+foreach ($ajustesEsperado ?? [] as $aj) {
+    $sum_ajustes_esp += $aj['accion'] === 'AGREGAR' ? -(float)$aj['monto'] : (float)$aj['monto'];
+}
+
+$loQueSeDice = round($saldo_ini + $total_ventas - $total_gastos - $digital_aprobado + $sum_ajustes_esp, 2);
+
+$diferencia = round($loQueEs - $loQueSeDice, 2);
 $resultado  = abs($diferencia) < 0.01 ? 'CONSISTENTE' : ($diferencia > 0 ? 'SOBRANTE' : 'FALTANTE');
 $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobrante' : 'dif-faltante');
 ?>
@@ -129,12 +137,21 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
                 </div>
                 <div class="caja-linea caja-linea--sub">
                     <span>− Egresos del turno</span>
-                    <strong class="text-danger"><?= $f2($total_gastos) ?></strong>
+                    <strong style="color:var(--cj-dark)"><?= $f2($total_gastos) ?></strong>
                 </div>
                 <?php if ($digital_aprobado > 0): ?>
                 <div class="caja-linea caja-linea--sub">
                     <span>− Cobros electrónicos</span>
                     <strong class="text-danger"><?= $f2($digital_aprobado) ?></strong>
+                </div>
+                <?php endif; ?>
+                <?php if ($sum_ajustes_esp != 0): ?>
+                <div class="caja-linea <?= $sum_ajustes_esp > 0 ? '' : 'caja-linea--sub' ?>">
+                    <?php $colorAj = $sum_ajustes_esp >= 0 ? '#059669' : '#dc2626'; ?>
+                    <span style="color:<?= $colorAj ?>;font-weight:600;"><?= $sum_ajustes_esp >= 0 ? '+' : '−' ?> Ajustes declarados</span>
+                    <strong style="color:<?= $colorAj ?>;">
+                        <?= $f2(abs($sum_ajustes_esp)) ?>
+                    </strong>
                 </div>
                 <?php endif; ?>
                 <div class="caja-linea caja-linea--total">
@@ -198,13 +215,28 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
             <p class="caja-empty">Sin gastos registrados.</p>
         <?php else: ?>
         <table class="caja-table">
-            <thead><tr><th>Tipo</th><th>Descripción</th><th>Comprobante</th><th class="text-right">Monto</th></tr></thead>
+            <thead><tr><th>Tipo</th><th>Detalle</th><th>Comprobante</th><th class="text-right">Monto</th></tr></thead>
             <tbody>
-            <?php foreach ($gastos as $g): ?>
+            <?php
+            $tipoPagoLabel = ['ADELANTO' => 'Adelanto', 'PAGO_TOTAL' => 'Pago total', 'OTROS' => 'Otros'];
+            $tipoDocLabel  = ['BOLETA' => 'Boleta', 'FACTURA' => 'Factura', 'NOTA_DE_VENTA' => 'Nota de venta'];
+            foreach ($gastos as $g):
+                $modo = $g['modo_ref'] ?? '';
+                if ($modo === 'PERSONAL') {
+                    $detalle = htmlspecialchars($g['descripcion']) . ' · <em>' . ($tipoPagoLabel[$g['tipo_pago'] ?? ''] ?? '') . '</em>';
+                } elseif ($modo === 'LOCAL') {
+                    $detalle = htmlspecialchars($g['descripcion']);
+                    if (!empty($g['concepto_desc'])) $detalle .= ' · ' . htmlspecialchars($g['concepto_desc']);
+                } elseif ($modo === 'FACTURA') {
+                    $detalle = $tipoDocLabel[$g['tipo_documento'] ?? ''] ?? htmlspecialchars($g['descripcion']);
+                } else {
+                    $detalle = htmlspecialchars($g['descripcion']);
+                }
+            ?>
                 <tr>
-                    <td><span class="caja-gasto-badge caja-gasto-badge--<?= strtolower($g['tipo']) ?>"><?= $g['tipo'] ?></span></td>
-                    <td><?= htmlspecialchars($g['descripcion']) ?></td>
-                    <td><?= htmlspecialchars($g['comprobante'] ?? '—') ?></td>
+                    <td><span class="caja-gasto-badge caja-gasto-badge--<?= $g['tipo_css'] ?? 'otro' ?>"><?= htmlspecialchars($g['etiqueta'] ?? '') ?></span></td>
+                    <td style="font-size:.83rem;"><?= $detalle ?></td>
+                    <td style="font-size:.78rem;color:#64748b;"><?= htmlspecialchars($g['comprobante'] ?? '—') ?></td>
                     <td class="text-right"><?= $f2($g['monto']) ?></td>
                 </tr>
             <?php endforeach; ?>
@@ -263,75 +295,308 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
         <div class="caja-card__header-row">
             <div>
                 <h2 class="caja-card__title">Ajustes de cierre</h2>
-                <p class="caja-card__desc">Si hay diferencias justificadas, regístralas aquí. El monto ajusta el saldo de apertura del siguiente turno.</p>
+                <p class="caja-card__desc">Registra diferencias justificadas. El monto ajusta la base del siguiente turno automáticamente.</p>
             </div>
+            <button class="caja-btn caja-btn--outline" onclick="toggleSeccion('seccionRect', this)">
+                Modificar
+            </button>
         </div>
+        <div id="seccionRect" hidden>
 
-        <?php
-        $tipoLabel = [
-            'DINERO_ENCONTRADO' => 'Efectivo encontrado',
-            'DEVOLUCION_DINERO' => 'Devolución de efectivo',
-            'AJUSTE_CONTEO'     => 'Ajuste de conteo',
-            'COMPENSACION'      => 'Compensación autorizada',
-            'OTRO'              => 'Otro concepto',
-        ];
-        ?>
         <?php if (!empty($rectifs)): ?>
         <table class="caja-table" style="margin-bottom:1rem;">
-            <thead><tr><th>Tipo</th><th>Descripción</th><th>Por</th><th class="text-right">Monto</th></tr></thead>
+            <thead>
+                <tr><th>Tipo</th><th>Descripción</th><th>Por</th><th class="text-right">Ajuste</th><th class="text-center">Quitar</th></tr>
+            </thead>
             <tbody>
             <?php foreach ($rectifs as $r): ?>
+                <?php
+                    $signo   = (int)($r['signo'] ?? ($r['monto'] >= 0 ? 1 : -1));
+                    $esSuma  = $signo > 0;
+                    $prefijo = $esSuma ? '+' : '−';
+                    $color   = $esSuma ? '#065f46' : '#991b1b';
+                    $bg      = $esSuma ? '#d1fae5' : '#fee2e2';
+                ?>
                 <tr>
-                    <td><?= $tipoLabel[$r['tipo_rectificacion']] ?? htmlspecialchars($r['tipo_rectificacion']) ?></td>
+                    <td><?= htmlspecialchars($r['etiqueta'] ?? $r['tipo_rectificacion']) ?></td>
                     <td><?= htmlspecialchars($r['descripcion_contexto']) ?></td>
-                    <td><?= htmlspecialchars($r['registrado_por']) ?></td>
-                    <td class="text-right <?= $r['monto'] < 0 ? 'text-danger':'' ?>"><?= $f2($r['monto']) ?></td>
+                    <td style="font-size:.78rem;color:#64748b;"><?= htmlspecialchars($r['registrado_por']) ?></td>
+                    <td class="text-right">
+                        <span style="font-weight:700;color:<?= $color ?>;background:<?= $bg ?>;padding:2px 8px;border-radius:5px;font-size:.85rem;">
+                            <?= $prefijo ?> <?= $f2(abs((float)$r['monto'])) ?>
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <button onclick="abrirModalEliminarRect(<?= $r['id_rectificacion'] ?>)"
+                            style="background:transparent;border:1px solid #fca5a5;color:#ef4444;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:600;cursor:pointer;">
+                            ✕
+                        </button>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
         <?php endif; ?>
 
-        <div class="caja-rect-form">
-            <select id="rectTipo" class="caja-input">
-                <option value="DINERO_ENCONTRADO">Efectivo encontrado</option>
-                <option value="DEVOLUCION_DINERO">Devolución de efectivo</option>
-                <option value="AJUSTE_CONTEO">Ajuste de conteo</option>
-                <option value="COMPENSACION">Compensación autorizada</option>
-                <option value="OTRO">Otro concepto</option>
+        <div class="caja-rect-form" style="grid-template-columns:100px 110px 1fr 140px auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+            <span style="font-size:.82rem;font-weight:600;color:#475569;align-self:center;">Efectivo</span>
+            <select id="rectAccion" class="caja-input" onchange="rectAccionChanged(this)">
+                <option value="AGREGAR">Agregar</option>
+                <option value="QUITAR">Quitar</option>
             </select>
-            <input type="text" id="rectDesc" class="caja-input" placeholder="Descripción (ej: encontré S/20 en bolsillo)">
+            <input type="text" id="rectDesc" class="caja-input" placeholder="Descripción breve">
             <div class="caja-input-money">
-                <span>S/</span>
-                <input type="number" id="rectMonto" class="caja-input caja-input--money" step="0.01" placeholder="Monto (negativo = descuento)">
+                <span id="rectSigno" style="font-weight:700;min-width:14px;text-align:center;color:#059669;">+</span>
+                <input type="number" id="rectMonto" class="caja-input caja-input--money" min="0.01" step="0.01" placeholder="0.00">
             </div>
             <button class="caja-btn caja-btn--secondary" onclick="submitRectificacion(<?= $sesion['id_sesion'] ?>)">
                 Aplicar
             </button>
         </div>
         <div id="rectMsg" class="caja-alert" hidden></div>
+        </div><!-- /seccionRect -->
+    </section>
+
+    <!-- Modal eliminar rectificación -->
+    <div id="modalEliminarRect" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:500;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:14px;padding:1.75rem;width:300px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.22);">
+            <h3 style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:.35rem;">Eliminar ajuste</h3>
+            <p style="font-size:0.8rem;color:#64748b;margin-bottom:1rem;">El saldo del siguiente turno será revertido. Confirma con tu contraseña.</p>
+            <input type="password" id="rectPassword"
+                   style="width:100%;padding:.55rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;margin-bottom:.75rem;box-sizing:border-box;"
+                   placeholder="Contraseña de administrador">
+            <div id="rectElimMsg" style="font-size:.78rem;color:#991b1b;margin-bottom:.5rem;display:none;"></div>
+            <div style="display:flex;gap:.6rem;justify-content:flex-end;">
+                <button onclick="cerrarModalEliminarRect()"
+                    style="background:#f1f5f9;border:none;border-radius:7px;padding:.5rem 1rem;font-size:.82rem;cursor:pointer;color:#475569;">
+                    Cancelar
+                </button>
+                <button id="btnConfirmarElimRect"
+                    style="background:#dc2626;border:none;border-radius:7px;padding:.5rem 1rem;font-size:.82rem;font-weight:700;color:#fff;cursor:pointer;">
+                    Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Ajustes al saldo esperado ────────────────────── -->
+    <section class="caja-card">
+        <div class="caja-card__header-row">
+            <div>
+                <h2 class="caja-card__title">Correcciones al saldo esperado</h2>
+                <p class="caja-card__desc">
+                    Registra cobros o pagos omitidos en el turno.
+                    <strong>Agregar</strong> suma al saldo esperado · <strong>Quitar</strong> resta del saldo esperado.
+                </p>
+            </div>
+            <button class="caja-btn caja-btn--outline" onclick="toggleSeccion('seccionAjuste', this)">
+                Modificar
+            </button>
+        </div>
+        <div id="seccionAjuste" hidden>
+
+        <?php if (!empty($ajustesEsperado)):
+            $tipoLabel = ['COBRO'=>'Cobro elec.','PERSONAL'=>'Personal','LOCAL'=>'Local','COMPRA'=>'Compra','OTRO'=>'Otro'];
+            $tipoColor = ['COBRO'=>'#3b82f6','PERSONAL'=>'#7c3aed','LOCAL'=>'#0e7490','COMPRA'=>'#0e7490','OTRO'=>'#64748b'];
+            $tipoBg    = ['COBRO'=>'#eff6ff','PERSONAL'=>'#ede9fe','LOCAL'=>'#f0fdfe','COMPRA'=>'#f0fdfe','OTRO'=>'#f1f5f9'];
+        ?>
+        <table class="caja-table" style="margin-bottom:1.25rem;">
+            <thead>
+                <tr><th>Tipo</th><th>Detalle</th><th>Acción</th><th class="text-right">Monto</th><th class="text-center">✕</th></tr>
+            </thead>
+            <tbody>
+            <?php foreach ($ajustesEsperado as $aj):
+                $esAgregar = $aj['accion'] === 'AGREGAR';
+                $t = $aj['tipo'] ?? 'COBRO';
+
+                if ($t === 'COBRO')    $detalle = htmlspecialchars($aj['modo_desc'] ?? '');
+                elseif ($t === 'PERSONAL') $detalle = htmlspecialchars($aj['staff_desc'] ?? '') . ($aj['tipo_pago'] ? ' · ' . ($aj['tipo_pago'] === 'ADELANTO' ? 'Adelanto' : 'Pago total') : '');
+                elseif ($t === 'LOCAL')    $detalle = htmlspecialchars($aj['local_desc'] ?? '') . ($aj['concepto_desc'] ? ' · ' . htmlspecialchars($aj['concepto_desc']) : '');
+                elseif ($t === 'COMPRA')   $detalle = ['BOLETA'=>'Boleta','FACTURA'=>'Factura','NOTA_DE_VENTA'=>'Nota de venta'][$aj['tipo_documento'] ?? ''] ?? '';
+                else                       $detalle = htmlspecialchars($aj['descripcion'] ?? '');
+
+                $notaDesc = ($t !== 'OTRO' && !empty($aj['descripcion'])) ? '<br><span style="font-size:.73rem;color:#94a3b8;">' . htmlspecialchars($aj['descripcion']) . '</span>' : '';
+            ?>
+                <tr>
+                    <td>
+                        <span style="font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:5px;
+                            background:<?= $tipoBg[$t] ?? '#f1f5f9' ?>;color:<?= $tipoColor[$t] ?? '#64748b' ?>">
+                            <?= $tipoLabel[$t] ?? $t ?>
+                        </span>
+                    </td>
+                    <td style="font-size:.82rem;"><?= $detalle ?><?= $notaDesc ?></td>
+                    <td>
+                        <?php
+                        // AGREGAR resta del esperado (efecto negativo = rojo)
+                        // QUITAR suma al esperado (efecto positivo = verde)
+                        $efectoPositivo = !$esAgregar;
+                        ?>
+                        <span style="font-size:.72rem;font-weight:700;padding:2px 7px;border-radius:5px;
+                            background:<?= $efectoPositivo ? '#d1fae5' : '#fee2e2' ?>;
+                            color:<?= $efectoPositivo ? '#065f46' : '#991b1b' ?>">
+                            <?= $esAgregar ? '− Agregar' : '+ Quitar' ?>
+                        </span>
+                    </td>
+                    <td class="text-right" style="font-weight:700;color:<?= $efectoPositivo ? '#065f46' : '#991b1b' ?>">
+                        <?= $esAgregar ? '−' : '+' ?> <?= $f2($aj['monto']) ?>
+                    </td>
+                    <td class="text-center">
+                        <button onclick="abrirModalEliminarAjuste(<?= $aj['id_ajuste'] ?>)"
+                            style="background:transparent;border:1px solid #fca5a5;color:#ef4444;border-radius:5px;padding:2px 8px;font-size:.72rem;font-weight:600;cursor:pointer;">✕</button>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+
+        <!-- Formulario de corrección -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+            <!-- Fila 1: tipo + acción -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem;">
+                <div>
+                    <label style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;display:block;margin-bottom:.25rem;">Tipo de corrección</label>
+                    <select id="ajTipo" class="caja-input" onchange="ajTipoChanged(this)">
+                        <option value="COBRO">Cobro electrónico (Yape/POS)</option>
+                        <option value="PERSONAL">Pago de Personal</option>
+                        <option value="LOCAL">Pago de Local</option>
+                        <option value="COMPRA">Pago de Compras</option>
+                        <option value="DEPOSITO">Depósito a KGyR</option>
+                        <option value="OTRO">Otros pagos</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;display:block;margin-bottom:.25rem;">Acción</label>
+                    <select id="ajAccion" class="caja-input" onchange="ajAccionChanged(this)">
+                        <option value="AGREGAR">Agregar</option>
+                        <option value="QUITAR">Quitar</option>
+                    </select>
+                </div>
+            </div>
+            <!-- Fila 2: campos dinámicos + monto + aplicar -->
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                <div id="ajMiddle" style="display:flex;gap:.5rem;align-items:center;flex:1;min-width:0;flex-wrap:wrap;"></div>
+                <div class="caja-input-money" style="max-width:130px;">
+                    <span id="ajSigno" style="font-weight:700;color:#059669;">+</span>
+                    <input type="number" id="ajMonto" class="caja-input caja-input--money" min="0.01" step="0.01" placeholder="0.00">
+                </div>
+                <button class="caja-btn caja-btn--secondary" onclick="addAjusteEsperado(<?= $sesion['id_sesion'] ?>)">Aplicar</button>
+            </div>
+        </div>
+        <div id="ajMsg" class="caja-alert" hidden style="margin-top:.5rem;"></div>
+        </div><!-- /seccionAjuste -->
+    </section>
+
+    <!-- Modal eliminar ajuste esperado -->
+    <div id="modalEliminarAjuste" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:500;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:14px;padding:1.75rem;width:300px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.22);">
+            <h3 style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:.35rem;">Eliminar ajuste</h3>
+            <p style="font-size:.8rem;color:#64748b;margin-bottom:1rem;">Confirma con tu contraseña de administrador.</p>
+            <input type="password" id="ajPassword"
+                   style="width:100%;padding:.55rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;margin-bottom:.75rem;box-sizing:border-box;"
+                   placeholder="Contraseña">
+            <div id="ajElimMsg" style="font-size:.78rem;color:#991b1b;margin-bottom:.5rem;display:none;"></div>
+            <div style="display:flex;gap:.6rem;justify-content:flex-end;">
+                <button onclick="cerrarModalEliminarAjuste()"
+                    style="background:#f1f5f9;border:none;border-radius:7px;padding:.5rem 1rem;font-size:.82rem;cursor:pointer;color:#475569;">
+                    Cancelar
+                </button>
+                <button id="btnConfirmarElimAjuste"
+                    style="background:#dc2626;border:none;border-radius:7px;padding:.5rem 1rem;font-size:.82rem;font-weight:700;color:#fff;cursor:pointer;">
+                    Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Comentario del turno ─────────────────────────── -->
+    <section class="caja-card">
+        <h2 class="caja-card__title">Comentario del turno</h2>
+
+        <?php if (!empty($sesion['comentario_cajera'])): ?>
+        <div style="padding:.85rem 1rem;background:#fef9c3;border-left:4px solid #ca8a04;border-radius:0 8px 8px 0;margin-bottom:1rem;">
+            <p style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#92400e;margin:0 0 .35rem;">
+                Comentario de la cajera
+            </p>
+            <p style="color:#1e293b;font-size:.86rem;margin:0;white-space:pre-wrap;"><?= htmlspecialchars($sesion['comentario_cajera']) ?></p>
+        </div>
+
+        <?php if (!empty($sesion['respuesta_admin'])): ?>
+        <div style="padding:.85rem 1rem;background:#eff6ff;border-left:4px solid #3b82f6;border-radius:0 8px 8px 0;">
+            <p style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#3b82f6;margin:0 0 .35rem;">
+                Respuesta del administrador
+            </p>
+            <p style="color:#1e293b;font-size:.86rem;margin:0;white-space:pre-wrap;"><?= htmlspecialchars($sesion['respuesta_admin']) ?></p>
+        </div>
+        <?php else: ?>
+        <div>
+            <p style="font-size:.82rem;font-weight:600;color:#334155;margin:.25rem 0 .5rem;">Respuesta del administrador</p>
+            <textarea id="adminRespuesta" class="caja-input"
+                      style="width:100%;resize:vertical;min-height:80px;font-family:inherit;box-sizing:border-box;"
+                      placeholder="Escribe la respuesta a la cajera..."></textarea>
+            <div style="margin-top:.6rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                <input type="password" id="adminRespPassword" class="caja-input"
+                       style="max-width:210px;" placeholder="Contraseña de administrador">
+                <button class="caja-btn caja-btn--secondary"
+                        onclick="guardarRespuesta(<?= $sesion['id_sesion'] ?>)">
+                    Guardar respuesta
+                </button>
+                <span id="respMsg" style="font-size:.82rem;display:none;"></span>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php else: ?>
+        <p style="color:#94a3b8;font-size:.85rem;margin:0;">Este turno no tiene comentarios.</p>
+        <?php endif; ?>
     </section>
 
 </main>
 
+<script src="<?= $basePath ?>/assets/js/session-guard.js"></script>
 <script>
-const BASE = '<?= $basePath ?>';
+const BASE        = '<?= $basePath ?>';
+const TIPOS_RECT  = <?= json_encode($tiposRect  ?? []) ?>;
+const AJ_MODOS    = <?= json_encode($modos      ?? []) ?>;
+const AJ_STAFF    = <?= json_encode($staff      ?? []) ?>;
+const AJ_LOCALES  = <?= json_encode($locales    ?? []) ?>;
+const AJ_CONCEPTOS= <?= json_encode($conceptos  ?? []) ?>;
+
+function toggleSeccion(id, btn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const abierto = !el.hidden;
+    el.hidden = abierto;
+    btn.textContent = abierto ? 'Modificar' : 'Cerrar';
+    btn.style.background = abierto ? '' : '#e2e8f0';
+}
+
+function rectAccionChanged(sel) {
+    const esAgregar = sel.value === 'AGREGAR';
+    const signoEl   = document.getElementById('rectSigno');
+    if (signoEl) {
+        signoEl.textContent = esAgregar ? '+' : '−';
+        signoEl.style.color = esAgregar ? '#059669' : '#dc2626';
+    }
+}
 
 async function submitRectificacion(sesionId) {
-    const tipo  = document.getElementById('rectTipo').value;
-    const desc  = document.getElementById('rectDesc').value.trim();
-    const monto = parseFloat(document.getElementById('rectMonto').value);
-    const msg   = document.getElementById('rectMsg');
+    const accion     = document.getElementById('rectAccion')?.value;
+    const tipo       = (TIPOS_RECT || []).find(t => accion === 'AGREGAR' ? t.signo > 0 : t.signo < 0);
+    const tipoRectId = tipo?.id_tipo_rect;
+    const desc       = document.getElementById('rectDesc').value.trim();
+    const monto      = parseFloat(document.getElementById('rectMonto').value);
+    const msg        = document.getElementById('rectMsg');
 
-    if (!desc || isNaN(monto) || monto === 0) {
-        showAlert(msg, 'Completa descripción y monto.', 'error'); return;
+    if (!tipoRectId || !desc || isNaN(monto) || monto <= 0) {
+        showAlert(msg, 'Completa descripción y un monto positivo.', 'error'); return;
     }
 
     try {
         const r   = await fetch(`${BASE}/caja/api/reporte/${sesionId}/rectificar`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ tipo, descripcion: desc, monto }),
+            body:    JSON.stringify({ tipo_rect_id: tipoRectId, descripcion: desc, monto }),
         });
         const res = await r.json();
         if (res.success) { showAlert(msg, '✓ ' + res.message, 'ok'); setTimeout(() => location.reload(), 1200); }
@@ -343,6 +608,170 @@ function showAlert(el, txt, type) {
     el.textContent = txt;
     el.className   = `caja-alert caja-alert--${type}`;
     el.hidden      = false;
+}
+
+// ── Eliminar rectificación ────────────────────────────
+let _rectIdAEliminar = null;
+
+function abrirModalEliminarRect(rectId) {
+    _rectIdAEliminar = rectId;
+    document.getElementById('rectPassword').value = '';
+    document.getElementById('rectElimMsg').style.display = 'none';
+    document.getElementById('modalEliminarRect').style.display = 'flex';
+    setTimeout(() => document.getElementById('rectPassword').focus(), 50);
+}
+
+function cerrarModalEliminarRect() {
+    document.getElementById('modalEliminarRect').style.display = 'none';
+    _rectIdAEliminar = null;
+}
+
+document.getElementById('btnConfirmarElimRect')?.addEventListener('click', async function() {
+    const password = document.getElementById('rectPassword').value.trim();
+    const msgEl    = document.getElementById('rectElimMsg');
+    if (!password) { msgEl.textContent = 'Ingresa tu contraseña.'; msgEl.style.display = 'block'; return; }
+
+    try {
+        const r   = await fetch(`${BASE}/caja/api/rectificacion/${_rectIdAEliminar}/eliminar`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ password }),
+        });
+        const res = await r.json();
+        if (res.success) { location.reload(); }
+        else { msgEl.textContent = res.message || 'Error al eliminar.'; msgEl.style.display = 'block'; }
+    } catch { msgEl.textContent = 'Error de conexión.'; msgEl.style.display = 'block'; }
+});
+
+// ── Correcciones al saldo esperado ────────────────────
+function ajTipoChanged(sel) {
+    const middle = document.getElementById('ajMiddle');
+    const tipo   = sel.value;
+    let html = '';
+
+    if (tipo === 'COBRO') {
+        const opts = AJ_MODOS.map(m => `<option value="${m.id_modo}">${m.descripcion}</option>`).join('');
+        html = `<select id="ajRef" class="caja-input" style="max-width:140px"><option value="">— Modo —</option>${opts}</select>
+                <input type="text" id="ajDesc" class="caja-input" style="flex:1;min-width:120px" placeholder="Descripción (opc.)" maxlength="200">`;
+    } else if (tipo === 'PERSONAL') {
+        const opts = AJ_STAFF.map(s => `<option value="${s.id}">${s.nombre_completo}</option>`).join('');
+        html = `<select id="ajRef" class="caja-input" style="flex:1"><option value="">— Personal —</option>${opts}</select>
+                <select id="ajTipoPago" class="caja-input" style="max-width:130px">
+                    <option value="PAGO_TOTAL">Pago total</option><option value="ADELANTO">Adelanto</option>
+                </select>
+                <input type="text" id="ajDesc" class="caja-input" style="max-width:140px" placeholder="Descripción (opc.)" maxlength="200">`;
+    } else if (tipo === 'LOCAL') {
+        const optsL = AJ_LOCALES.map(l => `<option value="${l.id}">${l.descripcion}</option>`).join('');
+        const optsC = AJ_CONCEPTOS.map(c => `<option value="${c.id}">${c.descripcion}</option>`).join('');
+        html = `<select id="ajRef" class="caja-input" style="max-width:120px"><option value="">— Local —</option>${optsL}</select>
+                <select id="ajRef2" class="caja-input" style="flex:1"><option value="">— Concepto —</option>${optsC}</select>
+                <input type="text" id="ajDesc" class="caja-input" style="max-width:130px" placeholder="N° comprobante" maxlength="100">`;
+    } else if (tipo === 'COMPRA') {
+        html = `<select id="ajTipoDoc" class="caja-input" style="max-width:150px">
+                    <option value="BOLETA">Boleta</option><option value="FACTURA">Factura</option><option value="NOTA_DE_VENTA">Nota de venta</option>
+                </select>
+                <input type="text" id="ajDesc" class="caja-input" style="flex:1" placeholder="N° comprobante" maxlength="100">`;
+    } else if (tipo === 'DEPOSITO') {
+        html = `<input type="text" id="ajDesc" class="caja-input" style="flex:1" placeholder="N° comprobante o Referencia" maxlength="200">`;
+    } else {
+        html = `<input type="text" id="ajDesc" class="caja-input" style="flex:1" placeholder="Descripción del pago" maxlength="200">`;
+    }
+
+    middle.innerHTML = html;
+}
+
+function ajAccionChanged(sel) {
+    const signoEl = document.getElementById('ajSigno');
+    if (!signoEl) return;
+    const esAgregar = sel.value === 'AGREGAR';
+    signoEl.textContent = esAgregar ? '+' : '−';
+    signoEl.style.color = esAgregar ? '#059669' : '#dc2626';
+}
+
+async function addAjusteEsperado(sesionId) {
+    const tipo   = document.getElementById('ajTipo')?.value;
+    const accion = document.getElementById('ajAccion')?.value;
+    const monto  = parseFloat(document.getElementById('ajMonto')?.value);
+    const desc   = document.getElementById('ajDesc')?.value?.trim() || '';
+    const msg    = document.getElementById('ajMsg');
+
+    if (isNaN(monto) || monto <= 0) { showAlert(msg, 'Ingresa un monto válido.', 'error'); return; }
+
+    const payload = { tipo, accion, descripcion: desc, monto };
+    if (tipo === 'COBRO')    payload.modo_id        = parseInt(document.getElementById('ajRef')?.value) || null;
+    if (tipo === 'PERSONAL') { payload.ref_id = parseInt(document.getElementById('ajRef')?.value) || null; payload.tipo_pago = document.getElementById('ajTipoPago')?.value; }
+    if (tipo === 'LOCAL')    { payload.ref_id = parseInt(document.getElementById('ajRef')?.value) || null; payload.ref2_id = parseInt(document.getElementById('ajRef2')?.value) || null; }
+    if (tipo === 'COMPRA')   payload.tipo_documento = document.getElementById('ajTipoDoc')?.value;
+
+    try {
+        const r   = await fetch(`${BASE}/caja/api/sesion/${sesionId}/ajuste-esperado`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body:   JSON.stringify(payload),
+        });
+        const res = await r.json();
+        if (res.success) { showAlert(msg, '✓ ' + res.message, 'ok'); setTimeout(() => location.reload(), 900); }
+        else showAlert(msg, res.message, 'error');
+    } catch { showAlert(msg, 'Error de conexión.', 'error'); }
+}
+
+// Inicializar el middle con COBRO por defecto
+document.addEventListener('DOMContentLoaded', () => {
+    const sel = document.getElementById('ajTipo');
+    if (sel) ajTipoChanged(sel);
+});
+
+let _ajusteIdAEliminar = null;
+
+function abrirModalEliminarAjuste(ajusteId) {
+    _ajusteIdAEliminar = ajusteId;
+    document.getElementById('ajPassword').value = '';
+    document.getElementById('ajElimMsg').style.display = 'none';
+    document.getElementById('modalEliminarAjuste').style.display = 'flex';
+    setTimeout(() => document.getElementById('ajPassword').focus(), 50);
+}
+
+function cerrarModalEliminarAjuste() {
+    document.getElementById('modalEliminarAjuste').style.display = 'none';
+    _ajusteIdAEliminar = null;
+}
+
+document.getElementById('btnConfirmarElimAjuste')?.addEventListener('click', async function() {
+    const password = document.getElementById('ajPassword').value.trim();
+    const msgEl    = document.getElementById('ajElimMsg');
+    if (!password) { msgEl.textContent = 'Ingresa tu contraseña.'; msgEl.style.display = 'block'; return; }
+    try {
+        const r   = await fetch(`${BASE}/caja/api/ajuste-esperado/${_ajusteIdAEliminar}/eliminar`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body:   JSON.stringify({ password }),
+        });
+        const res = await r.json();
+        if (res.success) location.reload();
+        else { msgEl.textContent = res.message || 'Error.'; msgEl.style.display = 'block'; }
+    } catch { msgEl.textContent = 'Error de conexión.'; msgEl.style.display = 'block'; }
+});
+
+// ── Respuesta del administrador ───────────────────────
+async function guardarRespuesta(sesionId) {
+    const respuesta = document.getElementById('adminRespuesta')?.value?.trim();
+    const password  = document.getElementById('adminRespPassword')?.value?.trim();
+    const msgEl     = document.getElementById('respMsg');
+
+    if (!respuesta) { msgEl.textContent = 'Escribe la respuesta.'; msgEl.style.color = '#dc2626'; msgEl.style.display = 'inline'; return; }
+    if (!password)  { msgEl.textContent = 'Ingresa tu contraseña.'; msgEl.style.color = '#dc2626'; msgEl.style.display = 'inline'; return; }
+
+    try {
+        const r   = await fetch(`${BASE}/caja/api/sesion/${sesionId}/respuesta`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body:   JSON.stringify({ respuesta, password }),
+        });
+        const res = await r.json();
+        if (res.success) {
+            msgEl.textContent = '✓ Respuesta guardada.'; msgEl.style.color = '#059669'; msgEl.style.display = 'inline';
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            msgEl.textContent = res.message || 'Error.'; msgEl.style.color = '#dc2626'; msgEl.style.display = 'inline';
+        }
+    } catch { msgEl.textContent = 'Error de conexión.'; msgEl.style.color = '#dc2626'; msgEl.style.display = 'inline'; }
 }
 
 // ── Eliminar cuadre ───────────────────────────────────

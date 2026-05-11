@@ -99,12 +99,12 @@ $fDif = function($v) {
                        value="<?= htmlspecialchars($filtroHasta) ?>">
             </div>
             <div class="rep-filtro-group">
-                <label>Local</label>
-                <select name="local" class="caja-input" style="max-width:160px;">
-                    <option value="0">Todos</option>
-                    <?php foreach ($locales as $l): ?>
-                        <option value="<?= $l['id'] ?>" <?= $filtroLocal == $l['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($l['descripcion']) ?>
+                <label>Caja</label>
+                <select name="caja" class="caja-input" style="max-width:200px;">
+                    <option value="0">Todas</option>
+                    <?php foreach ($cajas as $c): ?>
+                        <option value="<?= $c['id'] ?>" <?= $filtroCaja == $c['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($c['descripcion']) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -113,9 +113,8 @@ $fDif = function($v) {
                 <label>Resultado</label>
                 <select name="resultado" class="caja-input" style="max-width:140px;">
                     <option value="">Todos</option>
-                    <option value="CONSISTENTE" <?= $filtroResultado === 'CONSISTENTE' ? 'selected' : '' ?>>Conforme</option>
-                    <option value="SOBRANTE"    <?= $filtroResultado === 'SOBRANTE'    ? 'selected' : '' ?>>Superávit</option>
-                    <option value="FALTANTE"    <?= $filtroResultado === 'FALTANTE'    ? 'selected' : '' ?>>Déficit</option>
+                    <option value="SUPERAVIT" <?= $filtroResultado === 'SUPERAVIT' ? 'selected' : '' ?>>Superávit</option>
+                    <option value="DEFICIT"   <?= $filtroResultado === 'DEFICIT'   ? 'selected' : '' ?>>Déficit</option>
                 </select>
             </div>
             <div class="rep-filtro-group" style="justify-content:flex-end;">
@@ -142,13 +141,15 @@ $fDif = function($v) {
                         <th>Vendedor/a</th>
                         <th class="text-center">Resultado</th>
                         <th class="text-right">Diferencia</th>
+                        <th class="text-right">Con corrección</th>
                         <th class="text-right">Base siguiente</th>
+                        <th class="text-center">Comentario</th>
                         <th class="text-center no-print">Ver</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($registros)): ?>
-                    <tr><td colspan="10" class="caja-table__empty">Sin registros para los filtros seleccionados.</td></tr>
+                    <tr><td colspan="12" class="caja-table__empty">Sin registros para los filtros seleccionados.</td></tr>
                 <?php endif; ?>
                 <?php foreach ($registros as $r):
                     $resultado = $r['resultado_cuadre'] ?? '—';
@@ -188,8 +189,31 @@ $fDif = function($v) {
                             <?php endif; ?>
                         </td>
                         <td class="text-right"><?= $fDif($diferencia) ?></td>
+                        <td class="text-right">
+                            <?php
+                                $difCorr = $diferencia + (float)($r['sum_rectifs'] ?? 0) - (float)($r['sum_ajustes'] ?? 0);
+                                if (abs($difCorr) < 0.01):
+                            ?>
+                                <span style="background:#d1fae5;color:#065f46;font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:5px;">Resuelto</span>
+                            <?php else: ?>
+                                <?= $fDif($difCorr) ?>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-right" style="font-variant-numeric:tabular-nums;">
                             <?= $r['base_siguiente'] !== null ? $f2($r['base_siguiente']) : '<span style="color:#94a3b8">—</span>' ?>
+                        </td>
+                        <td class="text-center">
+                            <?php if ($r['por_responder']): ?>
+                                <span style="background:#fef3c7;color:#92400e;font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:5px;white-space:nowrap;">
+                                    Por responder
+                                </span>
+                            <?php elseif (!empty($r['comentario_cajera'])): ?>
+                                <span style="background:#d1fae5;color:#065f46;font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:5px;">
+                                    Respondido
+                                </span>
+                            <?php else: ?>
+                                <span style="color:#cbd5e1;font-size:.8rem;">—</span>
+                            <?php endif; ?>
                         </td>
                         <td class="text-center no-print">
                             <a href="<?= $basePath ?>/caja/reporte/<?= $r['id_sesion'] ?>"

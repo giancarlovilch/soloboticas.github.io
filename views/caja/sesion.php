@@ -5,6 +5,8 @@
 /** @var array $turnos */
 /** @var array $conceptos */
 /** @var array $staff */
+/** @var array $tiposEgreso */
+/** @var array $modos */
 /** @var array $detalle */
 /** @var array $gastos */
 $basePath  = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
@@ -203,11 +205,9 @@ $act = [
         <!-- Formulario rápido para agregar -->
         <div class="caja-digital-form" id="digitalFormAdd">
             <select id="digitalModo" class="caja-input" style="max-width:140px;">
-                <option value="2">Yape</option>
-                <option value="3">Plin</option>
-                <option value="4">Visa / POS</option>
-                <option value="5">BCP</option>
-                <option value="6">Transferencia</option>
+                <?php foreach ($modos ?? [] as $m): ?>
+                    <option value="<?= $m['id_modo'] ?>"><?= htmlspecialchars($m['descripcion']) ?></option>
+                <?php endforeach; ?>
             </select>
             <div class="caja-input-money" style="flex:1;max-width:160px;">
                 <span>S/</span>
@@ -255,31 +255,64 @@ $act = [
         </div>
 
         <div id="gastosContainer" class="caja-gastos-list">
-            <?php foreach ($gastos ?? [] as $g): ?>
-            <div class="caja-gasto-row" data-tipo="<?= htmlspecialchars($g['tipo']) ?>">
+            <?php foreach ($gastos ?? [] as $g):
+                $modo = $g['modo_ref'] ?? '';
+            ?>
+            <div class="caja-gasto-row">
                 <select class="caja-input caja-gasto__tipo" onchange="tipoChanged(this)">
-                    <option value="PERSONAL" <?= $g['tipo'] === 'PERSONAL' ? 'selected':'' ?>>Pago personal</option>
-                    <option value="LOCAL"    <?= $g['tipo'] === 'LOCAL'    ? 'selected':'' ?>>Gasto local</option>
-                    <option value="OTRO"     <?= $g['tipo'] === 'OTRO'     ? 'selected':'' ?>>Otro</option>
+                    <?php foreach ($tiposEgreso ?? [] as $te): ?>
+                        <option value="<?= $te['id_tipo_egreso'] ?>"
+                                data-modo="<?= $te['modo_ref'] ?>"
+                                <?= (int)($g['tipo_egreso_id'] ?? 0) === (int)$te['id_tipo_egreso'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($te['etiqueta']) ?>
+                        </option>
+                    <?php endforeach; ?>
                 </select>
-                <div class="caja-gasto__ref">
-                    <?php if ($g['tipo'] === 'PERSONAL'): ?>
-                        <select class="caja-input caja-gasto__staff">
+
+                <div class="caja-gasto__middle">
+                    <?php if ($modo === 'PERSONAL'): ?>
+                        <select class="caja-input caja-gasto__staff" style="flex:1">
                             <option value="<?= $g['ref_id'] ?>" selected><?= htmlspecialchars($g['descripcion']) ?></option>
                         </select>
-                    <?php elseif ($g['tipo'] === 'LOCAL'): ?>
-                        <select class="caja-input caja-gasto__concepto">
+                        <select class="caja-input caja-gasto__tipopago" style="max-width:130px">
+                            <option value="PAGO_TOTAL" <?= ($g['tipo_pago'] ?? 'PAGO_TOTAL') === 'PAGO_TOTAL' ? 'selected' : '' ?>>Pago total</option>
+                            <option value="ADELANTO"   <?= ($g['tipo_pago'] ?? '') === 'ADELANTO'    ? 'selected' : '' ?>>Adelanto</option>
+                            <option value="OTROS"      <?= ($g['tipo_pago'] ?? '') === 'OTROS'       ? 'selected' : '' ?>>Otros</option>
+                        </select>
+                    <?php elseif ($modo === 'LOCAL'): ?>
+                        <select class="caja-input caja-gasto__local" style="max-width:120px">
                             <option value="<?= $g['ref_id'] ?>" selected><?= htmlspecialchars($g['descripcion']) ?></option>
                         </select>
-                    <?php else: ?>
-                        <input type="text" class="caja-input caja-gasto__desc" value="<?= htmlspecialchars($g['descripcion']) ?>" placeholder="Descripción">
+                        <select class="caja-input caja-gasto__concepto" style="flex:1">
+                            <?php if (!empty($g['concepto_id'])): ?>
+                                <option value="<?= $g['concepto_id'] ?>" selected><?= htmlspecialchars($g['concepto_desc'] ?? '') ?></option>
+                            <?php else: ?>
+                                <option value="">— Concepto —</option>
+                            <?php endif; ?>
+                        </select>
+                        <input type="text" class="caja-input caja-gasto__comp" style="max-width:110px"
+                               placeholder="N° comprobante" value="<?= htmlspecialchars($g['comprobante'] ?? '') ?>">
+                    <?php elseif ($modo === 'DEPOSITO'): ?>
+                        <input type="text" class="caja-input caja-gasto__comp" style="flex:1"
+                               placeholder="N° comprobante" value="<?= htmlspecialchars($g['comprobante'] ?? '') ?>">
+                    <?php elseif ($modo === 'LIBRE'): ?>
+                        <input type="text" class="caja-input caja-gasto__desc" style="flex:1"
+                               value="<?= htmlspecialchars($g['descripcion'] ?? '') ?>" placeholder="Descripción del pago">
+                    <?php elseif ($modo === 'FACTURA'): ?>
+                        <select class="caja-input caja-gasto__tipodoc" style="max-width:140px">
+                            <option value="BOLETA"         <?= ($g['tipo_documento'] ?? '') === 'BOLETA'         ? 'selected' : '' ?>>Boleta</option>
+                            <option value="FACTURA"        <?= ($g['tipo_documento'] ?? '') === 'FACTURA'        ? 'selected' : '' ?>>Factura</option>
+                            <option value="NOTA_DE_VENTA"  <?= ($g['tipo_documento'] ?? '') === 'NOTA_DE_VENTA'  ? 'selected' : '' ?>>Nota de venta</option>
+                        </select>
+                        <input type="text" class="caja-input caja-gasto__comp" style="flex:1"
+                               placeholder="N° comprobante" value="<?= htmlspecialchars($g['comprobante'] ?? '') ?>">
                     <?php endif; ?>
                 </div>
+
                 <div class="caja-input-money caja-gasto__monto">
                     <span>S/</span>
                     <input type="number" class="caja-input caja-input--money" value="<?= $g['monto'] ?>" min="0" step="0.01" oninput="recalcularGastos()">
                 </div>
-                <input type="text" class="caja-input caja-gasto__comp" placeholder="N° comprobante" value="<?= htmlspecialchars($g['comprobante'] ?? '') ?>">
                 <button type="button" class="caja-gasto__remove" onclick="this.closest('.caja-gasto-row').remove(); recalcularGastos()">✕</button>
             </div>
             <?php endforeach; ?>
@@ -289,6 +322,37 @@ $act = [
             <span>Total gastos:</span>
             <strong id="totalGastos">S/ 0.00</strong>
         </div>
+    </section>
+
+    <!-- ── Comentarios del turno ────────────────────────────── -->
+    <section class="caja-card" id="formComentario" <?= !$esEdicion ? 'hidden' : '' ?>>
+        <h2 class="caja-card__title">5. Comentarios del turno</h2>
+        <p class="caja-card__desc">¿Tuviste algún problema o algo que reportar? Escríbelo aquí antes de cerrar.</p>
+
+        <textarea id="comentarioCajera" class="caja-input"
+                  style="width:100%;resize:vertical;min-height:90px;font-family:inherit;box-sizing:border-box;"
+                  maxlength="500"
+                  placeholder="Describe cualquier incidencia del turno..."
+                  oninput="actualizarContador(this)"><?= htmlspecialchars($sesion['comentario_cajera'] ?? '') ?></textarea>
+        <div style="text-align:right;font-size:0.73rem;color:#94a3b8;margin-top:.2rem;">
+            <span id="charCount"><?= mb_strlen($sesion['comentario_cajera'] ?? '') ?></span>/500
+        </div>
+
+        <div style="margin-top:.6rem;display:flex;gap:.75rem;align-items:center;">
+            <button class="caja-btn caja-btn--outline" onclick="guardarComentario(<?= $sesionId ?>)">
+                Guardar comentario
+            </button>
+            <span id="comentarioMsg" style="font-size:.82rem;display:none;color:#059669;">✓ Guardado</span>
+        </div>
+
+        <?php if (!empty($sesion['respuesta_admin'])): ?>
+        <div style="margin-top:1rem;padding:.85rem 1rem;background:#eff6ff;border-left:4px solid #3b82f6;border-radius:0 8px 8px 0;">
+            <p style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#3b82f6;margin:0 0 .35rem;">
+                Respuesta del administrador
+            </p>
+            <p style="color:#1e293b;font-size:.86rem;margin:0;white-space:pre-wrap;"><?= htmlspecialchars($sesion['respuesta_admin']) ?></p>
+        </div>
+        <?php endif; ?>
     </section>
 
     <!-- ── Acciones ───────────────────────────────────────── -->
@@ -308,9 +372,35 @@ $act = [
 const BASE = '<?= $basePath ?>';
 const ES_EDICION = <?= $esEdicion ? 'true' : 'false' ?>;
 const SESION_ID  = <?= $sesionId ?: 'null' ?>;
-const CONCEPTOS  = <?= json_encode($conceptos ?? []) ?>;
-const STAFF      = <?= json_encode($staff ?? []) ?>;
+const CONCEPTOS    = <?= json_encode($conceptos ?? []) ?>;
+const STAFF        = <?= json_encode($staff ?? []) ?>;
+const TIPOS_EGRESO = <?= json_encode($tiposEgreso ?? []) ?>;
+const MODOS        = <?= json_encode($modos ?? []) ?>;
+const LOCALES      = <?= json_encode($locales ?? []) ?>;
 </script>
+<script>
+function actualizarContador(el) {
+    const cnt = document.getElementById('charCount');
+    if (cnt) cnt.textContent = el.value.length;
+}
+
+async function guardarComentario(sesionId) {
+    const comentario = document.getElementById('comentarioCajera')?.value ?? '';
+    const msgEl      = document.getElementById('comentarioMsg');
+    try {
+        const r   = await fetch(`${BASE}/caja/api/sesion/${sesionId}/comentario`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body:   JSON.stringify({ comentario }),
+        });
+        const res = await r.json();
+        if (res.success) {
+            msgEl.style.display = 'inline';
+            setTimeout(() => msgEl.style.display = 'none', 3000);
+        }
+    } catch {}
+}
+</script>
+<script src="<?= $basePath ?>/assets/js/session-guard.js"></script>
 <script src="<?= $basePath ?>/assets/js/caja.js"></script>
 </body>
 </html>

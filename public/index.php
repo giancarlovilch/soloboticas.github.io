@@ -2,6 +2,18 @@
 
 date_default_timezone_set('America/Lima');
 
+// Timeout de sesión: 8 horas de inactividad (cubre un turno completo)
+session_start();
+if (isset($_SESSION['user_id'])) {
+    if (isset($_SESSION['_last_act']) && (time() - $_SESSION['_last_act']) > 28800) {
+        session_unset();
+        session_destroy();
+        session_start();
+    } else {
+        $_SESSION['_last_act'] = time();
+    }
+}
+
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -76,7 +88,9 @@ $router->get('/horario',                        [HorarioController::class, 'inde
 $router->get('/horario/siguiente',              [HorarioController::class, 'siguiente']);
 $router->get('/horario/historial',              [HorarioController::class, 'historial']);
 $router->get('/horario/solicitudes',            [HorarioController::class, 'solicitudes']);
-$router->post('/horario/api/solicitud/cubrir',  [HorarioController::class, 'cubrir']);
+$router->post('/horario/api/slot/{id}/liberar-admin',   [HorarioController::class, 'liberarSlotAdmin']);
+$router->post('/horario/api/solicitud/cubrir',          [HorarioController::class, 'cubrir']);
+$router->post('/horario/api/solicitud/{id}/revertir',   [HorarioController::class, 'revertirCobertura']);
 $router->get('/horario/informacion',            [HorarioController::class, 'informacion']);
 $router->post('/admin/api/penalidad/{id}',      [HorarioController::class, 'actualizarPenalidad']);
 $router->get('/horario/api/semana/{id}',        [HorarioController::class, 'getSlots']);
@@ -95,7 +109,12 @@ $router->get('/caja/reporte/{id}',             [CajaController::class, 'reporte'
 $router->post('/caja/api/sesion/crear',        [CajaController::class, 'crearSesion']);
 $router->post('/caja/api/sesion/guardar',      [CajaController::class, 'guardarSesion']);
 $router->post('/caja/api/{id}/ventas',         [CajaController::class, 'submitVentas']);
-$router->post('/caja/api/reporte/{id}/rectificar', [CajaController::class, 'rectificar']);
+$router->post('/caja/api/reporte/{id}/rectificar',        [CajaController::class, 'rectificar']);
+$router->post('/caja/api/rectificacion/{id}/eliminar',    [CajaController::class, 'eliminarRectificacion']);
+$router->post('/caja/api/sesion/{id}/ajuste-esperado',       [CajaController::class, 'addAjusteEsperado']);
+$router->post('/caja/api/ajuste-esperado/{id}/eliminar',     [CajaController::class, 'deleteAjusteEsperado']);
+$router->post('/caja/api/sesion/{id}/comentario',            [CajaController::class, 'guardarComentario']);
+$router->post('/caja/api/sesion/{id}/respuesta',       [CajaController::class, 'guardarRespuesta']);
 $router->post('/caja/api/sesion/{id}/eliminar',        [CajaController::class, 'eliminarSesion']);
 $router->post('/caja/api/sesion/{id}/sincronizar-base', [CajaController::class, 'sincronizarBase']);
 $router->get('/caja/pagos-digitales',                    [CajaController::class, 'pagosDigitalesView']);
@@ -109,6 +128,10 @@ $router->get('/caja/api/saldo/{id}',                     [CajaController::class,
 
 // --- PORTAL STAFF (colaboradores) ---
 $router->get('/staff',                    [StaffController::class,       'index']);
+$router->get('/staff/mi-horario',              [StaffController::class, 'miHorario']);
+$router->post('/staff/api/asistencia/{id}/editar',   [StaffController::class, 'editarAsistencia']);
+$router->post('/staff/api/asistencia/registrar',         [StaffController::class, 'registrarAsistencia']);
+$router->post('/staff/api/asistencia/{id}/revertir',     [StaffController::class, 'revertirFalta']);
 $router->get('/staff/info',               [StaffController::class,       'info']);
 $router->get('/staff/api/historial',      [StaffController::class,       'historial']);
 $router->get('/staff/api/checklist',      [StaffController::class,       'getChecklist']);
@@ -123,10 +146,21 @@ $router->post('/admin/asistencia/actualizar',  [AsistenciaController::class, 'ad
 $router->post('/admin/asistencia/crear',       [AsistenciaController::class, 'adminCrear']);
 $router->post('/admin/asistencia/eliminar',    [AsistenciaController::class, 'adminEliminar']);
 
+// --- MÓDULO DE BASE DE DATOS ---
+require_once __DIR__ . '/../src/Controllers/DatabaseController.php';
+$router->get('/admin/database',                  [DatabaseController::class, 'index']);
+$router->get('/admin/database/sync-from-download', [DatabaseController::class, 'syncFromDownload']);
+$router->get('/admin/database/download-full',    [DatabaseController::class, 'downloadFull']);
+$router->get('/admin/database/apply',            [DatabaseController::class, 'applyToLocal']);
+$router->post('/admin/database/upload',          [DatabaseController::class, 'uploadMigration']);
+
 // --- MÓDULO DE REPORTES ---
 require_once __DIR__ . '/../src/Controllers/ReporteController.php';
 $router->get('/admin/reportes',         [ReporteController::class, 'index']);
-$router->get('/admin/reportes/arqueos', [ReporteController::class, 'arqueos']);
+$router->get('/admin/reportes/arqueos',    [ReporteController::class, 'arqueos']);
+$router->get('/admin/reportes/coberturas',   [ReporteController::class, 'coberturas']);
+$router->get('/admin/reportes/asistencias',       [ReporteController::class, 'asistencias']);
+$router->get('/admin/reportes/resumen-trabajadores', [ReporteController::class, 'resumenTrabajadores']);
 
 // --- RUTAS DE ADMINISTRACIÓN (INTRANET) ---
 // Registramos las rutas de API antes del dispatch

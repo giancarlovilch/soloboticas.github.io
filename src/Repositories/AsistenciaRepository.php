@@ -154,6 +154,144 @@ class AsistenciaRepository
         return $stmt->fetchAll();
     }
 
+    // ── Staff: registros propios por rango de fechas ──────
+    public function getByPostulanteRango(int $postulanteId, string $desde, string $hasta): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT a.*, l.descripcion AS local_desc,
+                    pr.nombres AS registrado_por_nombre
+             FROM asistencia a
+             LEFT JOIN local l      ON a.local_id          = l.id_local
+             LEFT JOIN postulante pr ON a.registrado_por_id = pr.id_postulante
+             WHERE a.postulante_id = :pid AND a.fecha BETWEEN :desde AND :hasta
+             ORDER BY a.fecha ASC, a.hora_ingreso ASC"
+        );
+        $stmt->execute(['pid' => $postulanteId, 'desde' => $desde, 'hasta' => $hasta]);
+        return $stmt->fetchAll();
+    }
+
+    /** Registra asistencia para otro trabajador (quien registra != quien asiste) */
+    public function registrarParaCompanhero(
+        int $postulanteId, int $registradorId, string $fecha,
+        string $horaIngreso, ?string $horaSalida, ?int $localId,
+        array $checklist, string $password
+    ): bool|string {
+        // Verificar contraseña del registrador
+        $stmt = $this->db->prepare("SELECT password FROM usuario WHERE postulante_id = :pid LIMIT 1");
+        $stmt->execute(['pid' => $registradorId]);
+        $hash = $stmt->fetchColumn();
+        if (!$hash || !password_verify($password, $hash)) return 'Contraseña incorrecta';
+
+        // No puede registrarse a sí mismo
+        if ($postulanteId === $registradorId) return 'No puedes registrar tu propia asistencia';
+
+        // Si no hay hora de entrada → FALTA
+        $esFalta = empty($horaIngreso);
+        $estadoCalculado = $esFalta ? 'FALTA' : self::calcularEstadoEntrada(
+            (int)substr($horaIngreso, 0, 2),
+            (int)substr($horaIngreso, 3, 2)
+        );
+
+        $ingresoVal = $esFalta ? null : "{$fecha} {$horaIngreso}:00";
+        $salidaVal  = (!$esFalta && $horaSalida) ? "{$fecha} {$horaSalida}:00" : null;
+
+        // Upsert: si ya existe para esa fecha, actualizar; si no, crear
+        $existing = $this->db->prepare(
+            "SELECT id_asistencia FROM asistencia WHERE postulante_id = :pid AND fecha = :fecha ORDER BY id_asistencia DESC LIMIT 1"
+        );
+        $existing->execute(['pid' => $postulanteId, 'fecha' => $fecha]);
+        $existId = $existing->fetchColumn();
+
+        if ($existId) {
+            $this->db->prepare(
+                "UPDATE asistencia SET hora_ingreso = :ing, hora_salida = :sal, estado = :est,
+                         registrado_por_id = :reg, local_id = :lid
+                 WHERE id_asistencia = :id"
+            )->execute([
+                'ing' => $ingresoVal,
+                'sal' => $salidaVal,
+                'est' => $estadoCalculado,
+                'reg' => $registradorId,
+                'lid' => $localId,
+                'id'  => $existId,
+            ]);
+            $asistId = $existId;
+        } else {
+            $this->db->prepare(
+                "INSERT INTO asistencia (postulante_id, registrado_por_id, local_id, fecha, hora_ingreso, hora_salida, estado)
+                 VALUES (:pid, :reg, :lid, :fecha, :ing, :sal, :est)"
+            )->execute([
+                'pid'   => $postulanteId,
+                'reg'   => $registradorId,
+                'lid'   => $localId,
+                'fecha' => $fecha,
+                'ing'   => $ingresoVal,
+                'sal'   => $salidaVal,
+                'est'   => $estadoCalculado,
+            ]);
+            $asistId = (int)$this->db->lastInsertId();
+        }
+
+        // Reemplazar checklist (borrar antes para evitar duplicados)
+        $this->db->prepare("DELETE FROM asistencia_checklist WHERE asistencia_id = :id")
+                 ->execute(['id' => $asistId]);
+        if (!empty($checklist)) {
+            $this->guardarChecklist($asistId, $checklist);
+        }
+
+        return true;
+    }
+
+    /** Carga todos los checklist de un conjunto de asistencia IDs de una vez */
+    public function getChecklistPorIds(array $ids): array
+    {
+        if (empty($ids)) return [];
+        $in   = implode(',', array_map('intval', $ids));
+        $stmt = $this->db->query(
+            "SELECT ac.asistencia_id, ac.checklist_id, ac.cumplido, c.descripcion, c.tipo
+             FROM asistencia_checklist ac
+             INNER JOIN checklist c ON ac.checklist_id = c.id_checklist
+             WHERE ac.asistencia_id IN ({$in})
+             ORDER BY c.tipo DESC, c.id_checklist ASC"
+        );
+        $result = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $result[$r['asistencia_id']][] = $r;
+        }
+        return $result;
+    }
+
+    /** Elimina un registro de FALTA (cualquier compañero con contraseña) */
+    public function revertirFalta(int $asistenciaId, int $registradorId, string $password): bool|string
+    {
+        $stmt = $this->db->prepare("SELECT password FROM usuario WHERE postulante_id = :pid LIMIT 1");
+        $stmt->execute(['pid' => $registradorId]);
+        $hash = $stmt->fetchColumn();
+        if (!$hash || !password_verify($password, $hash)) return 'Contraseña incorrecta';
+
+        $check = $this->db->prepare(
+            "SELECT id_asistencia FROM asistencia WHERE id_asistencia = :id AND estado = 'FALTA'"
+        );
+        $check->execute(['id' => $asistenciaId]);
+        if (!$check->fetchColumn()) return 'Registro no encontrado o no es una falta';
+
+        $this->db->prepare("DELETE FROM asistencia_checklist WHERE asistencia_id = :id")->execute(['id' => $asistenciaId]);
+        $this->db->prepare("DELETE FROM asistencia WHERE id_asistencia = :id")->execute(['id' => $asistenciaId]);
+        return true;
+    }
+
+    /** Staff actualiza sus propios tiempos (requiere que sea su registro) */
+    public function actualizarTiemposPropio(int $asistenciaId, int $postulanteId, string $ingreso, ?string $salida): bool
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE asistencia
+             SET hora_ingreso = :ing, hora_salida = :sal
+             WHERE id_asistencia = :id AND postulante_id = :pid"
+        );
+        $stmt->execute(['ing' => $ingreso, 'sal' => $salida ?: null, 'id' => $asistenciaId, 'pid' => $postulanteId]);
+        return $stmt->rowCount() > 0;
+    }
+
     // ── Admin: actualizar cualquier registro ──────────────
     public function actualizar(int $id, array $data): bool
     {

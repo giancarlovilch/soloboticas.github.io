@@ -528,3 +528,90 @@ body {
 
 .badge-extra    { background:#ede9fe; color:#5b21b6; }
 .badge-temprano { background:#e0f2fe; color:#075985; }
+
+/* ── HAMBURGER BUTTON ────────────────────────────────────── */
+.nav-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    margin-right: auto;
+}
+.nav-toggle span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: #2c3e50;
+    border-radius: 2px;
+    transition: all .2s;
+}
+.nav-toggle:hover span { background: #0097A7; }
+
+/* ── OVERLAY ─────────────────────────────────────────────── */
+.nav-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 200;
+}
+.nav-overlay--visible { display: block; }
+.nav-body-lock        { overflow: hidden; }
+
+/* ── RESPONSIVE ──────────────────────────────────────────── */
+@media (max-width: 768px) {
+    /* Mostrar hamburger */
+    .nav-toggle { display: flex; }
+
+    /* Header compacto */
+    .main-header { padding: 0 14px; gap: 8px; }
+    .company-name { display: none; }
+    .app-name { font-size: .9rem; }
+    .user-details { display: none; }
+
+    /* Grid → columna única */
+    .contenedor-grid {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+
+    /* Sidebar como drawer lateral */
+    .nav {
+        position: fixed;
+        top: 0; left: 0;
+        width: 260px;
+        height: 100vh;
+        z-index: 300;
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        box-shadow: 4px 0 20px rgba(0,0,0,.25);
+    }
+    .nav--open { transform: translateX(0); }
+
+    /* Contenido ocupa toda la pantalla */
+    .sidebar-1 {
+        padding: 12px;
+        min-height: calc(100vh - 60px);
+    }
+
+    /* Tablas con scroll horizontal */
+    .table-wrapper  { overflow-x: auto; }
+    .fl-table       { min-width: 520px; }
+
+    /* Buscador ocupa todo el ancho */
+    .search-box input { min-width: 0; width: 100%; }
+    .section-header   { flex-direction: column; align-items: flex-start; }
+    .search-box       { width: 100%; }
+}
+
+@media (max-width: 480px) {
+    .main-header { padding: 0 10px; }
+    .app-name    { font-size: .82rem; }
+    .logo-circle { width: 28px; height: 28px; font-size: .78rem; }
+    .home-cards  { grid-template-columns: 1fr 1fr; }
+}

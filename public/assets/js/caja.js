@@ -115,20 +115,23 @@ function agregarGasto() {
     const div = document.createElement('div');
     div.className = 'caja-gasto-row';
 
+    const tipoOpts = (TIPOS_EGRESO || []).map((t, i) =>
+        `<option value="${t.id_tipo_egreso}" data-modo="${t.modo_ref}"${i === 0 ? ' selected' : ''}>${t.etiqueta}</option>`
+    ).join('');
+
+    const defaultModo = TIPOS_EGRESO[0]?.modo_ref || 'PERSONAL';
+
     div.innerHTML = `
         <select class="caja-input caja-gasto__tipo" onchange="tipoChanged(this)">
-            <option value="PERSONAL">Pago personal</option>
-            <option value="LOCAL">Gasto local</option>
-            <option value="OTRO">Otro</option>
+            ${tipoOpts}
         </select>
-        <div class="caja-gasto__ref">
-            ${buildStaffSelect()}
+        <div class="caja-gasto__middle">
+            ${buildMiddle(defaultModo)}
         </div>
         <div class="caja-input-money caja-gasto__monto">
             <span>S/</span>
             <input type="number" class="caja-input caja-input--money" min="0" step="0.01" placeholder="0.00" oninput="recalcularGastos()">
         </div>
-        <input type="text" class="caja-input caja-gasto__comp" placeholder="N° comprobante">
         <button type="button" class="caja-gasto__remove" onclick="this.closest('.caja-gasto-row').remove(); recalcularGastos()">✕</button>
     `;
 
@@ -136,51 +139,89 @@ function agregarGasto() {
 }
 
 function buildStaffSelect() {
-    const opts = (STAFF || []).map(s =>
-        `<option value="${s.id}">${s.nombre_completo}</option>`
-    ).join('');
-    return `<select class="caja-input caja-gasto__staff"><option value="">— Personal —</option>${opts}</select>`;
+    const opts = (STAFF || []).map(s => `<option value="${s.id}">${s.nombre_completo}</option>`).join('');
+    return `<select class="caja-input caja-gasto__staff" style="flex:1"><option value="">— Personal —</option>${opts}</select>`;
+}
+
+function buildTipoPagoSelect() {
+    return `<select class="caja-input caja-gasto__tipopago" style="max-width:130px">
+        <option value="PAGO_TOTAL">Pago total</option>
+        <option value="ADELANTO">Adelanto</option>
+        <option value="OTROS">Otros</option>
+    </select>`;
+}
+
+function buildLocalSelect() {
+    const opts = (LOCALES || []).map(l => `<option value="${l.id}">${l.descripcion}</option>`).join('');
+    return `<select class="caja-input caja-gasto__local" style="max-width:120px"><option value="">— Local —</option>${opts}</select>`;
 }
 
 function buildConceptoSelect() {
-    const opts = (CONCEPTOS || []).map(c =>
-        `<option value="${c.id}">${c.descripcion}</option>`
-    ).join('');
-    return `<select class="caja-input caja-gasto__concepto"><option value="">— Concepto —</option>${opts}</select>`;
+    const opts = (CONCEPTOS || []).map(c => `<option value="${c.id}">${c.descripcion}</option>`).join('');
+    return `<select class="caja-input caja-gasto__concepto" style="flex:1"><option value="">— Concepto —</option>${opts}</select>`;
+}
+
+function buildTipoDocSelect() {
+    return `<select class="caja-input caja-gasto__tipodoc" style="max-width:140px">
+        <option value="BOLETA">Boleta</option>
+        <option value="FACTURA">Factura</option>
+        <option value="NOTA_DE_VENTA">Nota de venta</option>
+    </select>`;
+}
+
+function buildComprobanteInput(ph = 'N° comprobante') {
+    return `<input type="text" class="caja-input caja-gasto__comp" style="flex:1" placeholder="${ph}">`;
+}
+
+function buildMiddle(modoRef) {
+    if (modoRef === 'PERSONAL') return buildStaffSelect() + buildTipoPagoSelect();
+    if (modoRef === 'LOCAL')    return buildLocalSelect() + buildConceptoSelect() + buildComprobanteInput();
+    if (modoRef === 'FACTURA')  return buildTipoDocSelect() + buildComprobanteInput();
+    if (modoRef === 'DEPOSITO') return buildComprobanteInput('N° comprobante');
+    if (modoRef === 'LIBRE')    return `<input type="text" class="caja-input caja-gasto__desc" style="flex:1" placeholder="Descripción del pago">`;
+    return '';
 }
 
 function tipoChanged(select) {
-    const row  = select.closest('.caja-gasto-row');
-    const ref  = row.querySelector('.caja-gasto__ref');
-    const tipo = select.value;
-
-    if (tipo === 'PERSONAL') ref.innerHTML = buildStaffSelect();
-    else if (tipo === 'LOCAL') ref.innerHTML = buildConceptoSelect();
-    else ref.innerHTML = `<input type="text" class="caja-input caja-gasto__desc" placeholder="Descripción del gasto">`;
+    const row     = select.closest('.caja-gasto-row');
+    const middle  = row.querySelector('.caja-gasto__middle');
+    const modoRef = select.options[select.selectedIndex]?.dataset?.modo || '';
+    if (middle) middle.innerHTML = buildMiddle(modoRef);
 }
 
 // ── Recolectar gastos ─────────────────────────────────
 function collectGastos() {
     const gastos = [];
     document.querySelectorAll('.caja-gasto-row').forEach(row => {
-        const tipo  = row.querySelector('.caja-gasto__tipo')?.value;
-        const monto = parseFloat(row.querySelector('input[type="number"]')?.value) || 0;
-        const comp  = row.querySelector('.caja-gasto__comp')?.value?.trim() || null;
-        if (monto <= 0) return;
+        const tipoSel = row.querySelector('.caja-gasto__tipo');
+        const tipoId  = parseInt(tipoSel?.value) || 0;
+        const modoRef = tipoSel?.options[tipoSel.selectedIndex]?.dataset?.modo || '';
+        const monto   = parseFloat(row.querySelector('input[type="number"]')?.value) || 0;
+        if (monto <= 0 || !tipoId) return;
 
-        const gasto = { tipo, monto, comprobante: comp };
+        const gasto = { tipo_egreso_id: tipoId, modo_ref: modoRef, monto };
 
-        if (tipo === 'PERSONAL') {
+        if (modoRef === 'PERSONAL') {
             const sel = row.querySelector('.caja-gasto__staff');
             if (!sel?.value) return;
-            gasto.ref_id = parseInt(sel.value);
-        } else if (tipo === 'LOCAL') {
-            const sel = row.querySelector('.caja-gasto__concepto');
-            if (!sel?.value) return;
-            gasto.ref_id = parseInt(sel.value);
-        } else {
+            gasto.ref_id    = parseInt(sel.value);
+            gasto.tipo_pago = row.querySelector('.caja-gasto__tipopago')?.value || 'PAGO_TOTAL';
+        } else if (modoRef === 'LOCAL') {
+            const selLocal    = row.querySelector('.caja-gasto__local');
+            const selConcepto = row.querySelector('.caja-gasto__concepto');
+            if (!selLocal?.value) return;
+            gasto.ref_id      = parseInt(selLocal.value);
+            gasto.concepto_id = selConcepto?.value ? parseInt(selConcepto.value) : null;
+            gasto.comprobante = row.querySelector('.caja-gasto__comp')?.value?.trim() || null;
+        } else if (modoRef === 'FACTURA') {
+            gasto.tipo_documento = row.querySelector('.caja-gasto__tipodoc')?.value || 'BOLETA';
+            gasto.comprobante    = row.querySelector('.caja-gasto__comp')?.value?.trim() || null;
+        } else if (modoRef === 'DEPOSITO') {
+            gasto.comprobante = row.querySelector('.caja-gasto__comp')?.value?.trim() || null;
+        } else if (modoRef === 'LIBRE') {
             const inp = row.querySelector('.caja-gasto__desc');
-            gasto.descripcion = inp?.value?.trim() || 'Gasto';
+            if (!inp?.value?.trim()) return;
+            gasto.descripcion = inp.value.trim();
         }
 
         gastos.push(gasto);
@@ -246,7 +287,6 @@ function confirmarCierre() {
 }
 
 // ── Pagos digitales ───────────────────────────────────
-const MODO_LABELS = { 2:'Yape', 3:'Plin', 4:'Visa/POS', 5:'BCP', 6:'Transferencia' };
 
 async function agregarPagoDigital() {
     const sesionId = SESION_ID;

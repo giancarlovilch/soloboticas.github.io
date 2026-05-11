@@ -1,0 +1,167 @@
+<?php
+$basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+$meses    = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+[$anioF, $nmesF] = explode('-', $filtroMes);
+$mesLabel = $meses[(int)$nmesF - 1] . ' ' . $anioF;
+$f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumen por trabajador | Solo Boticas</title>
+    <link rel="stylesheet" href="<?= $basePath ?>/assets/css/normalize.css">
+    <link rel="stylesheet" href="<?= $basePath ?>/assets/css/caja.css">
+    <style>
+        .rt-section { font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;padding:.4rem .75rem;background:#f8fafc;border-bottom:1px solid #e2e8f0; }
+        .rt-num     { font-variant-numeric:tabular-nums;font-weight:700; }
+        .rt-zero    { color:#cbd5e1; }
+        @media print { .no-print{display:none!important;} body{background:#fff;} }
+    </style>
+</head>
+<body style="background:#f1f5f9;min-height:100vh;">
+
+<header class="caja-header">
+    <div class="caja-header__brand">
+        <div class="caja-header__logo">SB</div>
+        <div>
+            <p class="caja-header__company">Grupo KGyR S.A.C</p>
+            <p class="caja-header__app">Resumen por <strong>Trabajador</strong></p>
+        </div>
+    </div>
+    <div class="caja-header__right">
+        <span class="caja-header__user"><?= htmlspecialchars($userName) ?></span>
+        <button onclick="window.print()" class="caja-btn-back no-print" style="cursor:pointer;">🖨 Imprimir</button>
+        <a href="<?= $basePath ?>/admin/reportes" class="caja-btn-back">← Reportes</a>
+    </div>
+</header>
+
+<main class="caja-main" style="max-width:1100px;">
+
+    <!-- Filtro -->
+    <section class="caja-card no-print">
+        <form method="GET" style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;">
+            <div style="display:flex;flex-direction:column;gap:.25rem;">
+                <label style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Mes</label>
+                <input type="month" name="mes" class="caja-input" value="<?= htmlspecialchars($filtroMes) ?>" style="max-width:150px;">
+            </div>
+            <button type="submit" class="caja-btn caja-btn--primary">Ver</button>
+        </form>
+    </section>
+
+    <!-- Tabla -->
+    <section class="caja-card" style="padding:1rem;">
+        <p style="font-size:.75rem;color:#94a3b8;margin-bottom:.75rem;">
+            Resumen de <strong><?= htmlspecialchars($mesLabel) ?></strong>
+        </p>
+        <div class="caja-table-wrap">
+        <table class="caja-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" style="vertical-align:middle;">Trabajador</th>
+                    <!-- Asistencia -->
+                    <th colspan="5" class="text-center"
+                        style="background:#f0fdfe;color:#0e7490;border-bottom:2px solid #0e7490;">
+                        Asistencia
+                    </th>
+                    <!-- Ventas -->
+                    <th colspan="2" class="text-center"
+                        style="background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;">
+                        Ventas
+                    </th>
+                    <!-- Limpieza -->
+                    <th colspan="1" class="text-center"
+                        style="background:#fffbeb;color:#d97706;border-bottom:2px solid #d97706;">
+                        Limpieza
+                    </th>
+                    <!-- BCP -->
+                    <th colspan="2" class="text-center"
+                        style="background:#eff6ff;color:#1e40af;border-bottom:2px solid #1e40af;">
+                        Caja / BCP
+                    </th>
+                </tr>
+                <tr>
+                    <th style="background:#f0fdfe;color:#64748b;font-size:.62rem;">Total días</th>
+                    <th style="background:#f0fdfe;color:#065f46;font-size:.62rem;">A tiempo</th>
+                    <th style="background:#f0fdfe;color:#d97706;font-size:.62rem;">Tarde</th>
+                    <th style="background:#f0fdfe;color:#1e40af;font-size:.62rem;">Extra/Temp.</th>
+                    <th style="background:#fee2e2;color:#991b1b;font-size:.62rem;">Faltas</th>
+                    <th style="background:#f0fdf4;color:#64748b;font-size:.62rem;">Turnos</th>
+                    <th style="background:#f0fdf4;color:#059669;font-size:.62rem;">Prom. venta</th>
+                    <th style="background:#fffbeb;color:#d97706;font-size:.62rem;">Veces</th>
+                    <th style="background:#eff6ff;color:#64748b;font-size:.62rem;">Turnos caja</th>
+                    <th style="background:#eff6ff;color:#1e40af;font-size:.62rem;">Prom. ops. BCP</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php
+            $hayDatos = false;
+            foreach ($trabajadores as $t):
+                $pid  = $t['id'];
+                $ast  = $asistMap[$pid]  ?? null;
+                $ven  = $ventasMap[$pid] ?? null;
+                $bcp  = $bcpMap[$pid]    ?? null;
+                if (!$ast && !$ven && !$bcp) continue;
+                $hayDatos = true;
+
+                $faltas = (int)($ast['faltas'] ?? 0);
+            ?>
+            <tr style="<?= $faltas > 0 ? 'background:#fff8f8;' : '' ?>">
+                <td style="font-weight:600;color:#1e293b;">
+                    <?= htmlspecialchars($t['nombre']) ?>
+                    <?php if ($faltas > 0): ?>
+                        <span style="font-size:.65rem;background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:10px;font-weight:700;margin-left:4px;">
+                            <?= $faltas ?> falta<?= $faltas > 1 ? 's' : '' ?>
+                        </span>
+                    <?php endif; ?>
+                </td>
+                <!-- Asistencia -->
+                <td class="text-center rt-num"><?= (int)($ast['total']   ?? 0) ?: '<span class="rt-zero">0</span>' ?></td>
+                <td class="text-center" style="color:#065f46;font-weight:700;"><?= (int)($ast['a_tiempo'] ?? 0) ?: '<span class="rt-zero">0</span>' ?></td>
+                <td class="text-center" style="color:#d97706;font-weight:700;"><?= (int)($ast['tarde']    ?? 0) ?: '<span class="rt-zero">0</span>' ?></td>
+                <td class="text-center" style="color:#1e40af;font-weight:700;"><?= (int)($ast['extra']    ?? 0) ?: '<span class="rt-zero">0</span>' ?></td>
+                <td class="text-center">
+                    <?php if ($faltas > 0): ?>
+                        <span style="background:#fee2e2;color:#dc2626;font-weight:700;padding:2px 8px;border-radius:20px;font-size:.75rem;"><?= $faltas ?></span>
+                    <?php else: ?>
+                        <span class="rt-zero">0</span>
+                    <?php endif; ?>
+                </td>
+                <!-- Ventas -->
+                <?php
+                $turnosVenta = (int)($ven['turnos_venta'] ?? 0);
+                $promVenta   = $turnosVenta > 0 ? (float)$ven['total_ventas'] / $turnosVenta : 0;
+                ?>
+                <td class="text-center rt-num"><?= $turnosVenta ?: '<span class="rt-zero">—</span>' ?></td>
+                <td class="text-right rt-num" style="color:#059669;">
+                    <?= $promVenta > 0 ? $f2($promVenta) : '<span class="rt-zero">—</span>' ?>
+                </td>
+                <!-- Limpieza -->
+                <?php $limpieza = (int)($limpiezaMap[$pid] ?? 0); ?>
+                <td class="text-center rt-num" style="color:#d97706;">
+                    <?= $limpieza > 0 ? $limpieza : '<span class="rt-zero">—</span>' ?>
+                </td>
+                <!-- BCP -->
+                <?php
+                $turnosCaja = (int)($bcp['turnos_caja']    ?? 0);
+                $totalOps   = (int)($bcp['total_ops_bcp']  ?? 0);
+                $promOps    = $turnosCaja > 0 ? round($totalOps / $turnosCaja, 1) : 0;
+                ?>
+                <td class="text-center rt-num"><?= $turnosCaja ?: '<span class="rt-zero">—</span>' ?></td>
+                <td class="text-center rt-num" style="color:#1e40af;">
+                    <?= $promOps > 0 ? $promOps : '<span class="rt-zero">—</span>' ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+            <?php if (!$hayDatos): ?>
+                <tr><td colspan="11" class="caja-table__empty">Sin actividad registrada en <?= htmlspecialchars($mesLabel) ?>.</td></tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+        </div>
+    </section>
+
+</main>
+</body>
+</html>

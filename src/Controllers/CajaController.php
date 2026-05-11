@@ -68,10 +68,12 @@ class CajaController extends Controller
         $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
         $userName     = $_SESSION['user_name'] ?? 'Usuario';
 
-        $locales   = $this->repo->getLocales();
-        $turnos    = $this->repo->getTurnos();
-        $conceptos = $this->repo->getConceptosGasto();
-        $staff     = $this->repo->getStaffActivo();
+        $locales      = $this->repo->getLocales();
+        $turnos       = $this->repo->getTurnos();
+        $conceptos    = $this->repo->getConceptosGasto();
+        $staff        = $this->repo->getStaffActivo();
+        $tiposEgreso  = $this->repo->getTiposEgreso();
+        $modos        = $this->repo->getModosPago();
 
         require_once __DIR__ . '/../../views/caja/sesion.php';
     }
@@ -99,11 +101,13 @@ class CajaController extends Controller
             $sesion['saldo_inicial'] = $saldoReal;
         }
 
-        $locales   = $this->repo->getLocales();
-        $turnos    = $this->repo->getTurnos();
-        $conceptos = $this->repo->getConceptosGasto();
-        $staff     = $this->repo->getStaffActivo();
-        $gastos    = $this->repo->getGastosSesion($id);
+        $locales     = $this->repo->getLocales();
+        $turnos      = $this->repo->getTurnos();
+        $conceptos   = $this->repo->getConceptosGasto();
+        $staff       = $this->repo->getStaffActivo();
+        $tiposEgreso = $this->repo->getTiposEgreso();
+        $modos       = $this->repo->getModosPago();
+        $gastos      = $this->repo->getGastosSesion($id);
 
         // Cargar detalle_cuadre si existe (activos ya guardados)
         $db     = \Database::getConnection();
@@ -175,27 +179,42 @@ class CajaController extends Controller
             $localId = (int)$this->repo->getSesionById($sesionId)['id_local'];
 
             foreach ($data['gastos'] ?? [] as $gasto) {
-                $monto      = round((float)($gasto['monto'] ?? 0), 2);
-                $comp       = $gasto['comprobante'] ?? null;
-                if ($monto <= 0) continue;
+                $monto   = round((float)($gasto['monto'] ?? 0), 2);
+                $comp    = $gasto['comprobante'] ?? null;
+                $modoRef = $gasto['modo_ref'] ?? '';
+                $tipoId  = (int)($gasto['tipo_egreso_id'] ?? 0);
+                if ($monto <= 0 || empty($modoRef)) continue;
 
-                switch ($gasto['tipo'] ?? '') {
+                switch ($modoRef) {
                     case 'PERSONAL':
                         $this->repo->insertGastoPersonal(
                             $sesionId, $postulanteId,
-                            (int)$gasto['ref_id'], $monto, $comp
+                            (int)$gasto['ref_id'], $monto,
+                            $gasto['tipo_pago'] ?? 'PAGO_TOTAL'
                         );
                         break;
                     case 'LOCAL':
+                        $conceptoId = isset($gasto['concepto_id']) ? (int)$gasto['concepto_id'] : null;
                         $this->repo->insertGastoLocal(
-                            $sesionId, $localId, $postulanteId,
-                            (int)$gasto['ref_id'], $monto, $comp
+                            $sesionId, (int)$gasto['ref_id'], $postulanteId,
+                            $monto, $comp, $tipoId, $conceptoId
                         );
                         break;
-                    case 'OTRO':
+                    case 'FACTURA':
+                        $this->repo->insertGastoFactura(
+                            $sesionId, $postulanteId,
+                            $gasto['tipo_documento'] ?? 'BOLETA', $monto, $comp
+                        );
+                        break;
+                    case 'DEPOSITO':
+                        $this->repo->insertGastoDeposito(
+                            $sesionId, $postulanteId, $monto, $comp
+                        );
+                        break;
+                    case 'LIBRE':
                         $this->repo->insertGastoOtro(
                             $sesionId, $postulanteId,
-                            $gasto['descripcion'] ?? 'Gasto', $monto, $comp
+                            $gasto['descripcion'] ?? 'Otros pagos', $monto
                         );
                         break;
                 }
@@ -269,20 +288,39 @@ class CajaController extends Controller
     public function rectificar(int $id): void
     {
         $postulanteId = $this->requireAuth();
-        $data  = $this->getAllInput();
-        $monto = round((float)($data['monto'] ?? 0), 2);
-        $desc  = trim($data['descripcion'] ?? '');
-        $tipo  = $data['tipo'] ?? 'AJUSTE_CONTEO';
+        $data        = $this->getAllInput();
+        $monto       = round(abs((float)($data['monto'] ?? 0)), 2);
+        $desc        = trim($data['descripcion'] ?? '');
+        $tipoRectId  = (int)($data['tipo_rect_id'] ?? 0);
 
-        if ($monto == 0 || empty($desc)) {
-            $this->error('Monto y descripción son requeridos', 422);
+        if ($monto <= 0 || empty($desc) || !$tipoRectId) {
+            $this->error('Tipo, monto y descripción son requeridos', 422);
         }
 
         $sesion = $this->repo->getSesionById($id);
         if (!$sesion) $this->error('Sesión no encontrada', 404);
 
-        $this->repo->addRectificacion($id, $postulanteId, $tipo, $monto, $desc);
-        $this->success('Rectificación registrada. Base del día siguiente actualizada.');
+        $this->repo->addRectificacion($id, $postulanteId, $tipoRectId, $monto, $desc);
+        $this->success('Ajuste registrado. Base del siguiente turno actualizada.');
+    }
+
+    // ── POST /caja/api/rectificacion/{id}/eliminar ─────────
+    public function eliminarRectificacion(int $rectId): void
+    {
+        $postulanteId = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Solo administradores pueden eliminar ajustes', 403);
+        }
+
+        $password = trim($this->getAllInput()['password'] ?? '');
+        if (empty($password)) $this->error('La contraseña es requerida', 400);
+
+        $result = $this->repo->deleteRectificacion($rectId, $postulanteId, $password);
+        if ($result === true) {
+            $this->success('Ajuste eliminado y saldo revertido.');
+        } else {
+            $this->error($result, 401);
+        }
     }
 
     // ── POST /caja/api/sesion/{id}/sincronizar-base ────────
@@ -373,10 +411,11 @@ class CajaController extends Controller
     {
         $this->requireAuth();
         $this->success('OK', [
-            'locales'   => $this->repo->getLocales(),
-            'turnos'    => $this->repo->getTurnos(),
-            'conceptos' => $this->repo->getConceptosGasto(),
-            'staff'     => $this->repo->getStaffActivo(),
+            'locales'      => $this->repo->getLocales(),
+            'turnos'       => $this->repo->getTurnos(),
+            'conceptos'    => $this->repo->getConceptosGasto(),
+            'staff'        => $this->repo->getStaffActivo(),
+            'tiposEgreso'  => $this->repo->getTiposEgreso(),
         ]);
     }
 
@@ -390,6 +429,91 @@ class CajaController extends Controller
     {
         $this->requireAuth();
         $this->success('OK', ['saldo_base' => $this->repo->getSaldoBase($cajaId)]);
+    }
+
+    // ── POST /caja/api/sesion/{id}/ajuste-esperado ────────
+    public function addAjusteEsperado(int $id): void
+    {
+        $postulanteId = $this->requireAuth();
+        $data  = $this->getAllInput();
+        $tipo  = $data['tipo']   ?? 'COBRO';
+        $accion = $data['accion'] ?? '';
+        $desc  = trim($data['descripcion'] ?? '');
+        $monto = round(abs((float)($data['monto'] ?? 0)), 2);
+
+        $tiposValidos = ['COBRO','PERSONAL','LOCAL','COMPRA','DEPOSITO','OTRO'];
+        if (!in_array($tipo, $tiposValidos) || !in_array($accion, ['AGREGAR','QUITAR']) || $monto <= 0) {
+            $this->error('Tipo, acción y monto son requeridos', 422);
+        }
+        if ($tipo !== 'OTRO' && empty($desc) && empty($data['ref_id'])) {
+            $this->error('Completa los campos requeridos', 422);
+        }
+
+        $sesion = $this->repo->getSesionById($id);
+        if (!$sesion) $this->error('Sesión no encontrada', 404);
+
+        $extra = [
+            'modo_id'        => isset($data['modo_id'])        ? (int)$data['modo_id']   : null,
+            'ref_id'         => isset($data['ref_id'])         ? (int)$data['ref_id']    : null,
+            'ref2_id'        => isset($data['ref2_id'])        ? (int)$data['ref2_id']   : null,
+            'tipo_documento' => $data['tipo_documento'] ?? null,
+            'tipo_pago'      => $data['tipo_pago']      ?? null,
+        ];
+
+        $this->repo->addAjusteEsperado($id, $tipo, $accion, $desc, $monto, $postulanteId, $extra);
+        $this->success('Corrección registrada.');
+    }
+
+    // ── POST /caja/api/ajuste-esperado/{id}/eliminar ───────
+    public function deleteAjusteEsperado(int $ajusteId): void
+    {
+        $postulanteId = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') $this->error('Solo administradores', 403);
+
+        $password = trim($this->getAllInput()['password'] ?? '');
+        if (empty($password)) $this->error('La contraseña es requerida', 400);
+
+        $result = $this->repo->deleteAjusteEsperado($ajusteId, $postulanteId, $password);
+        if ($result === true) $this->success('Ajuste eliminado.');
+        else $this->error($result, 401);
+    }
+
+    // ── POST /caja/api/sesion/{id}/comentario ─────────────
+    public function guardarComentario(int $id): void
+    {
+        $this->requireAuth();
+        $comentario = trim($this->getAllInput()['comentario'] ?? '');
+        if (mb_strlen($comentario) > 500) $this->error('Máximo 500 caracteres', 422);
+
+        $db = \Database::getConnection();
+        $db->prepare("UPDATE sesion_caja SET comentario_cajera = :c WHERE id_sesion = :id")
+           ->execute(['c' => $comentario ?: null, 'id' => $id]);
+
+        $this->success('Comentario guardado.');
+    }
+
+    // ── POST /caja/api/sesion/{id}/respuesta ───────────────
+    public function guardarRespuesta(int $id): void
+    {
+        $postulanteId = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') $this->error('Solo administradores', 403);
+
+        $data     = $this->getAllInput();
+        $respuesta = trim($data['respuesta'] ?? '');
+        $password  = trim($data['password']  ?? '');
+
+        if (empty($password))  $this->error('La contraseña es requerida', 400);
+        if (empty($respuesta)) $this->error('La respuesta no puede estar vacía', 422);
+
+        if (!$this->repo->verificarPasswordAdmin($postulanteId, $password)) {
+            $this->error('Contraseña incorrecta', 401);
+        }
+
+        $db = \Database::getConnection();
+        $db->prepare("UPDATE sesion_caja SET respuesta_admin = :r WHERE id_sesion = :id")
+           ->execute(['r' => $respuesta, 'id' => $id]);
+
+        $this->success('Respuesta guardada.');
     }
 
     // ── POST /caja/api/sesion/{id}/eliminar ───────────────

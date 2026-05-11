@@ -150,11 +150,12 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--cj-bg)
 .caja-gastos-list { display: flex; flex-direction: column; gap: .6rem; margin-bottom: .85rem; }
 .caja-gasto-row {
     display: grid;
-    grid-template-columns: 140px 1fr 140px 130px 28px;
+    grid-template-columns: 140px 1fr 130px 28px;
     gap: .5rem; align-items: center;
     padding: .6rem .75rem;
     background: #fafafa; border: 1px solid var(--cj-border); border-radius: 8px;
 }
+.caja-gasto__middle { display: flex; gap: .4rem; align-items: center; }
 .caja-gasto-row:hover { border-color: #cbd5e1; }
 .caja-gasto__remove {
     background: none; border: none; color: #94a3b8; font-size: 1rem;
@@ -247,8 +248,10 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--cj-bg)
 
 .caja-gasto-badge { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 0.7rem; font-weight: 600; }
 .caja-gasto-badge--personal { background: #ede9fe; color: #5b21b6; }
-.caja-gasto-badge--local    { background: #f0fdfe; color: #0e7490; }
-.caja-gasto-badge--otro     { background: #f1f5f9; color: var(--cj-muted); }
+.caja-gasto-badge--local,
+.caja-gasto-badge--concepto { background: #f0fdfe; color: #0e7490; }
+.caja-gasto-badge--otro,
+.caja-gasto-badge--libre    { background: #f1f5f9; color: var(--cj-muted); }
 
 .caja-rect-form { display: grid; grid-template-columns: 160px 1fr 150px 110px; gap: .6rem; align-items: center; }
 .caja-empty { color: var(--cj-muted); font-size: 0.82rem; padding: .5rem 0; }

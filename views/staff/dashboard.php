@@ -44,42 +44,6 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
     </div>
 </header>
 
-<!-- ── Modal de confirmación ──────────────────────────── -->
-<div id="marcarModal" class="staff-modal-overlay" hidden>
-    <div class="staff-modal">
-        <div class="staff-modal__header">
-            <h3 id="modalTitulo">Marcar Entrada</h3>
-            <button class="staff-modal__close" onclick="cerrarModal()">✕</button>
-        </div>
-
-        <div class="staff-modal__hora-box">
-            <p class="staff-modal__hora-label">Tu hora registrada será:</p>
-            <div class="staff-modal__hora" id="modalHoraActual">--:--:--</div>
-        </div>
-
-        <div class="staff-modal__checklist-wrap" id="checklistWrap">
-            <p class="staff-modal__checklist-title">Declara lo siguiente:</p>
-            <div id="modalChecklist" class="staff-checklist"></div>
-        </div>
-
-        <div class="staff-modal__pw-wrap">
-            <label class="staff-modal__pw-label">Confirma con tu contraseña</label>
-            <input type="password" id="modalPassword"
-                   class="staff-modal__pw-input"
-                   placeholder="Tu contraseña"
-                   autocomplete="current-password">
-        </div>
-
-        <div id="modalError" class="staff-modal__error" hidden></div>
-
-        <div class="staff-modal__footer">
-            <button class="staff-modal__btn-cancel" onclick="cerrarModal()">Cancelar</button>
-            <button class="staff-modal__btn-confirm" id="btnConfirmar" onclick="confirmarMarcaje()">
-                Confirmar
-            </button>
-        </div>
-    </div>
-</div>
 
 <main class="staff-main">
 
@@ -89,47 +53,17 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
         <div class="staff-date"><?= $diaLabel ?></div>
     </section>
 
-    <!-- ── Estado y botones ────────────────────────────── -->
-    <section class="staff-card staff-today">
-        <div id="todayStatus" class="staff-today__status">
-            <span class="staff-spinner">Cargando...</span>
-        </div>
-
-        <div class="staff-today__times" id="todayTimes" hidden>
-            <div class="time-pill time-pill--in">
-                <span class="time-pill__label">Entrada</span>
-                <span class="time-pill__value" id="horaIngreso">--:--</span>
-            </div>
-            <div class="time-pill time-pill--out">
-                <span class="time-pill__label">Salida</span>
-                <span class="time-pill__value" id="horaSalida">--:--</span>
-            </div>
-        </div>
-
-        <!-- Selector de local (solo para ENTRADA) -->
-        <div class="staff-local-wrap" id="localWrap" hidden>
-            <label class="staff-local-label" for="localSelect">¿En qué local estás trabajando hoy?</label>
-            <select id="localSelect" class="staff-local-select">
-                <option value="">— Selecciona tu local —</option>
-            </select>
-        </div>
-
-        <div class="staff-btns" id="staffBtns">
-            <button id="btnEntrada"
-                    class="staff-btn-marcar staff-btn-marcar--entrada"
-                    disabled
-                    onclick="abrirModal('ENTRADA')">
-                Marcar Entrada
-            </button>
-            <button id="btnSalida"
-                    class="staff-btn-marcar staff-btn-marcar--salida"
-                    disabled
-                    onclick="abrirModal('SALIDA')">
-                Marcar Salida
-            </button>
-        </div>
-
-        <div id="marcarMsg" class="staff-msg" hidden></div>
+    <!-- ── Mi horario del mes ──────────────────────────── -->
+    <section class="staff-card" style="text-align:center;">
+        <h2 class="staff-section-title">Mi horario del mes</h2>
+        <p style="font-size:0.82rem;color:#64748b;margin-bottom:1rem;">
+            Consulta tus turnos asignados, coberturas y reemplazos del mes.
+        </p>
+        <a href="<?= $basePath ?>/staff/mi-horario"
+           class="staff-btn-marcar staff-btn-marcar--entrada"
+           style="display:inline-block;text-decoration:none;padding:.75rem 2rem;">
+            Ver mi reporte mensual →
+        </a>
     </section>
 
     <!-- ── Horarios semanales ────────────────────────── -->
@@ -188,6 +122,7 @@ const BASE = (function() {
 })();
 const url = (p) => `${BASE}${p}`;
 </script>
+<script src="<?= $basePath ?>/assets/js/session-guard.js"></script>
 <script src="<?= $basePath ?>/assets/js/staff.js"></script>
 </body>
 </html>
