@@ -82,7 +82,7 @@ class HorarioController extends Controller
         // Solo semanas futuras (que aún no han empezado)
         $db = \Database::getConnection();
         $stmtF = $db->query(
-            "SELECT * FROM semana WHERE fecha_inicio > CURDATE() ORDER BY fecha_inicio ASC LIMIT 2"
+            "SELECT * FROM semana WHERE fecha_inicio > CURDATE() ORDER BY fecha_inicio ASC LIMIT 1"
         );
         $semanas = $stmtF->fetchAll();
 

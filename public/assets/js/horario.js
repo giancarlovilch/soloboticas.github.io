@@ -66,20 +66,21 @@ function renderSlots(slots) {
             el.dataset.ocupadoPor = s.postulante_id;
             const nombre = s.trabajador_nombre || '—';
 
+            const nombreEl = el.querySelector('.hor-asiento__nombre');
+            nombreEl.textContent = nombre;
+
             if (parseInt(s.postulante_id) === MI_ID) {
                 // Slot propio: solo el dueño puede liberarlo
                 el.className           = 'hor-asiento hor-asiento--mio';
                 el.title               = `Tuyo (${nombre}) — clic para liberar`;
                 el.style.pointerEvents = 'auto';
                 el.onclick             = () => clickAsiento(el);
-                el.querySelector('.hor-asiento__nombre').textContent = nombre;
             } else {
-                // Ocupado por otro: nadie puede interactuar haciendo clic
+                // Ocupado por otro
                 el.className           = 'hor-asiento hor-asiento--ocupado';
                 el.title               = `Ocupado por ${nombre}`;
                 el.style.pointerEvents = 'none';
                 el.onclick             = null;
-                el.querySelector('.hor-asiento__nombre').textContent = nombre;
             }
             quitarBtnPicker(el);
         } else {

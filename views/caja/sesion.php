@@ -91,7 +91,7 @@ $act = [
                 </select>
             </div>
             <div class="caja-field">
-                <label>Vendedor/a del turno</label>
+                <label>Vendedor/a del turno <span class="req">*</span></label>
                 <select id="vendedorId" class="caja-input">
                     <option value="">— Selecciona vendedor/a —</option>
                     <?php foreach ($staff as $s): ?>

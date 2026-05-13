@@ -67,10 +67,10 @@ if ($semana) {
     </div>
     <div class="hor-header__right">
         <span class="hor-header__user"><?= htmlspecialchars($userName) ?></span>
-        <a href="<?= $basePath ?>/horario/solicitudes" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📋 Solicitudes</a>
-        <a href="<?= $basePath ?>/horario/informacion" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">ℹ️ Info</a>
-        <a href="<?= $basePath ?>/horario/historial" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📂 Historial</a>
-        <a href="<?= $basePath ?>/<?= $esAdmin ? 'admin/dashboard' : 'staff' ?>" class="hor-btn-back">← Volver</a>
+        <a href="<?= $basePath ?>/horario/solicitudes" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📋<span class="hor-btn-txt"> Solicitudes</span></a>
+        <a href="<?= $basePath ?>/horario/informacion" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">ℹ️<span class="hor-btn-txt"> Info</span></a>
+        <a href="<?= $basePath ?>/horario/historial" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📂<span class="hor-btn-txt"> Historial</span></a>
+        <a href="<?= $basePath ?>/<?= $esAdmin ? 'admin/dashboard' : 'staff' ?>" class="hor-btn-back">←<span class="hor-btn-txt"> Volver</span></a>
     </div>
 </header>
 
@@ -126,6 +126,23 @@ if ($semana) {
             </h1>
             <span class="hor-semana-estado estado-cerrada">🔒 Solo lectura</span>
         </div>
+
+        <!-- Filtro por trabajador -->
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+            <label style="font-size:.68rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">
+                Resaltar
+            </label>
+            <select id="filtroTrabajador"
+                    style="padding:.35rem .7rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.8rem;outline:none;min-width:160px;cursor:pointer;background:#fff;color:#1e293b;transition:border-color .15s;"
+                    onchange="aplicarFiltro(this.value)">
+                <option value="">— Todos —</option>
+            </select>
+            <button onclick="aplicarFiltro('')" id="btnLimpiarFiltro" hidden
+                    style="padding:.35rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.75rem;background:#f1f5f9;cursor:pointer;color:#475569;line-height:1;transition:all .15s;">
+                ✕
+            </button>
+        </div>
+
         <div id="horResumen" class="hor-resumen" hidden></div>
     </div>
 
@@ -165,8 +182,13 @@ if ($semana) {
                 ?>
                 <div class="hor-grid__row <?= $esOpcional ? 'hor-grid__row--opcional' : '' ?>"
                      style="--rol-color:<?= $rolColor ?>;">
+                    <?php
+                        $rolDesc  = htmlspecialchars($roles[$rol]['desc'] ?? $rol);
+                        $rolAbrev = ['CAJERA'=>'C','VENDEDORA'=>'V','LIMPIEZA'=>'L','ALMACENERA'=>'A'][$rol] ?? mb_substr($rolDesc, 0, 1);
+                    ?>
                     <div class="hor-grid__rol-label">
-                        <?= htmlspecialchars($roles[$rol]['desc'] ?? $rol) ?>
+                        <span class="hor-rol-full"><?= $rolDesc ?></span>
+                        <span class="hor-rol-short"><?= $rolAbrev ?></span>
                         <?php if ($cantidad > 1): ?><span class="hor-slot-num"><?= $n ?></span><?php endif; ?>
                         <?php if ($esOpcional): ?><span class="hor-opcional-badge">opc.</span><?php endif; ?>
                     </div>
@@ -204,6 +226,10 @@ if ($semana) {
 <script>
 const BASE      = '<?= $basePath ?>';
 const SEMANA_ID = <?= $semana ? $semana['id_semana'] : 'null' ?>;
+const MI_ID     = <?= $postulanteId ?? (int)($_SESSION['user_id'] ?? 0) ?>;
+
+let _slots   = [];
+let _filtroId = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (SEMANA_ID) cargarSlots();
@@ -214,8 +240,36 @@ async function cargarSlots() {
         const r   = await fetch(`${BASE}/horario/api/semana/${SEMANA_ID}`);
         const res = await r.json();
         if (!res.success) return;
-        renderSlots(res.data || []);
+        _slots = res.data || [];
+        poblarFiltro(_slots);
+        renderSlots(_slots);
     } catch {}
+}
+
+function poblarFiltro(slots) {
+    const sel = document.getElementById('filtroTrabajador');
+    if (!sel) return;
+    const vistos = new Set();
+    const opts = [{ id: 0, nombre: '— Todos —' }];
+    slots.forEach(s => {
+        if (s.postulante_id && !vistos.has(s.postulante_id)) {
+            vistos.add(s.postulante_id);
+            opts.push({ id: parseInt(s.postulante_id), nombre: s.trabajador_nombre || '—' });
+        }
+    });
+    opts.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    sel.innerHTML = opts.map(o =>
+        `<option value="${o.id}">${o.nombre}</option>`
+    ).join('');
+}
+
+function aplicarFiltro(val) {
+    _filtroId = parseInt(val) || 0;
+    const btn = document.getElementById('btnLimpiarFiltro');
+    if (btn) btn.hidden = !_filtroId;
+    const sel = document.getElementById('filtroTrabajador');
+    if (sel) sel.style.borderColor = _filtroId ? '#2563eb' : '#e2e8f0';
+    renderSlots(_slots);
 }
 
 function renderSlots(slots) {
@@ -231,7 +285,11 @@ function renderSlots(slots) {
         if (!el) return;
 
         if (s.postulante_id) {
-            el.className = 'hor-asiento hor-asiento--ocupado';
+            const pid    = parseInt(s.postulante_id);
+            const esMio  = pid === MI_ID;
+            const esFilt = _filtroId && pid === _filtroId && !esMio;
+            const cls    = esMio ? 'hor-asiento--mio' : (esFilt ? 'hor-asiento--filtrado' : 'hor-asiento--ocupado');
+            el.className = 'hor-asiento ' + cls;
             el.title     = s.trabajador_nombre || '—';
             el.querySelector('.hor-asiento__nombre').textContent = s.trabajador_nombre || '—';
         } else {

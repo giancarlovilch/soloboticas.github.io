@@ -56,7 +56,7 @@ class StaffController extends Controller
         require_once __DIR__ . '/../../views/staff/dashboard.php';
     }
 
-    /** GET /staff/mi-horario — reporte mensual (propio o de un compañero) */
+    /** GET /staff/mi-horario — vista mensual (propio o de un compañero) */
     public function miHorario(): void
     {
         $registradorId = $this->getSessionUserId();
@@ -68,6 +68,10 @@ class StaffController extends Controller
         $esPropioHorario = ($postulanteId === $registradorId);
 
         $filtroMes = $_GET['mes'] ?? date('Y-m');
+        // Validar formato Y-m
+        if (!preg_match('/^\d{4}-\d{2}$/', $filtroMes)) {
+            $filtroMes = date('Y-m');
+        }
         [$anio, $nmes] = explode('-', $filtroMes);
         $desde = "{$anio}-{$nmes}-01";
         $hasta = date('Y-m-t', strtotime($desde));

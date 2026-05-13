@@ -1,8 +1,10 @@
 <?php
 $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
-$meses    = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-[$anioF, $nmesF] = explode('-', $filtroMes);
-$mesLabel = $meses[(int)$nmesF - 1] . ' ' . $anioF;
+$mesesNomCompleto = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+$mesLabel   = $mesesNomCompleto[(int)date('n', strtotime($desde)) - 1] . ' ' . date('Y', strtotime($desde));
+$mesPasado  = date('Y-m', strtotime($desde . ' -1 month'));
+$mesSiguiente = date('Y-m', strtotime($desde . ' +1 month'));
+$mesActual  = date('Y-m');
 
 $estadoInfo = [
     'A TIEMPO' => ['bg'=>'#d1fae5','color'=>'#065f46','label'=>'A tiempo'],
@@ -177,10 +179,10 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
 <main class="mh-wrap">
 
     <!-- Filtros: trabajador + mes -->
-    <form method="GET" class="mh-top">
+    <form method="GET" class="mh-top" style="align-items:flex-end;">
         <div>
             <label>Ver horario de:</label>
-            <select name="trabajador">
+            <select name="trabajador" onchange="this.form.submit()">
                 <?php foreach ($trabajadores as $t): ?>
                     <option value="<?= $t['id'] ?>" <?= $t['id'] == $postulanteId ? 'selected' : '' ?>>
                         <?= htmlspecialchars($t['nombre']) ?><?= $t['id'] == $registradorId ? ' (Yo)' : '' ?>
@@ -188,12 +190,23 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
                 <?php endforeach; ?>
             </select>
         </div>
-        <div>
-            <label>Mes:</label>
-            <input type="month" name="mes" value="<?= htmlspecialchars($filtroMes) ?>">
-        </div>
-        <button type="submit" style="align-self:flex-end;">Ver</button>
+        <input type="hidden" name="mes" value="<?= htmlspecialchars($filtroMes) ?>">
     </form>
+
+    <!-- Navegación mensual -->
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem;">
+        <a href="?trabajador=<?= $postulanteId ?>&mes=<?= $mesPasado ?>"
+           style="padding:.38rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;border:1.5px solid #e2e8f0;background:#fff;color:#475569;text-decoration:none;white-space:nowrap;">
+            ← Mes anterior
+        </a>
+        <span style="font-size:.92rem;font-weight:700;color:#1e293b;padding:0 .5rem;"><?= $mesLabel ?></span>
+        <?php if ($filtroMes < $mesActual): ?>
+        <a href="?trabajador=<?= $postulanteId ?>&mes=<?= $mesSiguiente ?>"
+           style="padding:.38rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;border:1.5px solid #e2e8f0;background:#fff;color:#475569;text-decoration:none;white-space:nowrap;">
+            Mes siguiente →
+        </a>
+        <?php endif; ?>
+    </div>
 
     <?php if ($esPropioHorario): ?>
     <div style="background:#fef9c3;border:1px solid #fbbf24;border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.82rem;color:#92400e;">
@@ -214,7 +227,7 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
     <?php if (empty($fechas)): ?>
     <div style="text-align:center;padding:3rem;color:#94a3b8;">
         <div style="font-size:2.5rem;margin-bottom:.5rem;">📅</div>
-        <p style="font-weight:600;">Sin actividad en <?= htmlspecialchars($mesLabel) ?></p>
+        <p style="font-weight:600;">Sin turnos asignados en <?= $mesLabel ?></p>
     </div>
     <?php else: ?>
     <div class="mh-table-wrap">
@@ -236,12 +249,6 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
         </thead>
         <tbody>
         <?php
-        $asistPorTurnoIdx = [];
-        foreach ($asistencias as $idx => $a) {
-            $t = ($idx % 2 === 0) ? 1 : 2;
-            $asistPorTurnoIdx[$a['fecha']][$t] = $a;
-        }
-
         foreach ($fechas as $fecha):
             $dow      = $diasLabel[(int)date('w', strtotime($fecha))];
             $diaN     = date('d/m', strtotime($fecha));
@@ -249,10 +256,15 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
             $rempDia  = $rempPorFecha[$fecha]       ?? [];
             $asistDia = $asistPorFecha[$fecha]       ?? [];
 
-            // Asociar asistencia a turno por posición
+            // Asociar asistencia a turno por hora (< 14:00 = mañana, >= 14:00 = tarde)
             $asistTurno = [];
-            foreach ($asistDia as $i => $a) {
-                $asistTurno[$i === 0 ? 1 : 2] = $a;
+            foreach ($asistDia as $a) {
+                if ($a['hora_ingreso']) {
+                    $turno = ((int)date('H', strtotime($a['hora_ingreso'])) < 14) ? 1 : 2;
+                } else {
+                    $turno = !isset($asistTurno[1]) ? 1 : 2;
+                }
+                $asistTurno[$turno] = $a;
             }
 
             foreach ($slotsDia as $turnoId => $slot):

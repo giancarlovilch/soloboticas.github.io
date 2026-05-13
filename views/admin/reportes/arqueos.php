@@ -191,7 +191,7 @@ $fDif = function($v) {
                         <td class="text-right"><?= $fDif($diferencia) ?></td>
                         <td class="text-right">
                             <?php
-                                $difCorr = $diferencia + (float)($r['sum_rectifs'] ?? 0) - (float)($r['sum_ajustes'] ?? 0);
+                                $difCorr = $diferencia + (float)($r['sum_rectifs'] ?? 0) + (float)($r['sum_ajustes'] ?? 0);
                                 if (abs($difCorr) < 0.01):
                             ?>
                                 <span style="background:#d1fae5;color:#065f46;font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:5px;">Resuelto</span>

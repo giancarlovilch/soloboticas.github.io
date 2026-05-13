@@ -30,11 +30,12 @@ body {
     background: var(--sb-dark);
     color: #fff;
     padding: 0 1.5rem;
-    height: 64px;
+    min-height: 64px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
+    flex-wrap: wrap;
 }
 
 .staff-header__brand  { display: flex; align-items: center; gap: 12px; }
@@ -173,8 +174,16 @@ body {
 /* ── SPINNER ──────────────────────────────────────────── */
 .staff-spinner { color: var(--sb-muted); font-size: 0.85rem; }
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
     .staff-header { padding: 0 1rem; }
+    /* Ocultar nombre/rol en header — solo quedan Salir y ? */
+    .staff-header__user > div { display: none; }
+    .staff-header__user { gap: .5rem; }
+}
+
+@media (max-width: 480px) {
+    /* Ocultar subtítulo empresa */
+    .staff-header__company { display: none; }
     .staff-main   { margin-top: 1rem; }
     .staff-card   { padding: 1.25rem; }
 }

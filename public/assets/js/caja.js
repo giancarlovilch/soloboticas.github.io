@@ -80,13 +80,12 @@ async function crearSesion() {
     const btn        = $('btnCrear');
     const msg        = $('sesionMsg');
 
-    if (!cajaId || !turnoId) { showAlert(msg, 'Selecciona local, caja y turno.'); return; }
+    if (!cajaId || !turnoId || !vendedorId) { showAlert(msg, 'Selecciona local, caja, turno y vendedor/a.'); return; }
 
     btn.disabled    = true;
     btn.textContent = 'Creando...';
 
-    const payload = { caja_id: parseInt(cajaId), turno_id: parseInt(turnoId) };
-    if (vendedorId) payload.vendedor_id = parseInt(vendedorId);
+    const payload = { caja_id: parseInt(cajaId), turno_id: parseInt(turnoId), vendedor_id: parseInt(vendedorId) };
 
     try {
         const r   = await fetch(`${BASE}/caja/api/sesion/crear`, {

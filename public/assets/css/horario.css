@@ -19,9 +19,10 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
 /* ── HEADER ─────────────────────────────────────────── */
 .hor-header {
     background: var(--hor-dark); color: #fff;
-    height: 60px; padding: 0 1.5rem;
+    min-height: 60px; padding: 0 1.5rem;
     display: flex; align-items: center; justify-content: space-between; gap: 1rem;
     position: sticky; top: 0; z-index: 200;
+    flex-wrap: wrap;
 }
 .hor-header__brand { display: flex; align-items: center; gap: 12px; }
 .hor-header__logo  {
@@ -32,12 +33,12 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
 }
 .hor-header__company { font-size: 0.6rem; color: #94a3b8; text-transform: uppercase; letter-spacing: .07em; }
 .hor-header__app     { font-size: 0.95rem; font-weight: 700; color: #fff; }
-.hor-header__right   { display: flex; align-items: center; gap: .65rem; }
+.hor-header__right   { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .hor-header__user    { font-size: 0.78rem; color: #94a3b8; }
 .hor-btn-back {
     padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 500;
     border: 1px solid rgba(255,255,255,0.25); color: #fff; text-decoration: none;
-    transition: background .15s;
+    transition: background .15s; white-space: nowrap;
 }
 .hor-btn-back:hover { background: rgba(255,255,255,0.1); }
 
@@ -163,8 +164,9 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
     user-select: none;
 }
 .hor-asiento__nombre { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.hor-asiento--mio    .hor-asiento__nombre { font-weight: 700; color: var(--hor-dark); }
-.hor-asiento--ocupado .hor-asiento__nombre { font-weight: 350; color: #94a3b8; }
+.hor-asiento--mio      .hor-asiento__nombre { font-weight: 750; color: #dc2626; }
+.hor-asiento--ocupado  .hor-asiento__nombre { font-weight: 100; color: #50617a; }
+.hor-asiento--filtrado .hor-asiento__nombre { font-weight: 750; color: #2563eb; }
 
 /* Botón de asignación para admins (aparece en hover del slot libre) */
 .hor-asiento__btn-picker {
@@ -353,6 +355,10 @@ body.es-admin .hor-asiento--ocupado:hover {
 .hor-toast--ok    { background: #065f46; }
 .hor-toast--info  { background: #0369a1; }
 
+/* Abreviaturas de rol — base: muestra texto completo */
+.hor-rol-short { display: none; }
+.hor-rol-full  { display: inline; }
+
 /* ── RESPONSIVE ─────────────────────────────────────── */
 @media (max-width: 640px) {
     .hor-main { padding: 0 .5rem 3rem; }
@@ -365,8 +371,33 @@ body.es-admin .hor-asiento--ocupado:hover {
     .hor-dia-fecha  { font-size: 0.55rem; }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 640px) {
+    /* Header: ocultar texto de botones, dejar solo el icono */
+    .hor-btn-txt { display: none; }
+    .hor-btn { padding: .4rem .55rem; }
+    .hor-btn-back { padding: 5px 8px; }
+    /* Ocultar nombre de usuario en header */
+    .hor-header__user { display: none; }
+    .hor-header { padding: 0 .75rem; gap: .5rem; }
+}
+
+@media (max-width: 480px) {
+    /* Header: ocultar subtítulo empresa */
+    .hor-header__company { display: none; }
+    /* Abreviaturas: ocultar texto completo, mostrar letra */
+    .hor-rol-full  { display: none; }
+    .hor-rol-short { display: inline; }
+    /* Columna de rol angosta para una sola letra */
+    .hor-grid__header,
+    .hor-grid__row { grid-template-columns: 20px repeat(7, minmax(0, 1fr)); }
+    /* Zoom 80% en cada sala */
+    .hor-sala { zoom: 0.80; }
+}
+
+@media (max-width: 360px) {
     .hor-asiento { height: 30px; }
     .hor-grid__header,
     .hor-grid__row { gap: .15rem; }
+    /* Zoom 70% para pantallas muy pequeñas */
+    .hor-sala { zoom: 0.70; }
 }

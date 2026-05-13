@@ -45,7 +45,7 @@ $totAprobado  = array_sum(array_column(array_filter($pagos, fn($p) => $p['estado
     <div class="caja-header__right">
         <span class="caja-header__user"><?= htmlspecialchars($userName) ?> (<?= $userRol ?>)</span>
         <a href="<?= $basePath ?>/caja" class="caja-btn-back">← Caja</a>
-        <a href="<?= $basePath ?>/admin/dashboard" class="caja-btn-back">Dashboard</a>
+        <a href="<?= $basePath ?>/<?= ($userRol ?? '') === 'ADMIN' ? 'admin/dashboard' : 'staff' ?>" class="caja-btn-back">Dashboard</a>
     </div>
 </header>
 

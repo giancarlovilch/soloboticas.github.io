@@ -47,7 +47,7 @@ $estadoLabel = [
             Cobros Electrónicos
         </a>
         <?php endif; ?>
-        <a href="<?= $basePath ?>/admin/dashboard" class="caja-btn-back">← Dashboard</a>
+        <a href="<?= $basePath ?>/<?= ($userRol ?? '') === 'ADMIN' ? 'admin/dashboard' : 'staff' ?>" class="caja-btn-back">← Dashboard</a>
         <a href="<?= $basePath ?>/logout" class="caja-btn-back" style="border-color:#fca5a5;color:#ef4444;">Salir</a>
     </div>
 </header>
@@ -123,9 +123,15 @@ $estadoLabel = [
                 <p class="caja-kicker">Nuevo registro</p>
                 <h2>Apertura de turno de caja</h2>
             </div>
-            <a href="<?= $basePath ?>/caja/sesion/nueva" class="caja-btn caja-btn--primary">
-                + Abrir turno
-            </a>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <a href="<?= $basePath ?>/caja/transferir" class="caja-btn caja-btn--outline"
+                   style="border-color:#f59e0b;color:#92400e;background:#fffbeb;">
+                    💸 Pásame saldo
+                </a>
+                <a href="<?= $basePath ?>/caja/sesion/nueva" class="caja-btn caja-btn--primary">
+                    + Abrir turno
+                </a>
+            </div>
         </div>
     </section>
 

@@ -551,6 +551,54 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
         <?php endif; ?>
     </section>
 
+    <!-- ── Transferencias de saldo del día ────────────────── -->
+    <?php if (!empty($transferencias)): ?>
+    <section class="caja-card">
+        <h2 class="caja-card__title">Transferencias de saldo del día</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+            <thead>
+                <tr>
+                    <?php foreach (['Operación','Monto','Comprobante','Confirmado por','Hora'] as $th): ?>
+                    <th style="background:#f8fafc;padding:.45rem .8rem;font-size:.63rem;font-weight:700;
+                        text-transform:uppercase;letter-spacing:.06em;color:#64748b;
+                        border-bottom:2px solid #e2e8f0;text-align:left;"><?= $th ?></th>
+                    <?php endforeach; ?>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($transferencias as $tr):
+                $esEnvio = ((int)$tr['caja_origen_id'] === (int)$sesion['caja_id']);
+            ?>
+            <tr>
+                <td style="padding:.55rem .8rem;border-bottom:1px solid #f1f5f9;">
+                    <?php if ($esEnvio): ?>
+                        <span style="color:#dc2626;font-weight:600;">↑ Enviado</span>
+                        <span style="font-size:.75rem;color:#64748b;display:block;">hacia <?= htmlspecialchars($tr['caja_destino_desc']) ?></span>
+                    <?php else: ?>
+                        <span style="color:#059669;font-weight:600;">↓ Recibido</span>
+                        <span style="font-size:.75rem;color:#64748b;display:block;">desde <?= htmlspecialchars($tr['caja_origen_desc']) ?></span>
+                    <?php endif; ?>
+                </td>
+                <td style="padding:.55rem .8rem;border-bottom:1px solid #f1f5f9;font-weight:700;
+                    font-variant-numeric:tabular-nums;color:<?= $esEnvio ? '#dc2626' : '#059669' ?>;">
+                    <?= $esEnvio ? '−' : '+' ?> S/ <?= number_format($tr['monto'], 2) ?>
+                </td>
+                <td style="padding:.55rem .8rem;border-bottom:1px solid #f1f5f9;font-size:.78rem;color:#475569;">
+                    <?= htmlspecialchars($tr['numero_comprobante'] ?? '—') ?>
+                </td>
+                <td style="padding:.55rem .8rem;border-bottom:1px solid #f1f5f9;font-size:.75rem;">
+                    <?= htmlspecialchars($tr['confirmador_nombre'] ?? '—') ?>
+                </td>
+                <td style="padding:.55rem .8rem;border-bottom:1px solid #f1f5f9;font-size:.72rem;color:#64748b;white-space:nowrap;">
+                    <?= date('H:i', strtotime($tr['confirmed_at'])) ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </section>
+    <?php endif; ?>
+
 </main>
 
 <script src="<?= $basePath ?>/assets/js/session-guard.js"></script>

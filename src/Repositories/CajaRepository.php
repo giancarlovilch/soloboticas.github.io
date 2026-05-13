@@ -908,4 +908,166 @@ class CajaRepository
         $stmt->execute(['sid' => $sesionId]);
         return $stmt->fetchAll();
     }
+
+    // ── Transferencias de saldo entre locales ──────────────
+
+    public function getSaldosBaseCajas(): array
+    {
+        return $this->db->query(
+            "SELECT c.id_caja, c.descripcion AS caja_desc, l.descripcion AS local_desc,
+                    sc.id_sesion, dc.saldo_proximo_dia, sc.fecha_operacion, sc.estado AS sesion_estado
+             FROM caja c
+             INNER JOIN local l ON l.id_local = c.local_id
+             LEFT JOIN sesion_caja sc ON sc.id_sesion = (
+                 SELECT sc2.id_sesion
+                 FROM sesion_caja sc2
+                 INNER JOIN detalle_cuadre dc2 ON dc2.sesion_id = sc2.id_sesion
+                 WHERE sc2.caja_id = c.id_caja
+                 ORDER BY sc2.id_sesion DESC LIMIT 1
+             )
+             LEFT JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
+             WHERE c.activo = 1
+             ORDER BY l.descripcion ASC, c.descripcion ASC"
+        )->fetchAll();
+    }
+
+    private function getUltimaSesionConDetalle(int $cajaId): ?int
+    {
+        $stmt = $this->db->prepare(
+            "SELECT sc.id_sesion
+             FROM sesion_caja sc
+             INNER JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
+             WHERE sc.caja_id = :cid
+             ORDER BY sc.id_sesion DESC LIMIT 1"
+        );
+        $stmt->execute(['cid' => $cajaId]);
+        $id = $stmt->fetchColumn();
+        return $id ? (int)$id : null;
+    }
+
+    public function crearTransferencia(int $cajaOrigen, int $cajaDestino, float $monto, ?string $notas, int $solicitanteId): int
+    {
+        $this->db->prepare(
+            "INSERT INTO transferencia_saldo (caja_origen_id, caja_destino_id, monto, notas, solicitante_id)
+             VALUES (:ori, :des, :monto, :notas, :sol)"
+        )->execute(['ori' => $cajaOrigen, 'des' => $cajaDestino, 'monto' => $monto, 'notas' => $notas, 'sol' => $solicitanteId]);
+        return (int)$this->db->lastInsertId();
+    }
+
+    public function confirmarTransferencia(int $id, int $confirmadorId, string $password, string $comprobante): bool|string
+    {
+        $stmt = $this->db->prepare("SELECT password FROM usuario WHERE postulante_id = :pid LIMIT 1");
+        $stmt->execute(['pid' => $confirmadorId]);
+        $hash = $stmt->fetchColumn();
+        if (!$hash || !password_verify($password, $hash)) return 'Contraseña incorrecta';
+
+        $t = $this->db->prepare("SELECT * FROM transferencia_saldo WHERE id = :id AND estado = 'PENDIENTE'");
+        $t->execute(['id' => $id]);
+        $transfer = $t->fetch();
+        if (!$transfer) return 'Transferencia no encontrada o ya procesada';
+
+        // Aplicar a detalle_cuadre de la última sesión con detalle de cada caja
+        foreach ([
+            ['cid' => $transfer['caja_origen_id'],  'op' => '-'],
+            ['cid' => $transfer['caja_destino_id'], 'op' => '+'],
+        ] as $side) {
+            $sesionId = $this->getUltimaSesionConDetalle($side['cid']);
+            if ($sesionId) {
+                $op = $side['op'];
+                $this->db->prepare(
+                    "UPDATE detalle_cuadre SET saldo_proximo_dia = COALESCE(saldo_proximo_dia, 0) {$op} :monto
+                     WHERE sesion_id = :id"
+                )->execute(['monto' => $transfer['monto'], 'id' => $sesionId]);
+            }
+        }
+
+        $this->db->prepare(
+            "UPDATE transferencia_saldo SET estado = 'CONFIRMADA', confirmador_id = :cid,
+             numero_comprobante = :comp, confirmed_at = NOW() WHERE id = :id"
+        )->execute(['cid' => $confirmadorId, 'comp' => $comprobante, 'id' => $id]);
+
+        return true;
+    }
+
+    public function anularTransferencia(int $id, int $anuladorId, string $password): bool|string
+    {
+        $stmt = $this->db->prepare("SELECT password FROM usuario WHERE postulante_id = :pid LIMIT 1");
+        $stmt->execute(['pid' => $anuladorId]);
+        $hash = $stmt->fetchColumn();
+        if (!$hash || !password_verify($password, $hash)) return 'Contraseña incorrecta';
+
+        $t = $this->db->prepare("SELECT * FROM transferencia_saldo WHERE id = :id AND estado IN ('PENDIENTE','CONFIRMADA')");
+        $t->execute(['id' => $id]);
+        $transfer = $t->fetch();
+        if (!$transfer) return 'Transferencia no encontrada o ya anulada';
+
+        // Si estaba CONFIRMADA, revertir el saldo en detalle_cuadre
+        if ($transfer['estado'] === 'CONFIRMADA') {
+            foreach ([
+                ['cid' => $transfer['caja_origen_id'],  'op' => '+'],
+                ['cid' => $transfer['caja_destino_id'], 'op' => '-'],
+            ] as $side) {
+                $sesionId = $this->getUltimaSesionConDetalle($side['cid']);
+                if ($sesionId) {
+                    $op = $side['op'];
+                    $this->db->prepare(
+                        "UPDATE detalle_cuadre SET saldo_proximo_dia = COALESCE(saldo_proximo_dia, 0) {$op} :monto
+                         WHERE sesion_id = :id"
+                    )->execute(['monto' => $transfer['monto'], 'id' => $sesionId]);
+                }
+            }
+        }
+
+        $this->db->prepare(
+            "UPDATE transferencia_saldo SET estado = 'ANULADA', anulador_id = :aid, anulada_at = NOW()
+             WHERE id = :id"
+        )->execute(['aid' => $anuladorId, 'id' => $id]);
+
+        return true;
+    }
+
+    public function getTransferencias(): array
+    {
+        return $this->db->query(
+            "SELECT t.*,
+                    CONCAT(co.descripcion, ' · ', lo.descripcion) AS caja_origen_desc,
+                    CONCAT(cd.descripcion, ' · ', ld.descripcion) AS caja_destino_desc,
+                    ps.nombres AS solicitante_nombre,
+                    pc.nombres AS confirmador_nombre,
+                    pa.nombres AS anulador_nombre
+             FROM transferencia_saldo t
+             INNER JOIN caja co ON co.id_caja  = t.caja_origen_id
+             INNER JOIN caja cd ON cd.id_caja  = t.caja_destino_id
+             INNER JOIN local lo ON lo.id_local = co.local_id
+             INNER JOIN local ld ON ld.id_local = cd.local_id
+             INNER JOIN postulante ps ON ps.id_postulante = t.solicitante_id
+             LEFT JOIN postulante pc  ON pc.id_postulante = t.confirmador_id
+             LEFT JOIN postulante pa  ON pa.id_postulante = t.anulador_id
+             ORDER BY t.created_at DESC LIMIT 100"
+        )->fetchAll();
+    }
+
+    public function getTransferenciasByCaja(int $cajaId, string $fecha): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT t.*,
+                    CONCAT(co.descripcion, ' (', lo.descripcion, ')') AS caja_origen_desc,
+                    CONCAT(cd.descripcion, ' (', ld.descripcion, ')') AS caja_destino_desc,
+                    ps.nombres AS solicitante_nombre,
+                    pc.nombres AS confirmador_nombre
+             FROM transferencia_saldo t
+             INNER JOIN caja co ON co.id_caja  = t.caja_origen_id
+             INNER JOIN caja cd ON cd.id_caja  = t.caja_destino_id
+             INNER JOIN local lo ON lo.id_local = co.local_id
+             INNER JOIN local ld ON ld.id_local = cd.local_id
+             INNER JOIN postulante ps ON ps.id_postulante = t.solicitante_id
+             LEFT JOIN postulante pc  ON pc.id_postulante = t.confirmador_id
+             WHERE (t.caja_origen_id = :cid OR t.caja_destino_id = :cid2)
+               AND t.estado = 'CONFIRMADA'
+               AND DATE(t.confirmed_at) = :fecha
+             ORDER BY t.confirmed_at ASC"
+        );
+        $stmt->execute(['cid' => $cajaId, 'cid2' => $cajaId, 'fecha' => $fecha]);
+        return $stmt->fetchAll();
+    }
 }

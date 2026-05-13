@@ -70,8 +70,8 @@ if ($semana) {
     </div>
     <div class="hor-header__right">
         <span class="hor-header__user"><?= htmlspecialchars($userName) ?></span>
-        <a href="<?= $basePath ?>/horario/historial" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📂 Historial</a>
-        <a href="<?= $basePath ?>/horario" class="hor-btn-back">← Semana actual</a>
+        <a href="<?= $basePath ?>/horario/historial" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📂<span class="hor-btn-txt"> Historial</span></a>
+        <a href="<?= $basePath ?>/horario" class="hor-btn-back">←<span class="hor-btn-txt"> Semana actual</span></a>
     </div>
 </header>
 
@@ -177,8 +177,13 @@ if ($semana) {
                 ?>
                 <div class="hor-grid__row <?= $esOpcional ? 'hor-grid__row--opcional' : '' ?>"
                      style="--rol-color:<?= $rolColor ?>;">
+                    <?php
+                        $rolDesc  = htmlspecialchars($roles[$rol]['desc'] ?? $rol);
+                        $rolAbrev = ['CAJERA'=>'C','VENDEDORA'=>'V','LIMPIEZA'=>'L','ALMACENERA'=>'A'][$rol] ?? mb_substr($rolDesc, 0, 1);
+                    ?>
                     <div class="hor-grid__rol-label">
-                        <?= htmlspecialchars($roles[$rol]['desc'] ?? $rol) ?>
+                        <span class="hor-rol-full"><?= $rolDesc ?></span>
+                        <span class="hor-rol-short"><?= $rolAbrev ?></span>
                         <?php if ($cantidad > 1): ?>
                             <span class="hor-slot-num"><?= $n ?></span>
                         <?php endif; ?>

@@ -281,6 +281,11 @@ class CajaController extends Controller
         $data = $this->repo->getReporte($id);
         extract($data); // $sesion, $detalle, $venta, $gastos, $rectifs
 
+        $transferencias = $this->repo->getTransferenciasByCaja(
+            (int)$sesion['caja_id'],
+            $sesion['fecha_operacion']
+        );
+
         require_once __DIR__ . '/../../views/caja/reporte.php';
     }
 
@@ -554,5 +559,57 @@ class CajaController extends Controller
             $db->rollBack();
             $this->error('Error interno: ' . $e->getMessage(), 500);
         }
+    }
+
+    // ── Transferencias de saldo entre locales ──────────────
+
+    public function transferirIndex(): void
+    {
+        $this->requireAuth();
+        $basePath       = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $saldos         = $this->repo->getSaldosBaseCajas();
+        $transferencias = $this->repo->getTransferencias();
+        require_once __DIR__ . '/../../views/caja/transferir.php';
+    }
+
+    public function solicitarTransferencia(): void
+    {
+        $userId  = $this->requireAuth();
+        $data    = $this->getAllInput();
+        $origen  = (int)($data['caja_origen_id']  ?? 0);
+        $destino = (int)($data['caja_destino_id'] ?? 0);
+        $monto   = (float)($data['monto'] ?? 0);
+        $notas   = trim($data['notas'] ?? '') ?: null;
+
+        if (!$origen || !$destino || $monto <= 0) $this->error('Origen, destino y monto son requeridos', 422);
+        if ($origen === $destino) $this->error('El origen y destino no pueden ser la misma caja', 422);
+
+        $id = $this->repo->crearTransferencia($origen, $destino, $monto, $notas, $userId);
+        $this->success('Solicitud creada', ['id' => $id]);
+    }
+
+    public function confirmarTransferenciaAction(int $id): void
+    {
+        $userId      = $this->requireAuth();
+        $data        = $this->getAllInput();
+        $password    = trim($data['password'] ?? '');
+        $comprobante = trim($data['numero_comprobante'] ?? '');
+
+        if (!$password || !$comprobante) $this->error('Contraseña y número de comprobante son requeridos', 422);
+
+        $result = $this->repo->confirmarTransferencia($id, $userId, $password, $comprobante);
+        if ($result === true) $this->success('Transferencia confirmada');
+        else $this->error($result, 401);
+    }
+
+    public function anularTransferenciaAction(int $id): void
+    {
+        $userId   = $this->requireAuth();
+        $password = trim($this->getAllInput()['password'] ?? '');
+        if (!$password) $this->error('La contraseña es requerida', 400);
+
+        $result = $this->repo->anularTransferencia($id, $userId, $password);
+        if ($result === true) $this->success('Transferencia anulada');
+        else $this->error($result, 401);
     }
 }
