@@ -1,5 +1,5 @@
 /**
- * Gestión de asistencias — Solo Boticas Admin
+ * Gestión de fichas de asistencia — Solo Boticas Admin
  */
 
 const buildAdminUrl = (path) => {
@@ -7,25 +7,42 @@ const buildAdminUrl = (path) => {
     return `${window.location.origin}${base}${path}`;
 };
 
-let catalogoLocales   = [];
-let catalogoUsuarios  = [];
-let editRow           = null;
+let catalogoLocales  = [];
+let catalogoUsuarios = [];
+let _rbVals          = {};
+let _soloSinCalif    = false;
 
 // ── Init ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     cargarAsistencias();
 });
 
+// ── Toggle "Sin calificar" ────────────────────────────
+function toggleSinCalif() {
+    _soloSinCalif = !_soloSinCalif;
+    const btn = document.getElementById('btnSinCalif');
+    if (btn) {
+        btn.style.background   = _soloSinCalif ? '#0097A7' : '';
+        btn.style.color        = _soloSinCalif ? '#fff' : '';
+        btn.style.borderColor  = _soloSinCalif ? '#0097A7' : '';
+    }
+    cargarAsistencias();
+}
+
 // ── Cargar tabla ──────────────────────────────────────
 async function cargarAsistencias() {
-    const fecha = document.getElementById('filtroFecha')?.value ?? '';
+    const desde = document.getElementById('filtroDesde')?.value ?? '';
+    const hasta = document.getElementById('filtroHasta')?.value ?? '';
     const pid   = document.getElementById('filtroPostulante')?.value ?? '';
-
     const tbody = document.getElementById('tbodyAsistencias');
     tbody.innerHTML = '<tr><td colspan="9" class="text-center">Cargando...</td></tr>';
 
     try {
-        const qs  = new URLSearchParams({ fecha, postulante_id: pid });
+        const qs = new URLSearchParams({
+            desde, hasta,
+            postulante_id: pid,
+            sin_calificar: _soloSinCalif ? '1' : '',
+        });
         const r   = await fetch(buildAdminUrl(`/admin/api/asistencias?${qs}`), {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
         });
@@ -33,25 +50,28 @@ async function cargarAsistencias() {
         if (!res.success) throw new Error(res.message);
 
         const { registros, usuarios, locales } = res.data;
-
-        // Guardar catálogos
         catalogoLocales  = locales  || [];
         catalogoUsuarios = usuarios || [];
 
-        // Llenar filtro de trabajadores (solo primera vez)
         const filtro = document.getElementById('filtroPostulante');
         if (filtro && filtro.options.length === 1) {
             usuarios.forEach(u => {
                 const o = document.createElement('option');
-                o.value = u.id; o.textContent = `${u.nombre_completo} (${u.num_documento})`;
+                o.value = u.id;
+                o.textContent = `${u.nombre_completo} (${u.num_documento})`;
                 filtro.appendChild(o);
             });
         }
 
-        // Llenar locales en modales
         llenarLocalSelect('editLocal');
         llenarLocalSelect('addLocal');
         llenarUsuariosSelect('addPostulante');
+
+        const sinFicha = registros.filter(r => !r.id_asistencia).length;
+        const info = document.getElementById('contadorInfo');
+        if (info) {
+            info.textContent = `${registros.length} turno${registros.length !== 1 ? 's' : ''} · ${sinFicha} sin ficha`;
+        }
 
         renderTabla(registros);
     } catch (e) {
@@ -60,126 +80,129 @@ async function cargarAsistencias() {
     }
 }
 
+// ── Render tabla ──────────────────────────────────────
+const PUNT_LABEL = {
+    'MUY_TEMPRANO': ['+10 min antes', '#eff6ff', '#1e40af'],
+    'TEMPRANO':     ['Temprano',      '#f0fdfe', '#0e7490'],
+    'TARDE':        ['Tarde',         '#fef3c7', '#92400e'],
+    'MUY_TARDE':    ['+10 min tarde', '#fee2e2', '#991b1b'],
+};
+const TURNO_LABEL = { '1': '☀️ Mañana', '2': '🌙 Tarde' };
+
+function puntBadge(val) {
+    if (!val || !PUNT_LABEL[val]) return '<span style="color:#cbd5e1">—</span>';
+    const [label, bg, color] = PUNT_LABEL[val];
+    return `<span style="font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:12px;background:${bg};color:${color};">${label}</span>`;
+}
+
+function fichaEstadoBadge(r) {
+    if (!r.id_asistencia) {
+        return '<span style="font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:12px;background:#f1f5f9;color:#64748b;">Sin ficha</span>';
+    }
+    if (r.estado === 'FALTA') {
+        return '<span style="font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:12px;background:#fee2e2;color:#991b1b;">Falta</span>';
+    }
+    const tieneEntrada = !!r.llegada_puntualidad;
+    const tieneSalida  = !!r.salida_puntualidad;
+    if (tieneEntrada && tieneSalida) {
+        return '<span style="font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:12px;background:#d1fae5;color:#065f46;">Completo</span>';
+    }
+    if (tieneEntrada || tieneSalida) {
+        return '<span style="font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:12px;background:#fef9c3;color:#92400e;">Parcial</span>';
+    }
+    return '<span style="font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:12px;background:#ede9fe;color:#5b21b6;">Solo estado</span>';
+}
+
 function renderTabla(registros) {
     const tbody = document.getElementById('tbodyAsistencias');
     if (!registros.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center">No hay registros para los filtros seleccionados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center">No hay turnos para los filtros seleccionados.</td></tr>';
         return;
     }
-    tbody.innerHTML = registros.map(r => `
-        <tr>
-            <td>${formatFecha(r.fecha)}</td>
-            <td>${r.nombre_completo}</td>
-            <td><strong>${r.num_documento}</strong></td>
-            <td>${r.local_desc || '—'}</td>
-            <td>${r.hora_ingreso ? formatHora(r.hora_ingreso) : '—'}</td>
-            <td>${r.hora_salida  ? formatHora(r.hora_salida)  : '—'}</td>
-            <td class="text-center">${badgeEstado(r.estado)}</td>
-            <td class="text-center">${badgeObs(r.observacion)}</td>
-            <td class="text-center">
-                <button class="btn-edit" onclick='abrirModalEdit(${JSON.stringify(r)})'>Editar</button>
+    tbody.innerHTML = registros.map(r => {
+        const rowBg = !r.id_asistencia ? '#fafafa' : (r.estado === 'FALTA' ? '#fff5f5' : '');
+        const accionBtn = `<button class="btn-edit" style="font-size:.72rem;"
+            onclick='abrirModalEdit(${JSON.stringify(r).replace(/'/g, "\\'")})'>${r.id_asistencia ? 'Editar' : 'Calificar'}</button>`;
+        const elimBtn = r.id_asistencia
+            ? `<button class="btn-danger" onclick='abrirModalDel(${r.id_asistencia}, "${escHtml(r.trabajador_nombre)}", "${formatFecha(r.fecha_dia)}")'>Eliminar</button>`
+            : `<span style="color:#cbd5e1;font-size:.75rem;">—</span>`;
+
+        return `<tr style="background:${rowBg}">
+            <td>${formatFecha(r.fecha_dia)}</td>
+            <td>${escHtml(r.trabajador_nombre)}</td>
+            <td style="font-size:.75rem;">
+                ${TURNO_LABEL[String(r.turno_id)] || '—'}
+                <span style="display:block;color:#94a3b8;">${escHtml(r.local_desc)} · ${escHtml(r.rol_desc)}</span>
             </td>
-            <td class="text-center">
-                <button class="btn-danger" onclick='abrirModalDel(${r.id_asistencia}, "${r.nombre_completo}", "${formatFecha(r.fecha)}")'>Eliminar</button>
-            </td>
-        </tr>`).join('');
+            <td class="text-center">${fichaEstadoBadge(r)}</td>
+            <td class="text-center">${puntBadge(r.llegada_puntualidad)}</td>
+            <td class="text-center">${puntBadge(r.salida_puntualidad)}</td>
+            <td style="font-size:.75rem;color:#0097A7;">${escHtml(r.registrado_por_nombre || '—')}</td>
+            <td class="text-center">${accionBtn}</td>
+            <td class="text-center">${elimBtn}</td>
+        </tr>`;
+    }).join('');
 }
 
-// ── Modal EDITAR ──────────────────────────────────────
-async function abrirModalEdit(r) {
-    editRow = r;
-    document.getElementById('editId').value           = r.id_asistencia;
-    document.getElementById('editNombre').value       = r.nombre_completo;
-    document.getElementById('editFechaLabel').value   = formatFecha(r.fecha);
-    document.getElementById('editIngreso').value      = toDatetimeLocal(r.hora_ingreso);
-    document.getElementById('editSalida').value       = toDatetimeLocal(r.hora_salida);
-    document.getElementById('editEstado').value       = r.estado || 'A TIEMPO';
-    document.getElementById('editLocal').value        = r.local_id || '';
-    document.getElementById('editJustif').value       = r.justificacion || '';
-    document.getElementById('editObs').value          = r.observacion || 'PENDIENTE';
-    document.getElementById('editMsg').hidden         = true;
+// ── Radio buttons ─────────────────────────────────────
+function pickRb(btn) {
+    const field = btn.dataset.field;
+    document.querySelectorAll(`#editModal .mh-rb[data-field="${field}"]`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _rbVals[field] = btn.dataset.val;
+}
 
-    document.getElementById('editModalTitle').textContent =
-        `Editar — ${r.nombre_completo} (${formatFecha(r.fecha)})`;
+function preselectRb(field, val) {
+    if (val === null || val === undefined) return;
+    const sVal = String(val);
+    document.querySelectorAll(`#editModal .mh-rb[data-field="${field}"]`).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.val === sVal);
+    });
+    _rbVals[field] = sVal;
+}
 
-    // Cargar checklist de esta asistencia
-    await cargarChecklistEdit(r.id_asistencia);
+function clearRbs() {
+    document.querySelectorAll('#editModal .mh-rb').forEach(b => b.classList.remove('active'));
+    _rbVals = {};
+}
+
+// ── Modal EDITAR / CALIFICAR ──────────────────────────
+function abrirModalEdit(r) {
+    clearRbs();
+
+    // Campos del slot (para crear si no existe ficha)
+    document.getElementById('editId').value         = r.id_asistencia || 0;
+    document.getElementById('editSlotPid').value    = r.postulante_id;
+    document.getElementById('editSlotFecha').value  = r.fecha_dia;
+    document.getElementById('editSlotTurno').value  = r.turno_id;
+
+    document.getElementById('editNombre').value      = r.trabajador_nombre;
+    const turnoStr = TURNO_LABEL[String(r.turno_id)] || '';
+    document.getElementById('editFechaLabel').value  = `${formatFecha(r.fecha_dia)}${turnoStr ? ' · ' + turnoStr : ''} · ${r.local_desc}`;
+    document.getElementById('editEstado').value      = r.estado || 'FALTA';
+    document.getElementById('editLocal').value       = r.local_id || '';
+    document.getElementById('editJustif').value      = r.justificacion || '';
+    document.getElementById('editObs').value         = r.observacion || 'PENDIENTE';
+    document.getElementById('editComentarios').value = r.comentarios_ficha || '';
+    document.getElementById('editMsg').hidden        = true;
+
+    document.getElementById('editModalTitle').textContent = r.id_asistencia
+        ? `Editar ficha — ${r.trabajador_nombre}`
+        : `Calificar turno — ${r.trabajador_nombre}`;
+
+    preselectRb('llegada_puntualidad',  r.llegada_puntualidad);
+    preselectRb('abrio_puerta',         r.abrio_puerta);
+    preselectRb('aseo_personal',        r.aseo_personal);
+    preselectRb('vestimenta',           r.vestimenta);
+    preselectRb('unas',                 r.unas);
+    preselectRb('cabello',              r.cabello);
+    preselectRb('salida_puntualidad',   r.salida_puntualidad);
+    preselectRb('limpieza_espacio',     r.limpieza_espacio);
+    preselectRb('limpieza_local',       r.limpieza_local);
+    preselectRb('ayudo_cerrar',         r.ayudo_cerrar);
+    preselectRb('ordeno_medicamentos',  r.ordeno_medicamentos);
 
     document.getElementById('editModal').hidden = false;
-}
-
-async function cargarChecklistEdit(asistenciaId) {
-    const wrap = document.getElementById('editChecklistWrap');
-    const cont = document.getElementById('editChecklist');
-    cont.innerHTML = '<p style="color:#94a3b8;font-size:0.78rem;">Cargando...</p>';
-    wrap.hidden = false;
-
-    try {
-        const r   = await fetch(buildAdminUrl(`/admin/api/asistencia/checklist?asistencia_id=${asistenciaId}`), {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        });
-        const res = await r.json();
-        const items = res.data || [];
-
-        if (!items.length) {
-            cont.innerHTML = '<p style="color:#94a3b8;font-size:0.78rem;">Sin checklist registrado.</p>';
-            return;
-        }
-
-        cont.innerHTML = items.map(item => {
-            const checked    = item.cumplido ? 'checked' : '';
-            const tipoBadge  = item.tipo === 'APERTURA'
-                ? '<span style="font-size:0.62rem;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:10px;">APERTURA</span>'
-                : '<span style="font-size:0.62rem;background:#fef9c3;color:#92400e;padding:1px 6px;border-radius:10px;">CIERRE</span>';
-            return `
-            <div style="display:flex;align-items:center;gap:.6rem;padding:.45rem .6rem;border:1px solid #e2e8f0;border-radius:7px;background:#fafafa;"
-                 id="chk-row-${item.id_asistencia_checklist}">
-                <input type="checkbox" data-id="${item.id_asistencia_checklist}"
-                       class="chk-item" ${checked}
-                       style="width:15px;height:15px;accent-color:#0097A7;cursor:pointer;"
-                       onchange="guardarChecklistItem(this)">
-                <span style="flex:1;font-size:0.82rem;color:#1e293b;">${escHtml(item.descripcion)}</span>
-                ${tipoBadge}
-                <span style="font-size:0.7rem;font-weight:600;padding:1px 7px;border-radius:10px;
-                             background:${item.cumplido ? '#d1fae5' : '#fee2e2'};
-                             color:${item.cumplido ? '#065f46' : '#991b1b'};"
-                      id="chk-badge-${item.id_asistencia_checklist}">
-                    ${item.cumplido ? '✓ Cumple' : '✗ No cumple'}
-                </span>
-            </div>`;
-        }).join('');
-
-    } catch {
-        cont.innerHTML = '<p style="color:#dc3545;font-size:0.78rem;">Error al cargar el checklist.</p>';
-    }
-}
-
-async function guardarChecklistItem(checkbox) {
-    const itemId   = parseInt(checkbox.dataset.id);
-    const cumplido = checkbox.checked ? 1 : 0;
-    const badge    = document.getElementById(`chk-badge-${itemId}`);
-
-    // Feedback visual inmediato
-    if (badge) {
-        badge.style.background = cumplido ? '#d1fae5' : '#fee2e2';
-        badge.style.color      = cumplido ? '#065f46' : '#991b1b';
-        badge.textContent      = cumplido ? '✓ Cumple' : '✗ No cumple';
-    }
-
-    try {
-        await fetch(buildAdminUrl('/admin/asistencia/checklist/actualizar'), {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            body:    JSON.stringify({ id_asistencia_checklist: itemId, cumplido }),
-        });
-    } catch {
-        // Revertir si falla
-        checkbox.checked = !checkbox.checked;
-    }
-}
-
-function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function cerrarModalEdit() {
@@ -187,15 +210,33 @@ function cerrarModalEdit() {
 }
 
 async function guardarEdit() {
-    const id = parseInt(document.getElementById('editId').value);
+    const id = parseInt(document.getElementById('editId').value) || 0;
+    const yn = (k) => _rbVals[k] !== undefined ? parseInt(_rbVals[k]) : null;
+    const sv = (k) => _rbVals[k] || null;
+
     const data = {
-        id_asistencia: id,
-        hora_ingreso:  document.getElementById('editIngreso').value || null,
-        hora_salida:   document.getElementById('editSalida').value  || null,
-        estado:        document.getElementById('editEstado').value,
-        local_id:      document.getElementById('editLocal').value   || null,
-        justificacion: document.getElementById('editJustif').value  || null,
-        observacion:   document.getElementById('editObs').value,
+        id_asistencia:        id,
+        // Contexto del slot (para upsert si id=0)
+        postulante_id:        parseInt(document.getElementById('editSlotPid').value)   || null,
+        fecha:                document.getElementById('editSlotFecha').value,
+        turno_id:             parseInt(document.getElementById('editSlotTurno').value) || null,
+        // Datos de la ficha
+        estado:               document.getElementById('editEstado').value,
+        local_id:             document.getElementById('editLocal').value || null,
+        justificacion:        document.getElementById('editJustif').value || null,
+        observacion:          document.getElementById('editObs').value,
+        comentarios_ficha:    document.getElementById('editComentarios').value || null,
+        llegada_puntualidad:  sv('llegada_puntualidad'),
+        abrio_puerta:         yn('abrio_puerta'),
+        aseo_personal:        sv('aseo_personal'),
+        vestimenta:           sv('vestimenta'),
+        unas:                 sv('unas'),
+        cabello:              sv('cabello'),
+        salida_puntualidad:   sv('salida_puntualidad'),
+        limpieza_espacio:     sv('limpieza_espacio'),
+        limpieza_local:       yn('limpieza_local'),
+        ayudo_cerrar:         yn('ayudo_cerrar'),
+        ordeno_medicamentos:  sv('ordeno_medicamentos'),
     };
 
     try {
@@ -205,13 +246,8 @@ async function guardarEdit() {
             body: JSON.stringify(data),
         });
         const res = await r.json();
-
-        if (res.success) {
-            cerrarModalEdit();
-            await cargarAsistencias();
-        } else {
-            showMsg('editMsg', res.message || 'Error al guardar.', 'error');
-        }
+        if (res.success) { cerrarModalEdit(); await cargarAsistencias(); }
+        else showMsg('editMsg', res.message || 'Error al guardar.', 'error');
     } catch {
         showMsg('editMsg', 'Error de conexión.', 'error');
     }
@@ -221,8 +257,7 @@ async function guardarEdit() {
 function abrirModalAdd() {
     document.getElementById('addFecha').value      = new Date().toISOString().split('T')[0];
     document.getElementById('addPostulante').value = '';
-    document.getElementById('addIngreso').value    = '';
-    document.getElementById('addSalida').value     = '';
+    document.getElementById('addTurno').value      = '1';
     document.getElementById('addEstado').value     = 'FALTA';
     document.getElementById('addLocal').value      = '';
     document.getElementById('addJustif').value     = '';
@@ -242,11 +277,10 @@ async function guardarAdd() {
     const data = {
         postulante_id: parseInt(pid),
         fecha:         fec,
-        hora_ingreso:  document.getElementById('addIngreso').value || null,
-        hora_salida:   document.getElementById('addSalida').value  || null,
+        turno_id:      parseInt(document.getElementById('addTurno').value),
         estado:        document.getElementById('addEstado').value,
-        local_id:      document.getElementById('addLocal').value   || null,
-        justificacion: document.getElementById('addJustif').value  || null,
+        local_id:      document.getElementById('addLocal').value || null,
+        justificacion: document.getElementById('addJustif').value || null,
         observacion:   'PENDIENTE',
     };
 
@@ -257,15 +291,46 @@ async function guardarAdd() {
             body: JSON.stringify(data),
         });
         const res = await r.json();
-
-        if (res.success) {
-            cerrarModalAdd();
-            await cargarAsistencias();
-        } else {
-            showMsg('addMsg', res.message || 'Error al registrar.', 'error');
-        }
+        if (res.success) { cerrarModalAdd(); await cargarAsistencias(); }
+        else showMsg('addMsg', res.message || 'Error al registrar.', 'error');
     } catch {
         showMsg('addMsg', 'Error de conexión.', 'error');
+    }
+}
+
+// ── Modal ELIMINAR ────────────────────────────────────
+let _delId = null;
+
+function abrirModalDel(id, nombre, fecha) {
+    _delId = id;
+    document.getElementById('delDesc').textContent =
+        `Se eliminará la ficha de "${nombre}" del ${fecha}. No se puede deshacer.`;
+    document.getElementById('delPassword').value = '';
+    document.getElementById('delMsg').hidden     = true;
+    document.getElementById('delModal').removeAttribute('hidden');
+    setTimeout(() => document.getElementById('delPassword').focus(), 50);
+}
+
+function cerrarModalDel() {
+    document.getElementById('delModal').setAttribute('hidden', '');
+    _delId = null;
+}
+
+async function confirmarEliminar() {
+    const password = document.getElementById('delPassword').value.trim();
+    if (!password) { showMsg('delMsg', 'Ingresa tu contraseña.', 'error'); return; }
+
+    try {
+        const r   = await fetch(buildAdminUrl('/admin/asistencia/eliminar'), {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body:    JSON.stringify({ id_asistencia: _delId, password }),
+        });
+        const res = await r.json();
+        if (res.success) { cerrarModalDel(); await cargarAsistencias(); }
+        else showMsg('delMsg', res.message || 'No se pudo eliminar.', 'error');
+    } catch {
+        showMsg('delMsg', 'Error de conexión.', 'error');
     }
 }
 
@@ -286,7 +351,8 @@ function llenarUsuariosSelect(selectId) {
     if (!sel || sel.dataset.loaded) return;
     catalogoUsuarios.forEach(u => {
         const o = document.createElement('option');
-        o.value = u.id; o.textContent = `${u.nombre_completo} (${u.num_documento})`;
+        o.value = u.id;
+        o.textContent = `${u.nombre_completo} (${u.num_documento})`;
         sel.appendChild(o);
     });
     sel.dataset.loaded = '1';
@@ -295,9 +361,9 @@ function llenarUsuariosSelect(selectId) {
 function showMsg(elId, msg, type) {
     const el = document.getElementById(elId);
     if (!el) return;
-    el.textContent  = msg;
-    el.className    = `asist-msg asist-msg--${type}`;
-    el.hidden       = false;
+    el.textContent = msg;
+    el.className   = `asist-msg asist-msg--${type}`;
+    el.hidden      = false;
 }
 
 function formatFecha(f) {
@@ -306,16 +372,8 @@ function formatFecha(f) {
     return `${d}/${m}/${y}`;
 }
 
-function formatHora(dt) {
-    if (!dt) return '—';
-    const d = new Date(dt.replace(' ', 'T'));
-    return d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
-}
-
-function toDatetimeLocal(dt) {
-    if (!dt) return '';
-    // "2026-05-04 08:45:00" → "2026-05-04T08:45"
-    return dt.replace(' ', 'T').substring(0, 16);
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function badgeEstado(e) {
@@ -326,55 +384,6 @@ function badgeEstado(e) {
         'EXTRA':    ['badge-extra',      'Extra'],
         'TEMPRANO': ['badge-temprano',   'Temprano'],
     };
-    const [cls, label] = map[e] || ['badge-rechazado', e];
+    const [cls, label] = map[e] || ['badge-rechazado', e || '—'];
     return `<span class="badge ${cls}">${label}</span>`;
-}
-
-function badgeObs(o) {
-    if (o === 'PROCEDE')    return '<span class="badge badge-contratado">Procede</span>';
-    if (o === 'NO PROCEDE') return '<span class="badge badge-rechazado">No procede</span>';
-    return '<span class="badge badge-pendiente">Pendiente</span>';
-}
-
-// ── Modal ELIMINAR ────────────────────────────────────
-let _delId = null;
-
-function abrirModalDel(id, nombre, fecha) {
-    _delId = id;
-    document.getElementById('delDesc').textContent =
-        `Se eliminará el registro de "${nombre}" del ${fecha}. Esta acción no se puede deshacer.`;
-    document.getElementById('delPassword').value = '';
-    document.getElementById('delMsg').hidden     = true;
-    document.getElementById('delModal').removeAttribute('hidden');
-    setTimeout(() => document.getElementById('delPassword').focus(), 50);
-}
-
-function cerrarModalDel() {
-    document.getElementById('delModal').setAttribute('hidden', '');
-    _delId = null;
-}
-
-async function confirmarEliminar() {
-    const password = document.getElementById('delPassword').value.trim();
-    if (!password) {
-        showMsg('delMsg', 'Ingresa tu contraseña.', 'error'); return;
-    }
-
-    try {
-        const r   = await fetch(buildAdminUrl('/admin/asistencia/eliminar'), {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            body:    JSON.stringify({ id_asistencia: _delId, password }),
-        });
-        const res = await r.json();
-
-        if (res.success) {
-            cerrarModalDel();
-            await cargarAsistencias();
-        } else {
-            showMsg('delMsg', res.message || 'No se pudo eliminar.', 'error');
-        }
-    } catch {
-        showMsg('delMsg', 'Error de conexión.', 'error');
-    }
 }

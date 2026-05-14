@@ -704,7 +704,13 @@ class CajaRepository
         $locales         = $this->getLocales();
         $conceptos       = $this->getConceptosGasto();
 
-        return compact('sesion', 'detalle', 'venta', 'gastos', 'rectifs', 'tiposRect', 'digitales', 'digital_aprobado', 'vendedor', 'ajustesEsperado', 'modos', 'staff', 'locales', 'conceptos');
+        $correccionesVenta = $this->getCorreccionesVenta($sesionId);
+        $sumCorrDelta = array_sum(array_map(
+            fn($c) => (float)$c['monto_nuevo'] - (float)$c['monto_anterior'],
+            $correccionesVenta
+        ));
+
+        return compact('sesion', 'detalle', 'venta', 'gastos', 'rectifs', 'tiposRect', 'digitales', 'digital_aprobado', 'vendedor', 'ajustesEsperado', 'modos', 'staff', 'locales', 'conceptos', 'correccionesVenta', 'sumCorrDelta');
     }
 
     // ── Eliminar sesión y todos sus hijos ──────────────────
@@ -714,6 +720,7 @@ class CajaRepository
         $tablas = [
             "DELETE FROM rectificacion_cuadre  WHERE sesion_id = :sid",
             "DELETE FROM ajuste_esperado       WHERE sesion_id = :sid",
+            "DELETE FROM correccion_venta      WHERE sesion_id = :sid",
             "DELETE FROM detalle_cuadre        WHERE sesion_id = :sid",
             "DELETE FROM movimiento_sesion     WHERE sesion_id = :sid",
             "DELETE FROM pago_personal         WHERE sesion_id = :sid",
@@ -1069,5 +1076,49 @@ class CajaRepository
         );
         $stmt->execute(['cid' => $cajaId, 'cid2' => $cajaId, 'fecha' => $fecha]);
         return $stmt->fetchAll();
+    }
+
+    // ── Correcciones de venta ──────────────────────────────
+    public function getCorreccionesVenta(int $sesionId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT cv.id_correccion, cv.monto_anterior, cv.monto_nuevo, cv.motivo,
+                    cv.fecha_registro, p.nombres AS registrado_por
+             FROM correccion_venta cv
+             LEFT JOIN postulante p ON cv.usuario_id = p.id_postulante
+             WHERE cv.sesion_id = :sid
+             ORDER BY cv.fecha_registro ASC"
+        );
+        $stmt->execute(['sid' => $sesionId]);
+        return $stmt->fetchAll();
+    }
+
+    public function addCorreccionVenta(int $sesionId, float $montoNuevo, string $motivo, int $usuarioId): void
+    {
+        // monto_anterior = ventas originales + suma de deltas previos
+        $baseStmt = $this->db->prepare(
+            "SELECT total_ventas_sistema FROM detalle_cuadre WHERE sesion_id = :sid"
+        );
+        $baseStmt->execute(['sid' => $sesionId]);
+        $totalOriginal = (float)($baseStmt->fetchColumn() ?? 0);
+
+        $deltaStmt = $this->db->prepare(
+            "SELECT COALESCE(SUM(monto_nuevo - monto_anterior), 0) FROM correccion_venta WHERE sesion_id = :sid"
+        );
+        $deltaStmt->execute(['sid' => $sesionId]);
+        $sumDelta = (float)$deltaStmt->fetchColumn();
+
+        $montoAnterior = round($totalOriginal + $sumDelta, 2);
+
+        $this->db->prepare(
+            "INSERT INTO correccion_venta (sesion_id, monto_anterior, monto_nuevo, motivo, usuario_id)
+             VALUES (:sid, :ant, :nuevo, :mot, :uid)"
+        )->execute([
+            'sid'  => $sesionId,
+            'ant'  => $montoAnterior,
+            'nuevo' => round($montoNuevo, 2),
+            'mot'  => $motivo !== '' ? $motivo : null,
+            'uid'  => $usuarioId,
+        ]);
     }
 }

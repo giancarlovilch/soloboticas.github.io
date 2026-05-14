@@ -294,8 +294,12 @@ function renderSlots(slots) {
             el.querySelector('.hor-asiento__nombre').textContent = s.trabajador_nombre || '—';
         } else {
             el.className = 'hor-asiento hor-asiento--libre';
-            el.querySelector('.hor-asiento__nombre').textContent = '—';
-            if (s.rol_puesto !== 'ALMACENERA') {
+            if (s.rol_puesto === 'LIMPIEZA') {
+                el.querySelector('.hor-asiento__nombre').innerHTML = '<span style="font-size:1.25em;line-height:1;letter-spacing:1px;">🧹🫧🧼</span>';
+            } else {
+                el.querySelector('.hor-asiento__nombre').textContent = '—';
+            }
+            if (s.rol_puesto !== 'ALMACENERA' && s.rol_puesto !== 'LIMPIEZA') {
                 const lid = s.local_id;
                 libres[lid] = (libres[lid] || 0) + 1;
             }

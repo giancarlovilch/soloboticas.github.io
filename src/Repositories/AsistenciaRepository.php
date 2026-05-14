@@ -27,17 +27,7 @@ class AsistenciaRepository
     // Permite múltiples sesiones al día (distintos locales).
     public function getTodayByPostulante(int $id): ?array
     {
-        $sql = "SELECT a.*, l.descripcion AS local_desc
-                FROM {$this->table} a
-                LEFT JOIN local l ON a.local_id = l.id_local
-                WHERE a.postulante_id = :id
-                  AND a.fecha = CURDATE()
-                  AND a.hora_salida IS NULL
-                ORDER BY a.hora_ingreso DESC
-                LIMIT 1";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute(['id' => $id]);
-        return $stmt->fetch() ?: null;
+        return null; // hora_ingreso/hora_salida eliminados
     }
 
     // ── Historial de un trabajador (últimas N sesiones) ──
@@ -48,7 +38,7 @@ class AsistenciaRepository
                 FROM {$this->table} a
                 LEFT JOIN local l ON a.local_id = l.id_local
                 WHERE a.postulante_id = :id
-                ORDER BY a.fecha DESC, a.hora_ingreso DESC
+                ORDER BY a.fecha DESC, a.id_asistencia DESC
                 LIMIT {$limit}";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['id' => $id]);
@@ -80,38 +70,12 @@ class AsistenciaRepository
 
     public function marcarIngreso(int $id, ?int $localId = null): array
     {
-        $tz     = new DateTimeZone('America/Lima');
-        $now    = new DateTime('now', $tz);
-        $hora   = (int)$now->format('H');
-        $minuto = (int)$now->format('i');
-        $estado = self::calcularEstadoEntrada($hora, $minuto);
-
-        $sql = "INSERT INTO {$this->table}
-                    (postulante_id, local_id, fecha, hora_ingreso, estado)
-                VALUES (:id, :local, CURDATE(), NOW(), :estado)";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([
-            'id'     => $id,
-            'local'  => $localId,
-            'estado' => $estado,
-        ]);
-        return $this->getTodayByPostulante($id) ?? [];
+        return []; // hora_ingreso eliminado — usar registrarParaCompanhero
     }
 
-    // ── Marcar salida en la sesión abierta más reciente ──
     public function marcarSalida(int $id): bool
     {
-        // Cierra la sesión abierta más reciente del día (hora_salida IS NULL)
-        $sql = "UPDATE {$this->table}
-                SET hora_salida = NOW()
-                WHERE postulante_id = :id
-                  AND fecha = CURDATE()
-                  AND hora_salida IS NULL
-                ORDER BY hora_ingreso DESC
-                LIMIT 1";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute(['id' => $id]);
-        return $stmt->rowCount() > 0;
+        return false; // hora_salida eliminado — usar registrarParaCompanhero
     }
 
     // ── Admin: todos los registros con filtros ────────────
@@ -130,23 +94,23 @@ class AsistenciaRepository
         }
 
         $sql = "SELECT
-                    a.id_asistencia,
-                    a.postulante_id,
+                    a.id_asistencia, a.postulante_id,
                     CONCAT(p.nombres, ' ', p.apellidos) AS nombre_completo,
                     p.num_documento,
-                    a.local_id,
-                    l.descripcion AS local_desc,
-                    a.fecha,
-                    a.hora_ingreso,
-                    a.hora_salida,
-                    a.estado,
-                    a.justificacion,
-                    a.observacion
+                    a.local_id, l.descripcion AS local_desc,
+                    a.fecha, a.turno_id, a.estado,
+                    a.llegada_puntualidad, a.abrio_puerta, a.aseo_personal,
+                    a.vestimenta, a.unas, a.cabello,
+                    a.salida_puntualidad, a.limpieza_espacio, a.limpieza_local,
+                    a.ayudo_cerrar, a.ordeno_medicamentos, a.comentarios_ficha,
+                    a.justificacion, a.observacion,
+                    pr.nombres AS registrado_por_nombre
                 FROM {$this->table} a
                 INNER JOIN postulante p  ON a.postulante_id = p.id_postulante
-                LEFT JOIN local l       ON a.local_id = l.id_local
+                LEFT JOIN local l        ON a.local_id = l.id_local
+                LEFT JOIN postulante pr  ON a.registrado_por_id = pr.id_postulante
                 WHERE " . implode(' AND ', $where) . "
-                ORDER BY a.fecha DESC, a.hora_ingreso DESC
+                ORDER BY a.fecha DESC, a.id_asistencia DESC
                 LIMIT {$limit}";
 
         $stmt = $this->db->prepare($sql);
@@ -158,85 +122,107 @@ class AsistenciaRepository
     public function getByPostulanteRango(int $postulanteId, string $desde, string $hasta): array
     {
         $stmt = $this->db->prepare(
-            "SELECT a.*, l.descripcion AS local_desc,
+            "SELECT a.id_asistencia, a.postulante_id, a.fecha, a.turno_id, a.estado,
+                    a.llegada_puntualidad, a.abrio_puerta, a.aseo_personal, a.vestimenta,
+                    a.unas, a.cabello, a.salida_puntualidad, a.limpieza_espacio,
+                    a.limpieza_local, a.ayudo_cerrar, a.ordeno_medicamentos, a.comentarios_ficha,
+                    a.local_id, l.descripcion AS local_desc,
                     pr.nombres AS registrado_por_nombre
              FROM asistencia a
-             LEFT JOIN local l      ON a.local_id          = l.id_local
+             LEFT JOIN local l       ON a.local_id          = l.id_local
              LEFT JOIN postulante pr ON a.registrado_por_id = pr.id_postulante
              WHERE a.postulante_id = :pid AND a.fecha BETWEEN :desde AND :hasta
-             ORDER BY a.fecha ASC, a.hora_ingreso ASC"
+             ORDER BY a.fecha ASC, COALESCE(a.turno_id, 0) ASC"
         );
         $stmt->execute(['pid' => $postulanteId, 'desde' => $desde, 'hasta' => $hasta]);
         return $stmt->fetchAll();
     }
 
-    /** Registra asistencia para otro trabajador (quien registra != quien asiste) */
+    /** Registra ficha de asistencia (encuesta) para otro trabajador */
     public function registrarParaCompanhero(
-        int $postulanteId, int $registradorId, string $fecha,
-        string $horaIngreso, ?string $horaSalida, ?int $localId,
-        array $checklist, string $password
+        int $postulanteId, int $registradorId, string $fecha, int $turnoId,
+        string $seccion, array $campos, string $password
     ): bool|string {
-        // Verificar contraseña del registrador
         $stmt = $this->db->prepare("SELECT password FROM usuario WHERE postulante_id = :pid LIMIT 1");
         $stmt->execute(['pid' => $registradorId]);
         $hash = $stmt->fetchColumn();
         if (!$hash || !password_verify($password, $hash)) return 'Contraseña incorrecta';
+        if ($postulanteId === $registradorId) return 'No puedes registrar tu propia ficha';
 
-        // No puede registrarse a sí mismo
-        if ($postulanteId === $registradorId) return 'No puedes registrar tu propia asistencia';
-
-        // Si no hay hora de entrada → FALTA
-        $esFalta = empty($horaIngreso);
-        $estadoCalculado = $esFalta ? 'FALTA' : self::calcularEstadoEntrada(
-            (int)substr($horaIngreso, 0, 2),
-            (int)substr($horaIngreso, 3, 2)
-        );
-
-        $ingresoVal = $esFalta ? null : "{$fecha} {$horaIngreso}:00";
-        $salidaVal  = (!$esFalta && $horaSalida) ? "{$fecha} {$horaSalida}:00" : null;
-
-        // Upsert: si ya existe para esa fecha, actualizar; si no, crear
+        // Buscar registro existente para esa fecha+turno
         $existing = $this->db->prepare(
-            "SELECT id_asistencia FROM asistencia WHERE postulante_id = :pid AND fecha = :fecha ORDER BY id_asistencia DESC LIMIT 1"
+            "SELECT id_asistencia FROM asistencia
+             WHERE postulante_id = :pid AND fecha = :fecha
+               AND (turno_id = :tid OR turno_id IS NULL)
+             ORDER BY turno_id DESC, id_asistencia DESC LIMIT 1"
         );
-        $existing->execute(['pid' => $postulanteId, 'fecha' => $fecha]);
-        $existId = $existing->fetchColumn();
+        $existing->execute(['pid' => $postulanteId, 'fecha' => $fecha, 'tid' => $turnoId]);
+        $existId = (int)($existing->fetchColumn() ?: 0);
 
-        if ($existId) {
-            $this->db->prepare(
-                "UPDATE asistencia SET hora_ingreso = :ing, hora_salida = :sal, estado = :est,
-                         registrado_por_id = :reg, local_id = :lid
-                 WHERE id_asistencia = :id"
-            )->execute([
-                'ing' => $ingresoVal,
-                'sal' => $salidaVal,
-                'est' => $estadoCalculado,
-                'reg' => $registradorId,
-                'lid' => $localId,
-                'id'  => $existId,
-            ]);
-            $asistId = $existId;
-        } else {
-            $this->db->prepare(
-                "INSERT INTO asistencia (postulante_id, registrado_por_id, local_id, fecha, hora_ingreso, hora_salida, estado)
-                 VALUES (:pid, :reg, :lid, :fecha, :ing, :sal, :est)"
-            )->execute([
-                'pid'   => $postulanteId,
-                'reg'   => $registradorId,
-                'lid'   => $localId,
-                'fecha' => $fecha,
-                'ing'   => $ingresoVal,
-                'sal'   => $salidaVal,
-                'est'   => $estadoCalculado,
-            ]);
-            $asistId = (int)$this->db->lastInsertId();
+        if ($seccion === 'FALTA') {
+            if ($existId) {
+                $this->db->prepare(
+                    "UPDATE asistencia SET estado='FALTA', turno_id=:tid,
+                     llegada_puntualidad=NULL, abrio_puerta=NULL, aseo_personal=NULL,
+                     vestimenta=NULL, unas=NULL, cabello=NULL, salida_puntualidad=NULL,
+                     limpieza_espacio=NULL, limpieza_local=NULL, ayudo_cerrar=NULL,
+                     ordeno_medicamentos=NULL, comentarios_ficha=NULL, registrado_por_id=:reg
+                     WHERE id_asistencia=:id"
+                )->execute(['tid' => $turnoId, 'reg' => $registradorId, 'id' => $existId]);
+            } else {
+                $this->db->prepare(
+                    "INSERT INTO asistencia (postulante_id, registrado_por_id, fecha, turno_id, estado)
+                     VALUES (:pid, :reg, :fecha, :tid, 'FALTA')"
+                )->execute(['pid' => $postulanteId, 'reg' => $registradorId, 'fecha' => $fecha, 'tid' => $turnoId]);
+            }
+            return true;
         }
 
-        // Reemplazar checklist (borrar antes para evitar duplicados)
-        $this->db->prepare("DELETE FROM asistencia_checklist WHERE asistencia_id = :id")
-                 ->execute(['id' => $asistId]);
-        if (!empty($checklist)) {
-            $this->guardarChecklist($asistId, $checklist);
+        $yn = fn($k) => array_key_exists($k, $campos) && $campos[$k] !== null ? (int)$campos[$k] : null;
+
+        if ($seccion === 'ENTRADA') {
+            $llegada = $campos['llegada_puntualidad'] ?? null;
+            $estado  = match($llegada) {
+                'MUY_TEMPRANO' => 'EXTRA',
+                'TEMPRANO'     => 'TEMPRANO',
+                'TARDE', 'MUY_TARDE' => 'TARDE',
+                default        => 'A TIEMPO',
+            };
+            $fields = [
+                'llegada_puntualidad' => $llegada,
+                'abrio_puerta'        => $yn('abrio_puerta'),
+                'aseo_personal'       => $campos['aseo_personal'] ?? null,
+                'vestimenta'          => $campos['vestimenta']    ?? null,
+                'unas'                => $campos['unas']          ?? null,
+                'cabello'             => $campos['cabello']       ?? null,
+                'estado'              => $estado,
+            ];
+        } else { // SALIDA
+            $fields = [
+                'salida_puntualidad'  => $campos['salida_puntualidad']  ?? null,
+                'limpieza_espacio'    => $campos['limpieza_espacio']    ?? null,
+                'limpieza_local'      => $yn('limpieza_local'),
+                'ayudo_cerrar'        => $yn('ayudo_cerrar'),
+                'ordeno_medicamentos' => $campos['ordeno_medicamentos'] ?? null,
+            ];
+        }
+
+        $cf = trim($campos['comentarios_ficha'] ?? '');
+        if ($cf !== '') $fields['comentarios_ficha'] = substr($cf, 0, 200);
+        $fields['registrado_por_id'] = $registradorId;
+        $fields['turno_id']          = $turnoId;
+
+        if ($existId) {
+            $sets = implode(', ', array_map(fn($k) => "{$k} = :{$k}", array_keys($fields)));
+            $fields['id'] = $existId;
+            $this->db->prepare("UPDATE asistencia SET {$sets} WHERE id_asistencia = :id")->execute($fields);
+        } else {
+            $fields['postulante_id'] = $postulanteId;
+            $fields['fecha']         = $fecha;
+            if (!isset($fields['estado'])) $fields['estado'] = 'A TIEMPO';
+            $cols = implode(', ', array_keys($fields));
+            $vals = implode(', ', array_map(fn($k) => ":{$k}", array_keys($fields)));
+            $this->db->prepare("INSERT INTO asistencia ({$cols}) VALUES ({$vals})")->execute($fields);
         }
 
         return true;
@@ -280,16 +266,9 @@ class AsistenciaRepository
         return true;
     }
 
-    /** Staff actualiza sus propios tiempos (requiere que sea su registro) */
     public function actualizarTiemposPropio(int $asistenciaId, int $postulanteId, string $ingreso, ?string $salida): bool
     {
-        $stmt = $this->db->prepare(
-            "UPDATE asistencia
-             SET hora_ingreso = :ing, hora_salida = :sal
-             WHERE id_asistencia = :id AND postulante_id = :pid"
-        );
-        $stmt->execute(['ing' => $ingreso, 'sal' => $salida ?: null, 'id' => $asistenciaId, 'pid' => $postulanteId]);
-        return $stmt->rowCount() > 0;
+        return false; // reemplazado por registrarParaCompanhero
     }
 
     // ── Admin: actualizar cualquier registro ──────────────
@@ -298,23 +277,46 @@ class AsistenciaRepository
         $intOrNull  = fn($v) => ($v === '' || $v === null) ? null : (int)$v;
         $timeOrNull = fn($v) => ($v === '' || $v === null) ? null : $v;
 
+        $sn = fn($v) => ($v === '' || $v === null) ? null : (string)$v;
+        $in = fn($v) => ($v === '' || $v === null) ? null : (int)$v;
+
         $sql = "UPDATE {$this->table} SET
-                    hora_ingreso  = :ingreso,
-                    hora_salida   = :salida,
-                    estado        = :estado,
-                    justificacion = :justif,
-                    observacion   = :obs,
-                    local_id      = :local
+                    estado               = :estado,
+                    llegada_puntualidad  = :lleg,
+                    abrio_puerta         = :abrio,
+                    aseo_personal        = :aseo,
+                    vestimenta           = :vest,
+                    unas                 = :unas,
+                    cabello              = :cab,
+                    salida_puntualidad   = :sal_punt,
+                    limpieza_espacio     = :limp_esp,
+                    limpieza_local       = :limp_loc,
+                    ayudo_cerrar         = :ayudo,
+                    ordeno_medicamentos  = :ordena,
+                    comentarios_ficha    = :coment,
+                    justificacion        = :justif,
+                    observacion          = :obs,
+                    local_id             = :local
                 WHERE id_asistencia = :id";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
-            'ingreso' => $timeOrNull($data['hora_ingreso'] ?? null),
-            'salida'  => $timeOrNull($data['hora_salida']  ?? null),
-            'estado'  => $data['estado']       ?? 'A TIEMPO',
-            'justif'  => $data['justificacion'] ?? null,
+            'estado'   => $data['estado']       ?? 'FALTA',
+            'lleg'     => $sn($data['llegada_puntualidad']  ?? null),
+            'abrio'    => $in($data['abrio_puerta']         ?? null),
+            'aseo'     => $sn($data['aseo_personal']        ?? null),
+            'vest'     => $sn($data['vestimenta']           ?? null),
+            'unas'     => $sn($data['unas']                 ?? null),
+            'cab'      => $sn($data['cabello']              ?? null),
+            'sal_punt' => $sn($data['salida_puntualidad']   ?? null),
+            'limp_esp' => $sn($data['limpieza_espacio']     ?? null),
+            'limp_loc' => $in($data['limpieza_local']       ?? null),
+            'ayudo'    => $in($data['ayudo_cerrar']         ?? null),
+            'ordena'   => $sn($data['ordeno_medicamentos']  ?? null),
+            'coment'   => $sn($data['comentarios_ficha']    ?? null),
+            'justif'  => $sn($data['justificacion'] ?? null),
             'obs'     => $data['observacion']  ?? 'PENDIENTE',
-            'local'   => $intOrNull($data['local_id'] ?? null),
+            'local'   => $in($data['local_id'] ?? null),
             'id'      => $id,
         ]);
         return $stmt->rowCount() > 0 || true; // siempre true si no hay error
@@ -326,21 +328,114 @@ class AsistenciaRepository
         $intOrNull = fn($v) => ($v === '' || $v === null) ? null : (int)$v;
 
         $sql = "INSERT INTO {$this->table}
-                    (postulante_id, local_id, fecha, hora_ingreso, hora_salida, estado, justificacion, observacion)
+                    (postulante_id, local_id, fecha, estado, justificacion, observacion)
                 VALUES
-                    (:pid, :local, :fecha, :ingreso, :salida, :estado, :justif, :obs)";
+                    (:pid, :local, :fecha, :estado, :justif, :obs)";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
             'pid'     => $postulanteId,
             'local'   => $intOrNull($data['local_id'] ?? null),
             'fecha'   => $fecha,
-            'ingreso' => $data['hora_ingreso'] ?? null,
-            'salida'  => $data['hora_salida']  ?? null,
             'estado'  => $data['estado']        ?? 'FALTA',
             'justif'  => $data['justificacion'] ?? null,
             'obs'     => $data['observacion']   ?? 'PENDIENTE',
         ]);
         return true;
+    }
+
+    // ── Todos los slots del pasado con su ficha (admin) ──
+    public function getAllSlots(string $desde, string $hasta, int $postulanteId = 0, bool $soloSinCalificar = false, int $excludeId = 0): array
+    {
+        $where  = ["hs.postulante_id IS NOT NULL", "hs.fecha_dia <= CURDATE()"];
+        $params = [];
+
+        if ($desde) { $where[] = "hs.fecha_dia >= :desde"; $params['desde'] = $desde; }
+        if ($hasta) { $where[] = "hs.fecha_dia <= :hasta"; $params['hasta'] = $hasta; }
+        if ($postulanteId) { $where[] = "hs.postulante_id = :pid"; $params['pid'] = $postulanteId; }
+        if ($excludeId)    { $where[] = "hs.postulante_id != :excl"; $params['excl'] = $excludeId; }
+        if ($soloSinCalificar) {
+            $where[] = "(a.id_asistencia IS NULL OR (a.llegada_puntualidad IS NULL AND a.salida_puntualidad IS NULL AND (a.estado IS NULL OR a.estado NOT IN ('FALTA'))))";
+        }
+
+        $sql = "SELECT
+                    hs.id_slot, hs.fecha_dia, hs.turno_id,
+                    t.descripcion  AS turno_desc,
+                    p.id_postulante AS postulante_id,
+                    p.nombres      AS trabajador_nombre,
+                    l.descripcion  AS local_desc,
+                    rh.descripcion AS rol_desc,
+                    a.id_asistencia,
+                    a.estado,
+                    a.llegada_puntualidad, a.abrio_puerta, a.aseo_personal,
+                    a.vestimenta, a.unas, a.cabello,
+                    a.salida_puntualidad, a.limpieza_espacio, a.limpieza_local,
+                    a.ayudo_cerrar, a.ordeno_medicamentos, a.comentarios_ficha,
+                    a.justificacion, a.observacion, a.local_id,
+                    pr.nombres AS registrado_por_nombre
+                FROM horario_slot hs
+                INNER JOIN postulante p   ON hs.postulante_id   = p.id_postulante
+                INNER JOIN local l        ON hs.local_id         = l.id_local
+                INNER JOIN turno t        ON hs.turno_id         = t.id_turno
+                INNER JOIN rol_horario rh ON hs.rol_horario_id   = rh.id_rol_horario
+                LEFT JOIN asistencia a    ON  a.postulante_id    = hs.postulante_id
+                                          AND a.fecha            = hs.fecha_dia
+                                          AND (a.turno_id = hs.turno_id OR a.turno_id IS NULL)
+                LEFT JOIN postulante pr   ON a.registrado_por_id = pr.id_postulante
+                WHERE " . implode(' AND ', $where) . "
+                ORDER BY hs.fecha_dia DESC, hs.turno_id ASC, p.nombres ASC
+                LIMIT 500";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    /** Admin crea o actualiza ficha sin requerir contraseña */
+    public function upsertParaAdmin(int $postulanteId, string $fecha, int $turnoId, array $data): void
+    {
+        $sn = fn($v) => ($v === '' || $v === null) ? null : (string)$v;
+        $in = fn($v) => ($v === '' || $v === null) ? null : (int)$v;
+
+        $existing = $this->db->prepare(
+            "SELECT id_asistencia FROM asistencia
+             WHERE postulante_id = :pid AND fecha = :fecha
+               AND (turno_id = :tid OR turno_id IS NULL)
+             ORDER BY turno_id DESC, id_asistencia DESC LIMIT 1"
+        );
+        $existing->execute(['pid' => $postulanteId, 'fecha' => $fecha, 'tid' => $turnoId]);
+        $existId = (int)($existing->fetchColumn() ?: 0);
+
+        $fields = [
+            'turno_id'            => $turnoId,
+            'estado'              => $data['estado']              ?? 'FALTA',
+            'llegada_puntualidad' => $sn($data['llegada_puntualidad']  ?? null),
+            'abrio_puerta'        => $in($data['abrio_puerta']         ?? null),
+            'aseo_personal'       => $sn($data['aseo_personal']        ?? null),
+            'vestimenta'          => $sn($data['vestimenta']           ?? null),
+            'unas'                => $sn($data['unas']                 ?? null),
+            'cabello'             => $sn($data['cabello']              ?? null),
+            'salida_puntualidad'  => $sn($data['salida_puntualidad']   ?? null),
+            'limpieza_espacio'    => $sn($data['limpieza_espacio']     ?? null),
+            'limpieza_local'      => $in($data['limpieza_local']       ?? null),
+            'ayudo_cerrar'        => $in($data['ayudo_cerrar']         ?? null),
+            'ordeno_medicamentos' => $sn($data['ordeno_medicamentos']  ?? null),
+            'comentarios_ficha'   => $sn($data['comentarios_ficha']    ?? null),
+            'justificacion'       => $sn($data['justificacion']        ?? null),
+            'observacion'         => $data['observacion']              ?? 'PENDIENTE',
+            'local_id'            => $in($data['local_id']             ?? null),
+        ];
+
+        if ($existId) {
+            $sets = implode(', ', array_map(fn($k) => "{$k} = :{$k}", array_keys($fields)));
+            $fields['id'] = $existId;
+            $this->db->prepare("UPDATE asistencia SET {$sets} WHERE id_asistencia = :id")->execute($fields);
+        } else {
+            $fields['postulante_id'] = $postulanteId;
+            $fields['fecha']         = $fecha;
+            $cols = implode(', ', array_keys($fields));
+            $vals = implode(', ', array_map(fn($k) => ":{$k}", array_keys($fields)));
+            $this->db->prepare("INSERT INTO asistencia ({$cols}) VALUES ({$vals})")->execute($fields);
+        }
     }
 
     // ── Usuarios con cuenta (para filtro admin) ───────────

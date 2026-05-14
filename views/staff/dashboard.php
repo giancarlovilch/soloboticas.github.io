@@ -53,17 +53,24 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
         <div class="staff-date"><?= $diaLabel ?></div>
     </section>
 
-    <!-- ── Mi horario del mes ──────────────────────────── -->
+    <!-- ── Encuestas ────────────────────────────────────── -->
     <section class="staff-card" style="text-align:center;">
-        <h2 class="staff-section-title">Mi horario del mes</h2>
+        <h2 class="staff-section-title">Fichas del equipo</h2>
         <p style="font-size:0.82rem;color:#64748b;margin-bottom:1rem;">
-            Consulta tus turnos asignados, coberturas y reemplazos del mes.
+            Califica los turnos de tus compañeros y consulta tu propio record mensual.
         </p>
-        <a href="<?= $basePath ?>/staff/mi-horario"
-           class="staff-btn-marcar staff-btn-marcar--entrada"
-           style="display:inline-block;text-decoration:none;padding:.75rem 2rem;">
-            Ver mi reporte mensual →
-        </a>
+        <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;">
+            <a href="<?= $basePath ?>/staff/mi-horario?modo=pendientes"
+               class="staff-btn-marcar staff-btn-marcar--entrada"
+               style="display:inline-block;text-decoration:none;padding:.75rem 1.5rem;">
+                📋 Encuestas pendientes →
+            </a>
+            <a href="<?= $basePath ?>/staff/mi-horario?modo=mis-encuestas"
+               class="staff-btn-marcar"
+               style="display:inline-block;text-decoration:none;padding:.75rem 1.5rem;background:#7c3aed;">
+                👤 Mis encuestas →
+            </a>
+        </div>
     </section>
 
     <!-- ── Horarios semanales ────────────────────────── -->
@@ -92,26 +99,6 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
         </a>
     </section>
 
-    <!-- ── Historial ──────────────────────────────────── -->
-    <section class="staff-card">
-        <h2 class="staff-section-title">Mis últimas asistencias</h2>
-        <div class="staff-table-wrap">
-            <table class="staff-table">
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Local</th>
-                        <th>Entrada</th>
-                        <th>Salida</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody id="tbodyHistorial">
-                    <tr><td colspan="5" class="staff-table-empty">Cargando...</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </section>
 
 </main>
 

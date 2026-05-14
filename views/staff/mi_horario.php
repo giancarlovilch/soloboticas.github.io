@@ -1,59 +1,74 @@
 <?php
 $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
-$mesesNomCompleto = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-$mesLabel   = $mesesNomCompleto[(int)date('n', strtotime($desde)) - 1] . ' ' . date('Y', strtotime($desde));
-$mesPasado  = date('Y-m', strtotime($desde . ' -1 month'));
-$mesSiguiente = date('Y-m', strtotime($desde . ' +1 month'));
-$mesActual  = date('Y-m');
+$modo     = $modo ?? 'pendientes';
 
-$estadoInfo = [
-    'A TIEMPO' => ['bg'=>'#d1fae5','color'=>'#065f46','label'=>'A tiempo'],
-    'TARDE'    => ['bg'=>'#fef3c7','color'=>'#92400e','label'=>'Tarde'],
-    'EXTRA'    => ['bg'=>'#eff6ff','color'=>'#1e40af','label'=>'Extra'],
-    'TEMPRANO' => ['bg'=>'#f0fdfe','color'=>'#0e7490','label'=>'Temprano'],
-    'FALTA'    => ['bg'=>'#fee2e2','color'=>'#991b1b','label'=>'Falta'],
-];
+// ── Variables modo "mis-encuestas" ────────────────────
+if ($modo === 'mis-encuestas') {
+    $mesesNomCompleto = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    $mesLabel     = $mesesNomCompleto[(int)date('n', strtotime($desde)) - 1] . ' ' . date('Y', strtotime($desde));
+    $mesPasado    = date('Y-m', strtotime($desde . ' -1 month'));
+    $mesSiguiente = date('Y-m', strtotime($desde . ' +1 month'));
+    $mesActual    = date('Y-m');
+    $diasLabel    = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    $turnoLabel   = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
 
-$totalManana = 0; $totalTarde = 0;
-foreach ($slots as $s) { if ($s['turno_id'] == 1) $totalManana++; else $totalTarde++; }
+    $puntInfo = [
+        'MUY_TEMPRANO' => ['label'=>'+10 min antes', 'bg'=>'#eff6ff','color'=>'#1e40af'],
+        'TEMPRANO'     => ['label'=>'Temprano',       'bg'=>'#f0fdfe','color'=>'#0e7490'],
+        'TARDE'        => ['label'=>'Tarde',           'bg'=>'#fef3c7','color'=>'#92400e'],
+        'MUY_TARDE'    => ['label'=>'+10 min tarde',   'bg'=>'#fee2e2','color'=>'#991b1b'],
+    ];
 
-$fechas = array_unique(array_merge(array_column($slots, 'fecha_dia'), array_keys($asistPorFecha)));
-sort($fechas);
+    $slotsPorFechaTurno = [];
+    foreach ($slots as $s) { $slotsPorFechaTurno[$s['fecha_dia']][$s['turno_id']] = $s; }
 
-$diasLabel  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-$turnoLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
+    $fechas = array_unique(array_merge(
+        array_keys($slotsPorFechaTurno),
+        array_keys($asistPorFecha)
+    ));
+    sort($fechas);
 
-$slotsPorFechaTurno = [];
-foreach ($slots as $s) { $slotsPorFechaTurno[$s['fecha_dia']][$s['turno_id']] = $s; }
+    $totalManana = 0; $totalTarde = 0;
+    foreach ($slots as $s) { if ($s['turno_id'] == 1) $totalManana++; else $totalTarde++; }
 
-$rempPorFecha = [];
-foreach ($reemplazos as $r) { $rempPorFecha[$r['fecha_dia']][$r['turno_id']] = $r; }
+    $conFicha = 0; $conFalta = 0;
+    foreach ($slots as $s) {
+        $a = $asistPorFecha[$s['fecha_dia']][$s['turno_id']] ?? $asistPorFecha[$s['fecha_dia']][0] ?? null;
+        if ($a && $a['estado'] === 'FALTA') $conFalta++;
+        elseif ($a) $conFicha++;
+    }
+    $sinRegistro = count($slots) - $conFicha - $conFalta;
+}
 
-$conAsistencia = count(array_filter($asistencias, fn($a) => $a['hora_ingreso']));
-$sinRegistro   = max(0, count($slots) - $conAsistencia);
+// ── Variables modo "pendientes" ───────────────────────
+if ($modo === 'pendientes') {
+    $slotsData        = $slotsData        ?? [];
+    $desde            = $desde            ?? date('Y-m-01');
+    $hasta            = $hasta            ?? date('Y-m-d');
+    $filtroTrabajador = $filtroTrabajador ?? 0;
+    $soloSinCalif     = $soloSinCalif     ?? true;
+
+    $sinFicha = count(array_filter($slotsData, fn($s) => !$s['id_asistencia']));
+    $total    = count($slotsData);
+
+    $puntInfo = [
+        'MUY_TEMPRANO' => ['label'=>'+10 min antes', 'bg'=>'#eff6ff','color'=>'#1e40af'],
+        'TEMPRANO'     => ['label'=>'Temprano',       'bg'=>'#f0fdfe','color'=>'#0e7490'],
+        'TARDE'        => ['label'=>'Tarde',           'bg'=>'#fef3c7','color'=>'#92400e'],
+        'MUY_TARDE'    => ['label'=>'+10 min tarde',   'bg'=>'#fee2e2','color'=>'#991b1b'],
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horario mensual | Solo Boticas</title>
+    <title><?= $modo === 'mis-encuestas' ? 'Mis encuestas' : 'Encuestas pendientes' ?> | Solo Boticas</title>
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/normalize.css">
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/staff.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        .mh-wrap  { max-width:1040px;margin:0 auto;padding:1.25rem 1rem 3rem; }
-        .mh-top   { display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-bottom:1.25rem; }
-        .mh-top label { font-size:.75rem;font-weight:700;color:#64748b;display:block;margin-bottom:.2rem; }
-        .mh-top select, .mh-top input { padding:.4rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;outline:none; }
-        .mh-top select:focus, .mh-top input:focus { border-color:#0097A7; }
-        .mh-top button { padding:.4rem 1.1rem;background:#0097A7;color:#fff;border:none;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer; }
-
-        .mh-kpis { display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.25rem; }
-        .mh-kpi  { background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:.75rem 1rem;text-align:center; }
-        .mh-kpi__num   { font-size:1.5rem;font-weight:800; }
-        .mh-kpi__label { font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b; }
-
+        .mh-wrap  { max-width:1060px;margin:0 auto;padding:1.25rem 1rem 3rem; }
         .mh-table-wrap { overflow-x:auto; }
         .mh-table { width:100%;border-collapse:collapse;font-size:.80rem;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06); }
         .mh-table th { background:#f8fafc;padding:.5rem .7rem;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;border-bottom:2px solid #e2e8f0;white-space:nowrap; }
@@ -61,29 +76,55 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
         .mh-table tr:last-child td { border-bottom:none; }
         .mh-table tr:hover td { background:#fafafa; }
         .mh-badge { display:inline-block;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap; }
-        .mh-time  { font-variant-numeric:tabular-nums;font-weight:600;color:#1e293b; }
         .mh-sub   { font-size:.68rem;color:#94a3b8;display:block; }
-        .mh-reg-btn { background:#0097A7;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:.72rem;font-weight:700;cursor:pointer; }
-        .mh-chk   { display:flex;flex-wrap:wrap;gap:3px; }
-        .mh-chk-i { width:15px;height:15px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:.58rem;font-weight:700; }
-        .mh-chk-i--ok   { background:#d1fae5;color:#059669; }
-        .mh-chk-i--fail { background:#fee2e2;color:#dc2626; }
 
-        /* Modal */
+        .mh-kpis { display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.25rem; }
+        .mh-kpi  { background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:.75rem 1rem;text-align:center; }
+        .mh-kpi__num   { font-size:1.5rem;font-weight:800; }
+        .mh-kpi__label { font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b; }
+
+        /* Botones de acción en tabla */
+        .mh-acc { display:flex;gap:.3rem;flex-wrap:wrap;align-items:center; }
+        .mh-btn { border:none;border-radius:6px;padding:4px 10px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap; }
+        .mh-btn--entrada  { background:#0097A7;color:#fff; }
+        .mh-btn--salida   { background:#7c3aed;color:#fff; }
+        .mh-btn--falta    { background:#dc2626;color:#fff; }
+        .mh-btn--revertir { background:transparent;border:1px solid #fca5a5 !important;color:#dc2626; }
+        .mh-btn--filled   { opacity:.75; }
+
+        /* Selector de modo */
+        .mh-mode-bar { display:flex;gap:.5rem;margin-bottom:1.25rem;border-bottom:2px solid #e2e8f0;padding-bottom:.75rem; }
+        .mh-mode-btn { padding:.45rem 1.1rem;border-radius:8px 8px 0 0;font-size:.82rem;font-weight:700;text-decoration:none;color:#64748b;border:1.5px solid transparent;transition:all .15s; }
+        .mh-mode-btn--active { border-color:#0097A7;background:#f0fdfe;color:#0097A7; }
+
+        /* Filtros */
+        .mh-filtros { display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem; }
+        .mh-filtros input, .mh-filtros select { padding:.4rem .7rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.82rem;outline:none; }
+        .mh-filtros input:focus, .mh-filtros select:focus { border-color:#0097A7; }
+
+        /* Modal overlay */
         .mh-ov { position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:500;display:flex;align-items:center;justify-content:center; }
         .mh-ov[hidden] { display:none!important; }
-        .mh-modal { background:#fff;border-radius:14px;padding:1.5rem;width:420px;max-width:94vw;box-shadow:0 20px 60px rgba(0,0,0,.22);max-height:90vh;overflow-y:auto; }
-        .mh-modal h3 { font-size:1rem;font-weight:700;margin-bottom:.75rem;color:#1e293b; }
-        .mh-modal p  { font-size:.78rem;color:#64748b;margin-bottom:.75rem;line-height:1.5; }
-        .mh-fl label { font-size:.75rem;font-weight:600;color:#475569;display:block;margin-bottom:.2rem; }
-        .mh-fl input, .mh-fl select { width:100%;padding:.5rem .7rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;margin-bottom:.6rem;box-sizing:border-box;outline:none; }
-        .mh-fl input:focus { border-color:#0097A7; }
-        .mh-chk-form { display:flex;flex-direction:column;gap:.4rem;margin-bottom:.75rem; }
-        .mh-chk-row  { display:flex;align-items:center;gap:.6rem;font-size:.82rem;color:#334155;padding:.3rem .5rem;border-radius:6px;background:#f8fafc; }
-        .mh-chk-row input[type=checkbox] { width:16px;height:16px;cursor:pointer;accent-color:#0097A7; }
-        .mh-chk-sep  { font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin:.25rem 0; }
-        .mh-modal__footer { display:flex;gap:.5rem;justify-content:flex-end;margin-top:.25rem; }
+        .mh-modal { background:#fff;border-radius:14px;padding:1.5rem;width:480px;max-width:96vw;box-shadow:0 20px 60px rgba(0,0,0,.22);max-height:92vh;overflow-y:auto; }
+        .mh-modal h3 { font-size:1rem;font-weight:700;margin:0 0 .25rem;color:#1e293b; }
+        .mh-modal-sub { font-size:.75rem;color:#64748b;margin-bottom:1rem; }
         .mh-err { font-size:.75rem;color:#dc2626;margin-bottom:.5rem;display:none; }
+        .mh-modal__footer { display:flex;gap:.5rem;justify-content:flex-end;margin-top:.75rem; }
+        .mh-modal__footer button { border:none;border-radius:7px;padding:.5rem 1.1rem;font-size:.82rem;font-weight:700;cursor:pointer; }
+
+        /* Radio button groups */
+        .mh-field { margin-bottom:.9rem; }
+        .mh-field__label { font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:.35rem; }
+        .mh-rg { display:flex;gap:.35rem;flex-wrap:wrap; }
+        .mh-rb { padding:.38rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;background:#fff;color:#475569;transition:all .15s;line-height:1.3;text-align:center; }
+        .mh-rb small { display:block;font-size:.62rem;font-weight:400;color:#94a3b8;margin-top:1px; }
+        .mh-rb.active { border-color:#0097A7;background:#f0fdfe;color:#0e7490; }
+        .mh-rb.active small { color:#0097A7; }
+        .mh-sep { font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:.75rem;margin:.75rem 0 .5rem; }
+        .mh-pwd { display:flex;flex-direction:column;gap:.2rem;margin-top:.75rem;border-top:1px solid #f1f5f9;padding-top:.75rem; }
+        .mh-pwd label { font-size:.75rem;font-weight:600;color:#475569; }
+        .mh-pwd input { padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;outline:none;width:100%;box-sizing:border-box; }
+        textarea.mh-textarea { width:100%;padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.82rem;resize:vertical;min-height:60px;outline:none;box-sizing:border-box;font-family:inherit; }
 
         @media(max-width:640px){ .mh-kpis{grid-template-columns:repeat(2,1fr);} }
     </style>
@@ -95,7 +136,9 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
         <div class="staff-header__logo">SB</div>
         <div>
             <p class="staff-header__company">Grupo KGyR S.A.C</p>
-            <p class="staff-header__app">Horario de <strong><?= htmlspecialchars($nombreTrabajador) ?></strong></p>
+            <p class="staff-header__app">
+                <?= $modo === 'mis-encuestas' ? 'Mis encuestas' : 'Encuestas del equipo' ?>
+            </p>
         </div>
     </div>
     <div class="staff-header__user">
@@ -104,126 +147,344 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
     </div>
 </header>
 
+<?php if ($modo !== 'mis-encuestas'): ?>
+<!-- ── Modales (solo en modo pendientes) ──────────────── -->
+
 <!-- Modal revertir falta -->
 <div id="mhModalRevertir" class="mh-ov" hidden>
-    <div class="mh-modal" style="max-height:unset;">
+    <div class="mh-modal" style="max-width:360px;">
         <h3>Revertir falta</h3>
-        <p id="mhRevertirDesc"></p>
+        <p id="mhRevertirDesc" class="mh-modal-sub"></p>
         <div id="mhRevertirErr" class="mh-err"></div>
         <input type="hidden" id="mhRevertirId">
-        <div class="mh-fl">
+        <div class="mh-pwd">
             <label>Tu contraseña para confirmar</label>
             <input type="password" id="mhRevertirPwd" placeholder="Tu contraseña de acceso">
         </div>
         <div class="mh-modal__footer">
-            <button onclick="cerrarModalRevertir()"
-                style="background:#f1f5f9;border:none;border-radius:7px;padding:.5rem 1rem;font-size:.82rem;cursor:pointer;color:#475569;">
-                Cancelar
-            </button>
-            <button onclick="confirmarRevertir()"
-                style="background:#dc2626;border:none;border-radius:7px;padding:.5rem 1.25rem;font-size:.82rem;font-weight:700;color:#fff;cursor:pointer;">
-                Revertir
-            </button>
+            <button onclick="cerrarModalRevertir()" style="background:#f1f5f9;color:#475569;">Cancelar</button>
+            <button onclick="confirmarRevertir()" style="background:#dc2626;color:#fff;">Revertir</button>
         </div>
     </div>
 </div>
 
-<!-- Modal registrar asistencia -->
+<!-- Modal falta -->
+<div id="mhModalFalta" class="mh-ov" hidden>
+    <div class="mh-modal" style="max-width:360px;">
+        <h3>Registrar falta</h3>
+        <p id="mhFaltaDesc" class="mh-modal-sub"></p>
+        <div style="background:#fee2e2;border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem;font-size:.82rem;color:#991b1b;font-weight:600;">
+            ⚠ Se registrará que este trabajador no se presentó a su turno.
+        </div>
+        <div id="mhFaltaErr" class="mh-err"></div>
+        <div class="mh-pwd">
+            <label>Tu contraseña *</label>
+            <input type="password" id="mhFaltaPwd" placeholder="Tu contraseña de acceso">
+        </div>
+        <div class="mh-modal__footer">
+            <button onclick="cerrarModalFalta()" style="background:#f1f5f9;color:#475569;">Cancelar</button>
+            <button onclick="confirmarFalta()" style="background:#dc2626;color:#fff;">Confirmar falta</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal encuesta -->
 <div id="mhModal" class="mh-ov" hidden>
     <div class="mh-modal">
-        <h3 id="mhModalTitulo">Registrar asistencia</h3>
-        <p id="mhModalDesc"></p>
+        <h3 id="mhModalTitulo"></h3>
+        <p id="mhModalDesc" class="mh-modal-sub"></p>
         <div id="mhErr" class="mh-err"></div>
-        <input type="hidden" id="mhPid">
-        <input type="hidden" id="mhFecha">
-        <input type="hidden" id="mhLocalId">
-        <!-- Sección normal (visible si no es falta) -->
-        <div id="mhSeccionHoras">
-            <div class="mh-fl">
-                <label>Hora de entrada *</label>
-                <input type="time" id="mhIngreso">
-                <label>Hora de salida <span style="color:#94a3b8;font-weight:400;">(si ya salió)</span></label>
-                <input type="time" id="mhSalida">
+
+        <div id="mhSecEntrada">
+            <div class="mh-field">
+                <span class="mh-field__label">Puntualidad de llegada</span>
+                <div class="mh-rg">
+                    <button type="button" class="mh-rb" data-field="llegada_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRadio(this)">Muy temprano <small>+10 min antes</small></button>
+                    <button type="button" class="mh-rb" data-field="llegada_puntualidad" data-val="TEMPRANO"     onclick="pickRadio(this)">Temprano <small>menos de 10 min</small></button>
+                    <button type="button" class="mh-rb" data-field="llegada_puntualidad" data-val="TARDE"        onclick="pickRadio(this)" style="border-color:#dc2626;color:#991b1b;">Tarde <small>menos de 10 min</small></button>
+                    <button type="button" class="mh-rb" data-field="llegada_puntualidad" data-val="MUY_TARDE"    onclick="pickRadio(this)" style="border-color:#dc2626;color:#991b1b;">Muy tarde <small>+10 min después</small></button>
+                </div>
             </div>
-            <!-- Checklist APERTURA -->
-            <p class="mh-chk-sep">Verificación de apertura (entrada)</p>
-            <div class="mh-chk-form" id="chkApertura"></div>
-            <!-- Checklist CIERRE -->
-            <p class="mh-chk-sep">Verificación de cierre (salida)</p>
-            <div class="mh-chk-form" id="chkCierre"></div>
+            <div class="mh-field">
+                <span class="mh-field__label">¿Ayudó a abrir la puerta principal?</span>
+                <div class="mh-rg">
+                    <button type="button" class="mh-rb" data-field="abrio_puerta" data-val="1" onclick="pickRadio(this)">Sí</button>
+                    <button type="button" class="mh-rb" data-field="abrio_puerta" data-val="0" onclick="pickRadio(this)">No</button>
+                </div>
+            </div>
+            <div class="mh-sep">Presentación personal</div>
+            <div class="mh-field"><span class="mh-field__label">Aseo personal</span><div class="mh-rg">
+                <button type="button" class="mh-rb" data-field="aseo_personal" data-val="SUCIO"   onclick="pickRadio(this)">Sucio</button>
+                <button type="button" class="mh-rb" data-field="aseo_personal" data-val="REGULAR" onclick="pickRadio(this)">Regular</button>
+                <button type="button" class="mh-rb" data-field="aseo_personal" data-val="LIMPIO"  onclick="pickRadio(this)">Limpio</button>
+            </div></div>
+            <div class="mh-field"><span class="mh-field__label">Vestimenta</span><div class="mh-rg">
+                <button type="button" class="mh-rb" data-field="vestimenta" data-val="SUCIO"   onclick="pickRadio(this)">Sucio</button>
+                <button type="button" class="mh-rb" data-field="vestimenta" data-val="REGULAR" onclick="pickRadio(this)">Regular</button>
+                <button type="button" class="mh-rb" data-field="vestimenta" data-val="LIMPIO"  onclick="pickRadio(this)">Limpio</button>
+            </div></div>
+            <div class="mh-field"><span class="mh-field__label">Uñas</span><div class="mh-rg">
+                <button type="button" class="mh-rb" data-field="unas" data-val="SUCIAS"  onclick="pickRadio(this)">Sucias</button>
+                <button type="button" class="mh-rb" data-field="unas" data-val="REGULAR" onclick="pickRadio(this)">Regular</button>
+                <button type="button" class="mh-rb" data-field="unas" data-val="LIMPIO"  onclick="pickRadio(this)">Limpio</button>
+            </div></div>
+            <div class="mh-field"><span class="mh-field__label">Cabello</span><div class="mh-rg">
+                <button type="button" class="mh-rb" data-field="cabello" data-val="SUELTO"   onclick="pickRadio(this)">Suelto</button>
+                <button type="button" class="mh-rb" data-field="cabello" data-val="RECOGIDO" onclick="pickRadio(this)">Recogido</button>
+                <button type="button" class="mh-rb" data-field="cabello" data-val="MONO"     onclick="pickRadio(this)">Con moño</button>
+            </div></div>
         </div>
 
-        <!-- Aviso falta -->
-        <div id="mhSeccionFalta" hidden
-             style="background:#fee2e2;border-radius:8px;padding:.75rem 1rem;margin-bottom:.75rem;font-size:.82rem;color:#991b1b;font-weight:600;">
-            ⚠ Se registrará que este trabajador <strong>no se presentó</strong> a su turno.
+        <div id="mhSecSalida" hidden>
+            <div class="mh-field">
+                <span class="mh-field__label">Puntualidad de salida</span>
+                <div class="mh-rg">
+                    <button type="button" class="mh-rb" data-field="salida_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRadio(this)">Muy temprano <small>+10 min antes</small></button>
+                    <button type="button" class="mh-rb" data-field="salida_puntualidad" data-val="TEMPRANO"     onclick="pickRadio(this)">Temprano <small>menos de 10 min</small></button>
+                    <button type="button" class="mh-rb" data-field="salida_puntualidad" data-val="TARDE"        onclick="pickRadio(this)">Tarde <small>menos de 10 min</small></button>
+                    <button type="button" class="mh-rb" data-field="salida_puntualidad" data-val="MUY_TARDE"    onclick="pickRadio(this)">Muy tarde <small>+10 min después</small></button>
+                </div>
+            </div>
+            <div class="mh-sep">Cierre del turno</div>
+            <div class="mh-field"><span class="mh-field__label">Limpieza de su espacio personal</span><div class="mh-rg">
+                <button type="button" class="mh-rb" data-field="limpieza_espacio" data-val="SUCIO"   onclick="pickRadio(this)">Sucio</button>
+                <button type="button" class="mh-rb" data-field="limpieza_espacio" data-val="REGULAR" onclick="pickRadio(this)">Regular</button>
+                <button type="button" class="mh-rb" data-field="limpieza_espacio" data-val="LIMPIO"  onclick="pickRadio(this)">Limpio</button>
+            </div></div>
+            <div class="mh-field"><span class="mh-field__label">¿Hizo limpieza general del local?</span><div class="mh-rg">
+                <button type="button" class="mh-rb" data-field="limpieza_local" data-val="1" onclick="pickRadio(this)">Sí</button>
+                <button type="button" class="mh-rb" data-field="limpieza_local" data-val="0" onclick="pickRadio(this)">No</button>
+            </div></div>
+            <div class="mh-field"><span class="mh-field__label">¿Ayudó a cerrar el local?</span><div class="mh-rg">
+                <button type="button" class="mh-rb" data-field="ayudo_cerrar" data-val="1" onclick="pickRadio(this)">Sí</button>
+                <button type="button" class="mh-rb" data-field="ayudo_cerrar" data-val="0" onclick="pickRadio(this)">No</button>
+            </div></div>
+            <div class="mh-field"><span class="mh-field__label">Medicamentos</span><div class="mh-rg">
+                <button type="button" class="mh-rb" data-field="ordeno_medicamentos" data-val="DESORDENADO" onclick="pickRadio(this)">Desordenado</button>
+                <button type="button" class="mh-rb" data-field="ordeno_medicamentos" data-val="REGULAR"     onclick="pickRadio(this)">Regular</button>
+                <button type="button" class="mh-rb" data-field="ordeno_medicamentos" data-val="ORDENADO"    onclick="pickRadio(this)">Ordenado</button>
+            </div></div>
         </div>
 
-        <div class="mh-fl" style="border-top:1px solid #e2e8f0;margin-top:.25rem;padding-top:.75rem;">
-            <label>Tu contraseña (para confirmar el registro) *</label>
+        <div class="mh-sep">Comentarios</div>
+        <textarea id="mhComentarios" class="mh-textarea" maxlength="200" placeholder="Observaciones del turno (máx. 200 caracteres)"></textarea>
+        <div class="mh-pwd">
+            <label>Tu contraseña para confirmar *</label>
             <input type="password" id="mhPassword" placeholder="Tu contraseña de acceso">
         </div>
         <div class="mh-modal__footer">
-            <button onclick="cerrarModal()"
-                style="background:#f1f5f9;border:none;border-radius:7px;padding:.5rem 1rem;font-size:.82rem;cursor:pointer;color:#475569;">
-                Cancelar
-            </button>
-            <button onclick="confirmarRegistro()"
-                style="background:#0097A7;border:none;border-radius:7px;padding:.5rem 1.25rem;font-size:.82rem;font-weight:700;color:#fff;cursor:pointer;">
-                Actualizar
-            </button>
+            <button onclick="cerrarModal()" style="background:#f1f5f9;color:#475569;">Cancelar</button>
+            <button onclick="confirmarRegistro()" style="background:#0097A7;color:#fff;">Actualizar</button>
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <main class="mh-wrap">
 
-    <!-- Filtros: trabajador + mes -->
-    <form method="GET" class="mh-top" style="align-items:flex-end;">
-        <div>
-            <label>Ver horario de:</label>
-            <select name="trabajador" onchange="this.form.submit()">
-                <?php foreach ($trabajadores as $t): ?>
-                    <option value="<?= $t['id'] ?>" <?= $t['id'] == $postulanteId ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($t['nombre']) ?><?= $t['id'] == $registradorId ? ' (Yo)' : '' ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <input type="hidden" name="mes" value="<?= htmlspecialchars($filtroMes) ?>">
+    <!-- ── Selector de modo ──────────────────────────────── -->
+    <div class="mh-mode-bar">
+        <a href="?modo=pendientes"
+           class="mh-mode-btn <?= $modo === 'pendientes' ? 'mh-mode-btn--active' : '' ?>">
+            📋 Encuestas pendientes
+        </a>
+        <a href="?modo=mis-encuestas&mes=<?= $modo === 'mis-encuestas' ? htmlspecialchars($filtroMes) : date('Y-m') ?>"
+           class="mh-mode-btn <?= $modo === 'mis-encuestas' ? 'mh-mode-btn--active' : '' ?>">
+            👤 Mis encuestas
+        </a>
+    </div>
+
+<?php if ($modo === 'pendientes'): ?>
+    <!-- ══════════ MODO PENDIENTES ══════════ -->
+
+    <!-- Filtros -->
+    <form method="GET" class="mh-filtros">
+        <input type="hidden" name="modo" value="pendientes">
+        <input type="date" name="desde" value="<?= htmlspecialchars($desde) ?>" onchange="this.form.submit()">
+        <span style="color:#94a3b8;font-size:.8rem;">hasta</span>
+        <input type="date" name="hasta" value="<?= htmlspecialchars($hasta) ?>" onchange="this.form.submit()">
+        <select name="trabajador" onchange="this.form.submit()" style="min-width:160px;">
+            <option value="0">Todos los compañeros</option>
+            <?php foreach ($trabajadores as $t): ?>
+                <option value="<?= $t['id'] ?>" <?= $t['id'] == $filtroTrabajador ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($t['nombre']) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:.82rem;font-weight:600;color:#475569;cursor:pointer;">
+            <input type="checkbox" name="sin_calif" value="1"
+                   <?= $soloSinCalif ? 'checked' : '' ?> onchange="this.form.submit()"
+                   style="accent-color:#0097A7;width:15px;height:15px;">
+            Solo sin calificar
+        </label>
     </form>
 
+    <p style="font-size:.75rem;color:#64748b;margin-bottom:.75rem;">
+        <?= $total ?> turno<?= $total !== 1 ? 's' : '' ?>
+        <?php if ($sinFicha > 0): ?>
+        · <strong style="color:#dc2626;"><?= $sinFicha ?> sin ficha</strong>
+        <?php endif; ?>
+    </p>
+
+    <?php if (empty($slotsData)): ?>
+    <div style="text-align:center;padding:3rem;color:#94a3b8;">
+        <div style="font-size:2.5rem;margin-bottom:.5rem;">✅</div>
+        <p style="font-weight:600;">¡Todo calificado! No hay encuestas pendientes.</p>
+    </div>
+    <?php else: ?>
+    <div class="mh-table-wrap">
+    <table class="mh-table">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Compañero/a</th>
+                <th>Turno · Local</th>
+                <th>Estado</th>
+                <th>Llegada</th>
+                <th>Salida</th>
+                <th>Reg. por</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($slotsData as $s):
+            $asist    = $s['id_asistencia'] ? $s : null;
+            $esFalta  = $asist && $asist['estado'] === 'FALTA';
+            $llegPI   = $asist ? ($puntInfo[$asist['llegada_puntualidad'] ?? ''] ?? null) : null;
+            $salidPI  = $asist ? ($puntInfo[$asist['salida_puntualidad']  ?? ''] ?? null) : null;
+            $rowBg    = !$asist ? '#fafafa' : ($esFalta ? '#fff5f5' : '');
+
+            $asistData = $asist ? [
+                'llegada_puntualidad' => $asist['llegada_puntualidad'],
+                'abrio_puerta'        => $asist['abrio_puerta'],
+                'aseo_personal'       => $asist['aseo_personal'],
+                'vestimenta'          => $asist['vestimenta'],
+                'unas'                => $asist['unas'],
+                'cabello'             => $asist['cabello'],
+                'salida_puntualidad'  => $asist['salida_puntualidad'],
+                'limpieza_espacio'    => $asist['limpieza_espacio'],
+                'limpieza_local'      => $asist['limpieza_local'],
+                'ayudo_cerrar'        => $asist['ayudo_cerrar'],
+                'ordeno_medicamentos' => $asist['ordeno_medicamentos'],
+                'comentarios_ficha'   => $asist['comentarios_ficha'],
+                'id_asistencia'       => $asist['id_asistencia'],
+            ] : null;
+            $asistJson = htmlspecialchars(json_encode($asistData), ENT_QUOTES);
+            $diasLabel = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+            $dow  = $diasLabel[(int)date('w', strtotime($s['fecha_dia']))];
+            $diaN = date('d/m', strtotime($s['fecha_dia']));
+        ?>
+        <tr style="background:<?= $rowBg ?>">
+            <td style="white-space:nowrap;">
+                <strong style="color:#1e293b;"><?= $dow ?></strong>
+                <span class="mh-sub"><?= $diaN ?></span>
+            </td>
+            <td>
+                <span style="font-weight:600;"><?= htmlspecialchars($s['trabajador_nombre']) ?></span>
+                <span class="mh-sub"><?= htmlspecialchars($s['rol_desc']) ?></span>
+            </td>
+            <td>
+                <span class="mh-badge" style="background:<?= $s['turno_id']==1?'#fef9c3':'#e0e7ff'?>;color:<?= $s['turno_id']==1?'#92400e':'#3730a3'?>">
+                    <?= $s['turno_id']==1?'☀️ Mañana':'🌙 Tarde' ?>
+                </span>
+                <span class="mh-sub"><?= htmlspecialchars($s['local_desc']) ?></span>
+            </td>
+            <td>
+                <?php if ($esFalta): ?>
+                    <span class="mh-badge" style="background:#fee2e2;color:#991b1b;">Falta</span>
+                <?php elseif ($llegPI): ?>
+                    <span class="mh-badge" style="background:#d1fae5;color:#065f46;">Presente</span>
+                <?php else: ?>
+                    <span style="color:#cbd5e1;font-size:.75rem;">Sin reg.</span>
+                <?php endif; ?>
+            </td>
+            <td>
+                <?php if ($llegPI): ?>
+                    <span class="mh-badge" style="background:<?= $llegPI['bg']?>;color:<?= $llegPI['color']?>"><?= $llegPI['label']?></span>
+                <?php else: ?><span style="color:#cbd5e1;">—</span><?php endif; ?>
+            </td>
+            <td>
+                <?php if ($salidPI): ?>
+                    <span class="mh-badge" style="background:<?= $salidPI['bg']?>;color:<?= $salidPI['color']?>"><?= $salidPI['label']?></span>
+                <?php else: ?><span style="color:#cbd5e1;">—</span><?php endif; ?>
+            </td>
+            <td style="font-size:.72rem;color:#0097A7;">
+                <?= htmlspecialchars($s['registrado_por_nombre'] ?? '—') ?>
+            </td>
+            <td>
+                <div class="mh-acc">
+                    <?php if (!$esFalta): ?>
+                    <button class="mh-btn mh-btn--entrada <?= $asist && $asist['llegada_puntualidad'] ? 'mh-btn--filled' : '' ?>"
+                        data-pid="<?= $s['postulante_id'] ?>"
+                        data-fecha="<?= $s['fecha_dia'] ?>"
+                        data-turno="<?= $s['turno_id'] ?>"
+                        data-nombre="<?= htmlspecialchars($s['trabajador_nombre'], ENT_QUOTES) ?>"
+                        data-asist="<?= $asistJson ?>"
+                        onclick="abrirModal('ENTRADA', this)">
+                        <?= $asist && $asist['llegada_puntualidad'] ? '✏ Entrada' : 'Entrada' ?>
+                    </button>
+                    <button class="mh-btn mh-btn--salida <?= $asist && $asist['salida_puntualidad'] ? 'mh-btn--filled' : '' ?>"
+                        data-pid="<?= $s['postulante_id'] ?>"
+                        data-fecha="<?= $s['fecha_dia'] ?>"
+                        data-turno="<?= $s['turno_id'] ?>"
+                        data-nombre="<?= htmlspecialchars($s['trabajador_nombre'], ENT_QUOTES) ?>"
+                        data-asist="<?= $asistJson ?>"
+                        onclick="abrirModal('SALIDA', this)">
+                        <?= $asist && $asist['salida_puntualidad'] ? '✏ Salida' : 'Salida' ?>
+                    </button>
+                    <button class="mh-btn mh-btn--falta"
+                        data-pid="<?= $s['postulante_id'] ?>"
+                        data-fecha="<?= $s['fecha_dia'] ?>"
+                        data-turno="<?= $s['turno_id'] ?>"
+                        data-nombre="<?= htmlspecialchars($s['trabajador_nombre'], ENT_QUOTES) ?>"
+                        onclick="abrirModalFalta(this)">
+                        Faltó
+                    </button>
+                    <?php else: ?>
+                    <button class="mh-btn mh-btn--revertir"
+                        onclick="abrirModalRevertirFalta(<?= $asist['id_asistencia'] ?>, '<?= addslashes($s['trabajador_nombre']) ?>')">
+                        ↩ Revertir
+                    </button>
+                    <?php endif; ?>
+                </div>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <?php endif; ?>
+
+<?php else: ?>
+    <!-- ══════════ MODO MIS ENCUESTAS ══════════ -->
+
     <!-- Navegación mensual -->
-    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem;">
-        <a href="?trabajador=<?= $postulanteId ?>&mes=<?= $mesPasado ?>"
-           style="padding:.38rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;border:1.5px solid #e2e8f0;background:#fff;color:#475569;text-decoration:none;white-space:nowrap;">
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap;">
+        <a href="?modo=mis-encuestas&mes=<?= $mesPasado ?>"
+           style="padding:.38rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;border:1.5px solid #e2e8f0;background:#fff;color:#475569;text-decoration:none;">
             ← Mes anterior
         </a>
         <span style="font-size:.92rem;font-weight:700;color:#1e293b;padding:0 .5rem;"><?= $mesLabel ?></span>
         <?php if ($filtroMes < $mesActual): ?>
-        <a href="?trabajador=<?= $postulanteId ?>&mes=<?= $mesSiguiente ?>"
-           style="padding:.38rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;border:1.5px solid #e2e8f0;background:#fff;color:#475569;text-decoration:none;white-space:nowrap;">
+        <a href="?modo=mis-encuestas&mes=<?= $mesSiguiente ?>"
+           style="padding:.38rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;border:1.5px solid #e2e8f0;background:#fff;color:#475569;text-decoration:none;">
             Mes siguiente →
         </a>
         <?php endif; ?>
     </div>
 
-    <?php if ($esPropioHorario): ?>
     <div style="background:#fef9c3;border:1px solid #fbbf24;border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.82rem;color:#92400e;">
-        ⚠ Estás viendo tu propio horario. <strong>Solo un compañero puede registrar tu asistencia.</strong>
-        Selecciona a alguien del listado para registrar la de ellos.
+        👤 Esta es tu ficha personal. <strong>Solo un compañero puede completar tus encuestas.</strong>
     </div>
-    <?php endif; ?>
 
     <!-- KPIs -->
     <div class="mh-kpis">
         <div class="mh-kpi"><div class="mh-kpi__num" style="color:#0097A7;"><?= $totalManana ?></div><div class="mh-kpi__label">Turnos Mañana ☀️</div></div>
         <div class="mh-kpi"><div class="mh-kpi__num" style="color:#475569;"><?= $totalTarde ?></div><div class="mh-kpi__label">Turnos Tarde 🌙</div></div>
-        <div class="mh-kpi"><div class="mh-kpi__num" style="color:#059669;"><?= $conAsistencia ?></div><div class="mh-kpi__label">Con asistencia</div></div>
+        <div class="mh-kpi"><div class="mh-kpi__num" style="color:#059669;"><?= $conFicha ?></div><div class="mh-kpi__label">Con ficha</div></div>
         <div class="mh-kpi"><div class="mh-kpi__num" style="color:#dc2626;"><?= $sinRegistro ?></div><div class="mh-kpi__label">Sin registro</div></div>
     </div>
 
-    <!-- Tabla -->
     <?php if (empty($fechas)): ?>
     <div style="text-align:center;padding:3rem;color:#94a3b8;">
         <div style="font-size:2.5rem;margin-bottom:.5rem;">📅</div>
@@ -238,49 +499,28 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
                 <th>Turno</th>
                 <th>Local · Rol</th>
                 <th>Cobertura</th>
-                <th>Entrada</th>
-                <th>Salida</th>
-                <th>Horas</th>
                 <th>Estado</th>
-                <th>Registrado por</th>
-                <th>Checklist</th>
-                <?php if (!$esPropioHorario): ?><th></th><?php endif; ?>
+                <th>Llegada</th>
+                <th>Salida</th>
+                <th>Reg. por</th>
             </tr>
         </thead>
         <tbody>
-        <?php
-        foreach ($fechas as $fecha):
+        <?php foreach ($fechas as $fecha):
             $dow      = $diasLabel[(int)date('w', strtotime($fecha))];
             $diaN     = date('d/m', strtotime($fecha));
             $slotsDia = $slotsPorFechaTurno[$fecha] ?? [];
-            $rempDia  = $rempPorFecha[$fecha]       ?? [];
-            $asistDia = $asistPorFecha[$fecha]       ?? [];
-
-            // Asociar asistencia a turno por hora (< 14:00 = mañana, >= 14:00 = tarde)
-            $asistTurno = [];
-            foreach ($asistDia as $a) {
-                if ($a['hora_ingreso']) {
-                    $turno = ((int)date('H', strtotime($a['hora_ingreso'])) < 14) ? 1 : 2;
-                } else {
-                    $turno = !isset($asistTurno[1]) ? 1 : 2;
-                }
-                $asistTurno[$turno] = $a;
-            }
+            $rempDia  = $rempPorFecha[$fecha]        ?? [];
 
             foreach ($slotsDia as $turnoId => $slot):
-                $asist  = $asistTurno[$turnoId] ?? null;
-                $remp   = $rempDia[$turnoId]    ?? null;
-                $chk    = $asist ? ($checklists[$asist['id_asistencia']] ?? []) : [];
-                $estado = $asist['estado'] ?? null;
-                $ecfg   = $estado ? ($estadoInfo[$estado] ?? ['bg'=>'#f1f5f9','color'=>'#64748b','label'=>$estado]) : null;
+                $asist  = $asistPorFecha[$fecha][$turnoId]
+                        ?? $asistPorFecha[$fecha][0]
+                        ?? null;
+                $remp   = $rempDia[$turnoId] ?? null;
                 $rowBg  = $remp ? '#fff8f8' : ($slot['cubre_id'] ? '#f0fff4' : '#fff');
-
-                // Calcular horas trabajadas
-                $horas = '';
-                if ($asist && $asist['hora_ingreso'] && $asist['hora_salida']) {
-                    $diff = (strtotime($asist['hora_salida']) - strtotime($asist['hora_ingreso'])) / 3600;
-                    $horas = number_format($diff, 1) . ' h';
-                }
+                $esFalta = $asist && $asist['estado'] === 'FALTA';
+                $llegPI  = $asist ? ($puntInfo[$asist['llegada_puntualidad'] ?? ''] ?? null) : null;
+                $salidPI = $asist ? ($puntInfo[$asist['salida_puntualidad']  ?? ''] ?? null) : null;
         ?>
             <tr style="background:<?= $rowBg ?>">
                 <td style="white-space:nowrap;">
@@ -288,7 +528,7 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
                     <span class="mh-sub"><?= $diaN ?></span>
                 </td>
                 <td>
-                    <span class="mh-badge" style="background:<?= $turnoId==1 ? '#fef9c3':'#e0e7ff' ?>;color:<?= $turnoId==1 ? '#92400e':'#3730a3' ?>">
+                    <span class="mh-badge" style="background:<?= $turnoId==1?'#fef9c3':'#e0e7ff'?>;color:<?= $turnoId==1?'#92400e':'#3730a3'?>">
                         <?= $turnoLabel[$turnoId] ?? $turnoId ?>
                     </span>
                 </td>
@@ -306,95 +546,23 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
                     <?php endif; ?>
                 </td>
                 <td>
-                    <?php if ($asist && $asist['hora_ingreso']): ?>
-                        <span class="mh-time"><?= date('H:i', strtotime($asist['hora_ingreso'])) ?></span>
-                    <?php else: ?>
-                        <span style="color:#cbd5e1;">—</span>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <?php if ($asist && $asist['hora_salida']): ?>
-                        <span class="mh-time"><?= date('H:i', strtotime($asist['hora_salida'])) ?></span>
-                    <?php elseif ($asist): ?>
-                        <span style="color:#f59e0b;font-size:.75rem;">En turno</span>
-                    <?php else: ?>
-                        <span style="color:#cbd5e1;">—</span>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <?php if ($horas): ?>
-                        <span style="font-weight:600;color:#1e293b;"><?= $horas ?></span>
-                    <?php else: ?>
-                        <span style="color:#cbd5e1;">—</span>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <?php if ($ecfg): ?>
-                        <span class="mh-badge" style="background:<?= $ecfg['bg'] ?>;color:<?= $ecfg['color'] ?>"><?= $ecfg['label'] ?></span>
+                    <?php if ($esFalta): ?>
+                        <span class="mh-badge" style="background:#fee2e2;color:#991b1b;">Falta</span>
+                    <?php elseif ($llegPI): ?>
+                        <span class="mh-badge" style="background:#d1fae5;color:#065f46;">Presente</span>
                     <?php else: ?>
                         <span style="color:#cbd5e1;font-size:.75rem;">Sin reg.</span>
                     <?php endif; ?>
                 </td>
-                <td style="font-size:.72rem;">
-                    <?php if ($asist && $asist['registrado_por_nombre']): ?>
-                        <span style="color:#0097A7;font-weight:600;"><?= htmlspecialchars($asist['registrado_por_nombre']) ?></span>
-                    <?php else: ?>
-                        <span style="color:#cbd5e1;">—</span>
-                    <?php endif; ?>
+                <td><?php if ($llegPI): ?>
+                    <span class="mh-badge" style="background:<?=$llegPI['bg']?>;color:<?=$llegPI['color']?>"><?=$llegPI['label']?></span>
+                <?php else: ?><span style="color:#cbd5e1;">—</span><?php endif; ?></td>
+                <td><?php if ($salidPI): ?>
+                    <span class="mh-badge" style="background:<?=$salidPI['bg']?>;color:<?=$salidPI['color']?>"><?=$salidPI['label']?></span>
+                <?php else: ?><span style="color:#cbd5e1;">—</span><?php endif; ?></td>
+                <td style="font-size:.72rem;color:#0097A7;">
+                    <?= htmlspecialchars($asist['registrado_por_nombre'] ?? '—') ?>
                 </td>
-                <td>
-                    <?php if (!empty($chk)): ?>
-                    <div class="mh-chk" title="<?= implode(' · ', array_map(fn($c) => ($c['cumplido']?'✓':'✗').' '.$c['descripcion'], $chk)) ?>">
-                        <?php foreach ($chk as $c): ?>
-                            <div class="mh-chk-i <?= $c['cumplido'] ? 'mh-chk-i--ok' : 'mh-chk-i--fail' ?>"><?= $c['cumplido'] ? '✓' : '✗' ?></div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php else: ?>
-                        <span style="color:#cbd5e1;font-size:.75rem;">—</span>
-                    <?php endif; ?>
-                </td>
-                <?php if (!$esPropioHorario): ?>
-                <td style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;">
-                    <?php $esFaltaReg = $asist && $asist['estado'] === 'FALTA'; ?>
-
-                    <?php if (!$remp || $asist): ?>
-                    <?php
-                        $ingresoExist = ($asist && $asist['hora_ingreso']) ? date('H:i', strtotime($asist['hora_ingreso'])) : '';
-                        $salidaExist  = ($asist && $asist['hora_salida'])  ? date('H:i', strtotime($asist['hora_salida']))  : '';
-                        $chkExist     = [];
-                        foreach ($chk as $c) { $chkExist[$c['checklist_id']] = (int)$c['cumplido']; }
-                    ?>
-                    <button class="mh-reg-btn"
-                        data-pid="<?= $postulanteId ?>"
-                        data-fecha="<?= $fecha ?>"
-                        data-nombre="<?= htmlspecialchars($nombreTrabajador, ENT_QUOTES) ?>"
-                        data-local="<?= $slot['local_id'] ?? '' ?>"
-                        data-ingreso="<?= $ingresoExist ?>"
-                        data-salida="<?= $salidaExist ?>"
-                        data-chk='<?= htmlspecialchars(json_encode($chkExist), ENT_QUOTES) ?>'
-                        onclick="abrirModalFromBtn(this, false)">
-                        <?= $asist && !$esFaltaReg ? '✏ Actualizar' : 'Actualizar' ?>
-                    </button>
-                    <?php endif; ?>
-
-                    <button class="mh-reg-btn" style="background:#dc2626;"
-                        data-pid="<?= $postulanteId ?>"
-                        data-fecha="<?= $fecha ?>"
-                        data-nombre="<?= htmlspecialchars($nombreTrabajador, ENT_QUOTES) ?>"
-                        data-local="<?= $slot['local_id'] ?? '' ?>"
-                        data-ingreso="" data-salida="" data-chk="{}"
-                        onclick="abrirModalFromBtn(this, true)">
-                        Faltó
-                    </button>
-
-                    <?php if ($esFaltaReg): ?>
-                    <button onclick="abrirModalRevertirFalta(<?= $asist['id_asistencia'] ?>, '<?= addslashes($nombreTrabajador) ?>')"
-                        style="background:transparent;border:1px solid #fca5a5;color:#dc2626;border-radius:6px;padding:3px 9px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap;">
-                        ↩ Revertir
-                    </button>
-                    <?php endif; ?>
-                </td>
-                <?php endif; ?>
             </tr>
         <?php endforeach; ?>
         <?php endforeach; ?>
@@ -402,143 +570,175 @@ $sinRegistro   = max(0, count($slots) - $conAsistencia);
     </table>
     </div>
     <?php endif; ?>
+<?php endif; ?>
+
 </main>
 
+<?php if ($modo !== 'mis-encuestas'): ?>
 <script>
-const BASE       = '<?= $basePath ?>';
-const CHECKLIST  = <?= json_encode($checklistItems ?? []) ?>;
+const BASE = '<?= $basePath ?>';
 
-let _esFalta = false;
+let _seccion  = 'ENTRADA';
+let _pid      = 0;
+let _fecha    = '';
+let _turnoId  = 0;
+let _radioVals = {};
+let _faltaPid = 0; let _faltaFecha = ''; let _faltaTurno = 0;
 
-function abrirModalFromBtn(btn, esFalta) {
-    const chkExist = JSON.parse(btn.dataset.chk || '{}');
-    abrirModal(
-        parseInt(btn.dataset.pid),
-        btn.dataset.fecha,
-        btn.dataset.nombre,
-        btn.dataset.local || null,
-        esFalta,
-        btn.dataset.ingreso || '',
-        btn.dataset.salida  || '',
-        chkExist
-    );
+function fmtFecha(f) {
+    const d = new Date(f + 'T12:00:00');
+    const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    return `${dias[d.getDay()]} ${d.getDate()}/${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function pickRadio(btn) {
+    const field = btn.dataset.field;
+    document.querySelectorAll(`.mh-rb[data-field="${field}"]`).forEach(b => {
+        b.classList.remove('active');
+        b.style.borderColor = ''; b.style.color = '';
+    });
+    btn.classList.add('active');
+    btn.style.borderColor = ''; btn.style.color = '';
+    _radioVals[field] = btn.dataset.val;
+}
+
+function preselect(field, val) {
+    if (val === null || val === undefined) return;
+    const sVal = String(val);
+    document.querySelectorAll(`.mh-rb[data-field="${field}"]`).forEach(btn => {
+        const match = btn.dataset.val === sVal;
+        btn.classList.toggle('active', match);
+        if (!match) { btn.style.borderColor = ''; btn.style.color = ''; }
+    });
+    _radioVals[field] = sVal;
+}
+
+function clearAll() {
+    document.querySelectorAll('.mh-rb').forEach(b => { b.classList.remove('active'); b.style.borderColor = ''; b.style.color = ''; });
+    _radioVals = {};
+}
+
+function abrirModal(seccion, btn) {
+    _seccion = seccion; _pid = parseInt(btn.dataset.pid);
+    _fecha = btn.dataset.fecha; _turnoId = parseInt(btn.dataset.turno);
+    const exist = JSON.parse(btn.dataset.asist || 'null');
+    clearAll();
+    document.getElementById('mhPassword').value = '';
+    document.getElementById('mhComentarios').value = '';
+    document.getElementById('mhErr').style.display = 'none';
+    document.getElementById('mhModalTitulo').textContent =
+        (seccion === 'ENTRADA' ? 'Registrar entrada' : 'Registrar salida') + ` — ${btn.dataset.nombre}`;
+    document.getElementById('mhModalDesc').textContent = `${fmtFecha(_fecha)} · Confirma con TU propia contraseña.`;
+    document.getElementById('mhSecEntrada').hidden = seccion !== 'ENTRADA';
+    document.getElementById('mhSecSalida').hidden  = seccion !== 'SALIDA';
+    if (exist) {
+        document.getElementById('mhComentarios').value = exist.comentarios_ficha || '';
+        if (seccion === 'ENTRADA') {
+            preselect('llegada_puntualidad', exist.llegada_puntualidad);
+            preselect('abrio_puerta', exist.abrio_puerta);
+            preselect('aseo_personal', exist.aseo_personal);
+            preselect('vestimenta', exist.vestimenta);
+            preselect('unas', exist.unas);
+            preselect('cabello', exist.cabello);
+        } else {
+            preselect('salida_puntualidad', exist.salida_puntualidad);
+            preselect('limpieza_espacio', exist.limpieza_espacio);
+            preselect('limpieza_local', exist.limpieza_local);
+            preselect('ayudo_cerrar', exist.ayudo_cerrar);
+            preselect('ordeno_medicamentos', exist.ordeno_medicamentos);
+        }
+    }
+    document.getElementById('mhModal').removeAttribute('hidden');
+    setTimeout(() => document.getElementById('mhPassword').focus(), 80);
+}
+
+function cerrarModal() { document.getElementById('mhModal').setAttribute('hidden', ''); }
+
+async function confirmarRegistro() {
+    const password = document.getElementById('mhPassword').value.trim();
+    const err = document.getElementById('mhErr');
+    if (!password) { showErr(err, 'Tu contraseña es requerida.'); return; }
+    const payload = {
+        postulante_id: _pid, fecha: _fecha, turno_id: _turnoId,
+        seccion: _seccion, password,
+        comentarios_ficha: document.getElementById('mhComentarios').value.trim() || null,
+    };
+    if (_seccion === 'ENTRADA') {
+        payload.llegada_puntualidad = _radioVals['llegada_puntualidad'] || null;
+        payload.abrio_puerta        = _radioVals['abrio_puerta'] !== undefined ? parseInt(_radioVals['abrio_puerta']) : null;
+        payload.aseo_personal       = _radioVals['aseo_personal'] || null;
+        payload.vestimenta          = _radioVals['vestimenta'] || null;
+        payload.unas                = _radioVals['unas'] || null;
+        payload.cabello             = _radioVals['cabello'] || null;
+    } else {
+        payload.salida_puntualidad  = _radioVals['salida_puntualidad'] || null;
+        payload.limpieza_espacio    = _radioVals['limpieza_espacio'] || null;
+        payload.limpieza_local      = _radioVals['limpieza_local'] !== undefined ? parseInt(_radioVals['limpieza_local']) : null;
+        payload.ayudo_cerrar        = _radioVals['ayudo_cerrar'] !== undefined ? parseInt(_radioVals['ayudo_cerrar']) : null;
+        payload.ordeno_medicamentos = _radioVals['ordeno_medicamentos'] || null;
+    }
+    try {
+        const r = await fetch(`${BASE}/staff/api/asistencia/registrar`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        });
+        const res = await r.json();
+        if (res.success) { cerrarModal(); location.reload(); }
+        else showErr(err, res.message || 'Error.');
+    } catch { showErr(err, 'Error de conexión.'); }
+}
+
+function abrirModalFalta(btn) {
+    _faltaPid = parseInt(btn.dataset.pid); _faltaFecha = btn.dataset.fecha; _faltaTurno = parseInt(btn.dataset.turno);
+    document.getElementById('mhFaltaDesc').textContent = `${btn.dataset.nombre} · ${fmtFecha(_faltaFecha)}`;
+    document.getElementById('mhFaltaPwd').value = '';
+    document.getElementById('mhFaltaErr').style.display = 'none';
+    document.getElementById('mhModalFalta').removeAttribute('hidden');
+    setTimeout(() => document.getElementById('mhFaltaPwd').focus(), 50);
+}
+function cerrarModalFalta() { document.getElementById('mhModalFalta').setAttribute('hidden', ''); }
+
+async function confirmarFalta() {
+    const pwd = document.getElementById('mhFaltaPwd').value.trim();
+    const err = document.getElementById('mhFaltaErr');
+    if (!pwd) { showErr(err, 'Tu contraseña es requerida.'); return; }
+    try {
+        const r = await fetch(`${BASE}/staff/api/asistencia/registrar`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postulante_id: _faltaPid, fecha: _faltaFecha, turno_id: _faltaTurno, seccion: 'FALTA', password: pwd }),
+        });
+        const res = await r.json();
+        if (res.success) { cerrarModalFalta(); location.reload(); }
+        else showErr(err, res.message || 'Error.');
+    } catch { showErr(err, 'Error de conexión.'); }
 }
 
 function abrirModalRevertirFalta(id, nombre) {
     document.getElementById('mhRevertirId').value = id;
-    document.getElementById('mhRevertirDesc').textContent =
-        `Se eliminará el registro de falta de "${nombre}". El turno volverá a "Sin registro".`;
+    document.getElementById('mhRevertirDesc').textContent = `Eliminar el registro de falta de "${nombre}".`;
     document.getElementById('mhRevertirPwd').value = '';
     document.getElementById('mhRevertirErr').style.display = 'none';
     document.getElementById('mhModalRevertir').removeAttribute('hidden');
     setTimeout(() => document.getElementById('mhRevertirPwd').focus(), 50);
 }
-
-function cerrarModalRevertir() {
-    document.getElementById('mhModalRevertir').setAttribute('hidden', '');
-}
+function cerrarModalRevertir() { document.getElementById('mhModalRevertir').setAttribute('hidden', ''); }
 
 async function confirmarRevertir() {
     const id  = document.getElementById('mhRevertirId').value;
     const pwd = document.getElementById('mhRevertirPwd').value.trim();
     const err = document.getElementById('mhRevertirErr');
-    if (!pwd) { err.textContent = 'Tu contraseña es requerida.'; err.style.display = 'block'; return; }
+    if (!pwd) { showErr(err, 'Tu contraseña es requerida.'); return; }
     try {
-        const r   = await fetch(`${BASE}/staff/api/asistencia/${id}/revertir`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: pwd }),
+        const r = await fetch(`${BASE}/staff/api/asistencia/${id}/revertir`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pwd }),
         });
         const res = await r.json();
         if (res.success) { cerrarModalRevertir(); location.reload(); }
-        else { err.textContent = res.message || 'Error.'; err.style.display = 'block'; }
-    } catch { err.textContent = 'Error de conexión.'; err.style.display = 'block'; }
+        else showErr(err, res.message || 'Error.');
+    } catch { showErr(err, 'Error de conexión.'); }
 }
 
-function abrirModal(pid, fecha, nombre, localId, esFalta, ingresoExist = '', salidaExist = '', chkExist = {}) {
-    _esFalta = !!esFalta;
-    document.getElementById('mhPid').value      = pid;
-    document.getElementById('mhFecha').value    = fecha;
-    document.getElementById('mhLocalId').value  = localId || '';
-    document.getElementById('mhIngreso').value  = ingresoExist;
-    document.getElementById('mhSalida').value   = salidaExist;
-    document.getElementById('mhPassword').value = '';
-    document.getElementById('mhErr').style.display = 'none';
-
-    const d    = new Date(fecha + 'T12:00:00');
-    const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-    const fechaLabel = `${dias[d.getDay()]} ${d.getDate()}/${String(d.getMonth()+1).padStart(2,'0')}`;
-
-    document.getElementById('mhModalTitulo').textContent = esFalta
-        ? `Registrar falta — ${nombre}`
-        : `Registrar asistencia — ${nombre}`;
-    document.getElementById('mhModalDesc').textContent =
-        `${fechaLabel} · Confirma con TU propia contraseña.`;
-
-    // Mostrar/ocultar secciones
-    document.getElementById('mhSeccionHoras').hidden  = !!esFalta;
-    document.getElementById('mhSeccionFalta').hidden  = !esFalta;
-
-    if (!esFalta) {
-        const apertura = CHECKLIST.filter(c => c.tipo === 'APERTURA');
-        const cierre   = CHECKLIST.filter(c => c.tipo === 'CIERRE');
-        const hasExisting = Object.keys(chkExist).length > 0;
-        const build = (items, id) => {
-            document.getElementById(id).innerHTML = items.map(c => {
-                // Si hay datos existentes, usar su valor; si no, marcar por defecto
-                const checked = hasExisting
-                    ? (chkExist[c.id_checklist] === 1)
-                    : true;
-                return `<label class="mh-chk-row">
-                    <input type="checkbox" name="chk" data-id="${c.id_checklist}" ${checked ? 'checked' : ''}>
-                    ${c.descripcion}
-                </label>`;
-            }).join('');
-        };
-        build(apertura, 'chkApertura');
-        build(cierre,   'chkCierre');
-    }
-
-    document.getElementById('mhModal').removeAttribute('hidden');
-    setTimeout(() => document.getElementById(_esFalta ? 'mhPassword' : 'mhIngreso').focus(), 50);
-}
-
-function cerrarModal() {
-    document.getElementById('mhModal').setAttribute('hidden', '');
-}
-
-async function confirmarRegistro() {
-    const pid      = parseInt(document.getElementById('mhPid').value);
-    const fecha    = document.getElementById('mhFecha').value;
-    const localId  = document.getElementById('mhLocalId').value;
-    const ingreso  = document.getElementById('mhIngreso').value;
-    const salida   = document.getElementById('mhSalida').value;
-    const password = document.getElementById('mhPassword').value.trim();
-    const err      = document.getElementById('mhErr');
-
-    if (!_esFalta && !ingreso) { err.textContent = 'La hora de entrada es requerida.'; err.style.display = 'block'; return; }
-    if (!password) { err.textContent = 'Tu contraseña es requerida.'; err.style.display = 'block'; return; }
-
-    const checklist = _esFalta ? [] : Array.from(document.querySelectorAll('input[name=chk]')).map(c => ({
-        checklist_id: parseInt(c.dataset.id),
-        cumplido:     c.checked ? 1 : 0,
-    }));
-
-    try {
-        const r   = await fetch(`${BASE}/staff/api/asistencia/registrar`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                postulante_id: pid, fecha,
-                hora_ingreso: _esFalta ? null : ingreso,
-                hora_salida:  _esFalta ? null : (salida || null),
-                local_id: localId ? parseInt(localId) : null,
-                checklist, password,
-            }),
-        });
-        const res = await r.json();
-        if (res.success) { cerrarModal(); location.reload(); }
-        else { err.textContent = res.message || 'Error.'; err.style.display = 'block'; }
-    } catch { err.textContent = 'Error de conexión.'; err.style.display = 'block'; }
-}
+function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
 </script>
+<?php endif; ?>
 </body>
 </html>

@@ -230,16 +230,16 @@ function renderHistorial(registros) {
     const tbody = document.getElementById('tbodyHistorial');
     if (!tbody) return;
     if (!registros.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="staff-table-empty">Sin registros aún.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="staff-table-empty">Sin registros aún.</td></tr>';
         return;
     }
+    const puntLabel = { MUY_TEMPRANO:'+10 min antes', TEMPRANO:'Temprano', TARDE:'Tarde', MUY_TARDE:'+10 min tarde' };
     tbody.innerHTML = registros.map(r => `
         <tr>
             <td>${formatFecha(r.fecha)}</td>
             <td>${r.local_desc || '—'}</td>
-            <td>${r.hora_ingreso ? formatHora(r.hora_ingreso) : '—'}</td>
-            <td>${r.hora_salida  ? formatHora(r.hora_salida)  : '—'}</td>
             <td>${badgeEstado(r.estado)}</td>
+            <td>${r.llegada_puntualidad ? (puntLabel[r.llegada_puntualidad] || r.llegada_puntualidad) : '—'}</td>
         </tr>`).join('');
 }
 

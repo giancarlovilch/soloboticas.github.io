@@ -125,9 +125,21 @@ if ($semana) {
         </div>
         <?php endif; ?>
 
-        <a href="<?= $basePath ?>/horario/historial" class="hor-btn hor-btn--outline">
-            📂 Historial
-        </a>
+        <!-- Filtro por trabajador -->
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+            <label style="font-size:.68rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">
+                Resaltar
+            </label>
+            <select id="filtroTrabajador"
+                    style="padding:.35rem .7rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.8rem;outline:none;min-width:160px;cursor:pointer;background:#fff;color:#1e293b;transition:border-color .15s;"
+                    onchange="aplicarFiltro(this.value)">
+                <option value="">— Todos —</option>
+            </select>
+            <button onclick="aplicarFiltro('')" id="btnLimpiarFiltro" hidden
+                    style="padding:.35rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.75rem;background:#f1f5f9;cursor:pointer;color:#475569;line-height:1;transition:all .15s;">
+                ✕
+            </button>
+        </div>        
     </div>
 
     <!-- ── Resumen de disponibles ──────────────────────────── -->

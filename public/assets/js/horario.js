@@ -4,6 +4,8 @@
 
 let _pickerSlotEl = null;
 let TRABAJADORES  = [];
+let _slots        = [];
+let _filtroId     = 0;
 
 // ── Carga inicial ──────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -35,10 +37,37 @@ async function cargarSlots() {
         const r   = await fetch(`${BASE}/horario/api/semana/${SEMANA_ID}`);
         const res = await r.json();
         if (!res.success) return;
-        renderSlots(res.data || []);
+        _slots = res.data || [];
+        poblarFiltro(_slots);
+        renderSlots(_slots);
     } catch {
         mostrarToast('Error al cargar los horarios.', 'error');
     }
+}
+
+function poblarFiltro(slots) {
+    const sel = document.getElementById('filtroTrabajador');
+    if (!sel) return;
+    const vistos = new Set();
+    const opts = [{ id: 0, nombre: '— Todos —' }];
+    slots.forEach(s => {
+        if (s.postulante_id && !vistos.has(s.postulante_id)) {
+            vistos.add(s.postulante_id);
+            opts.push({ id: parseInt(s.postulante_id), nombre: s.trabajador_nombre || '—' });
+        }
+    });
+    opts.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    sel.innerHTML = opts.map(o => `<option value="${o.id}">${o.nombre}</option>`).join('');
+    if (_filtroId) sel.value = _filtroId;
+}
+
+function aplicarFiltro(val) {
+    _filtroId = parseInt(val) || 0;
+    const btn = document.getElementById('btnLimpiarFiltro');
+    if (btn) btn.hidden = !_filtroId;
+    const sel = document.getElementById('filtroTrabajador');
+    if (sel) sel.style.borderColor = _filtroId ? '#2563eb' : '#e2e8f0';
+    renderSlots(_slots);
 }
 
 function renderSlots(slots) {
@@ -76,8 +105,9 @@ function renderSlots(slots) {
                 el.style.pointerEvents = 'auto';
                 el.onclick             = () => clickAsiento(el);
             } else {
-                // Ocupado por otro
-                el.className           = 'hor-asiento hor-asiento--ocupado';
+                // Ocupado por otro (o filtrado)
+                const esFiltrado = _filtroId && parseInt(s.postulante_id) === _filtroId;
+                el.className           = 'hor-asiento ' + (esFiltrado ? 'hor-asiento--filtrado' : 'hor-asiento--ocupado');
                 el.title               = `Ocupado por ${nombre}`;
                 el.style.pointerEvents = 'none';
                 el.onclick             = null;
@@ -88,7 +118,9 @@ function renderSlots(slots) {
             el.title              = 'Libre — clic para tomar';
             el.style.pointerEvents = '';
             el.onclick            = () => clickAsiento(el);
-            el.querySelector('.hor-asiento__nombre').textContent = '＋';
+            el.querySelector('.hor-asiento__nombre').innerHTML = el.dataset.rol === 'LIMPIEZA'
+                ? '<span style="font-size:1.25em;line-height:1;letter-spacing:1px;">🧹🫧🧼</span>'
+                : '＋';
             if (ES_ADMIN) agregarBtnPicker(el);
         }
     });
@@ -121,7 +153,7 @@ function actualizarResumen(slots) {
 
     const libres = {};
     slots.forEach(s => {
-        if (s.rol_puesto === 'ALMACENERA') return;
+        if (s.rol_puesto === 'ALMACENERA' || s.rol_puesto === 'LIMPIEZA') return;
         const lid = s.local_id;
         if (!libres[lid]) libres[lid] = 0;
         if (!s.postulante_id) libres[lid]++;

@@ -289,6 +289,23 @@ class CajaController extends Controller
         require_once __DIR__ . '/../../views/caja/reporte.php';
     }
 
+    // ── POST /caja/api/sesion/{id}/corregir-venta ─────────
+    public function corregirVenta(int $id): void
+    {
+        $postulanteId = $this->requireAuth();
+        $data         = $this->getAllInput();
+        $montoNuevo   = round((float)($data['monto_nuevo'] ?? -1), 2);
+        $motivo       = trim($data['motivo'] ?? '');
+
+        if ($montoNuevo < 0) $this->error('El monto no puede ser negativo', 422);
+
+        $sesion = $this->repo->getSesionById($id);
+        if (!$sesion) $this->error('Sesión no encontrada', 404);
+
+        $this->repo->addCorreccionVenta($id, $montoNuevo, $motivo, $postulanteId);
+        $this->success('Corrección registrada.');
+    }
+
     // ── POST /caja/api/reporte/{id}/rectificar ─────────────
     public function rectificar(int $id): void
     {

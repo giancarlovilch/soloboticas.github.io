@@ -93,7 +93,12 @@ class ReporteController extends Controller
                         SELECT SUM(CASE WHEN ae.accion = 'AGREGAR' THEN ae.monto ELSE -ae.monto END)
                         FROM ajuste_esperado ae
                         WHERE ae.sesion_id = sc.id_sesion
-                    ), 0) AS sum_ajustes
+                    ), 0) AS sum_ajustes,
+                    COALESCE((
+                        SELECT SUM(cv.monto_nuevo - cv.monto_anterior)
+                        FROM correccion_venta cv
+                        WHERE cv.sesion_id = sc.id_sesion
+                    ), 0) AS sum_corr_ventas
                 FROM sesion_caja sc
                 INNER JOIN caja c      ON sc.caja_id              = c.id_caja
                 INNER JOIN local l     ON c.local_id               = l.id_local

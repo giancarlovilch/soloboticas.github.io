@@ -386,9 +386,9 @@ class HorarioRepository
 
     public function liberarSlot(int $slotId, int $postulanteId): string
     {
-        // Restricción a nivel DB: el UPDATE solo tiene efecto si el slot
-        // pertenece exactamente al usuario que lo solicita.
-        // Nadie puede liberar el turno de otro — ni admin, ni staff.
+        $slot = $this->getSlotById($slotId);
+        if (!$slot) return 'Slot no encontrado';
+
         $stmt = $this->db->prepare(
             "UPDATE horario_slot
              SET postulante_id = NULL, fecha_asignacion = NULL
@@ -396,7 +396,44 @@ class HorarioRepository
         );
         $stmt->execute(['id' => $slotId, 'pid' => $postulanteId]);
 
-        return $stmt->rowCount() > 0 ? 'ok' : 'Solo puedes liberar tus propios turnos';
+        if ($stmt->rowCount() === 0) return 'Solo puedes liberar tus propios turnos';
+
+        if ($slot['rol_puesto'] !== 'LIMPIEZA') {
+            $this->limpiezaCascade($postulanteId, (int)$slot['semana_id'], (int)$slot['local_id'], (int)$slot['turno_id'], $slot['fecha_dia']);
+        }
+
+        return 'ok';
+    }
+
+    private function limpiezaCascade(int $postulanteId, int $semanaId, int $localId, int $turnoId, string $fechaDia): void
+    {
+        // Verifica si aún tiene algún slot no-LIMPIEZA en ese local/turno/día
+        $check = $this->db->prepare(
+            "SELECT COUNT(*) FROM horario_slot hs
+             INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+             WHERE hs.semana_id     = :sid
+               AND hs.postulante_id = :pid
+               AND hs.local_id      = :lid
+               AND hs.turno_id      = :tid
+               AND hs.fecha_dia     = :fdia
+               AND rh.codigo       != 'LIMPIEZA'"
+        );
+        $check->execute(['sid' => $semanaId, 'pid' => $postulanteId, 'lid' => $localId, 'tid' => $turnoId, 'fdia' => $fechaDia]);
+
+        if ((int)$check->fetchColumn() === 0) {
+            // Sin respaldo → liberar su LIMPIEZA del mismo local/turno/día
+            $this->db->prepare(
+                "UPDATE horario_slot hs
+                 INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+                 SET hs.postulante_id = NULL, hs.fecha_asignacion = NULL
+                 WHERE hs.semana_id     = :sid
+                   AND hs.postulante_id = :pid
+                   AND hs.local_id      = :lid
+                   AND hs.turno_id      = :tid
+                   AND hs.fecha_dia     = :fdia
+                   AND rh.codigo        = 'LIMPIEZA'"
+            )->execute(['sid' => $semanaId, 'pid' => $postulanteId, 'lid' => $localId, 'tid' => $turnoId, 'fdia' => $fechaDia]);
+        }
     }
 
     public function getSlotById(int $id): ?array
@@ -499,6 +536,10 @@ class HorarioRepository
             'admin'   => $adminId,
             'removido'=> $removidoId,
         ]);
+
+        if ($slot['rol_puesto'] !== 'LIMPIEZA') {
+            $this->limpiezaCascade($removidoId, (int)$slot['semana_id'], (int)$slot['local_id'], (int)$slot['turno_id'], $slot['fecha_dia']);
+        }
 
         return 'ok';
     }

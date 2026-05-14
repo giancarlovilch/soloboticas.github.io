@@ -115,11 +115,13 @@ class AsistenciaController extends Controller
         $this->requireSession();
         $this->requireAdmin();
 
-        $q    = $this->getQueryParams();
-        $fecha = $q['fecha'] ?? '';
+        $q     = $this->getQueryParams();
+        $desde = $q['desde'] ?? '';
+        $hasta = $q['hasta'] ?? '';
         $pid   = isset($q['postulante_id']) ? (int)$q['postulante_id'] : 0;
+        $sinCalif = !empty($q['sin_calificar']);
 
-        $result = $this->service->adminListar($fecha, $pid);
+        $result = $this->service->adminListar($desde, $hasta, $pid, $sinCalif);
         $this->success($result['message'], $result['data']);
     }
 

@@ -65,7 +65,7 @@ $fDif = function($v) {
     </div>
 </header>
 
-<main class="caja-main" style="max-width:1100px;">
+<main class="caja-main">
 
     <!-- ── KPIs rápidos ─── -->
     <div class="rep-kpis">
@@ -191,12 +191,20 @@ $fDif = function($v) {
                         <td class="text-right"><?= $fDif($diferencia) ?></td>
                         <td class="text-right">
                             <?php
-                                $difCorr = $diferencia + (float)($r['sum_rectifs'] ?? 0) + (float)($r['sum_ajustes'] ?? 0);
+                                $corrVentas = (float)($r['sum_corr_ventas'] ?? 0);
+                                $difCorr = $diferencia + (float)($r['sum_rectifs'] ?? 0) + (float)($r['sum_ajustes'] ?? 0) - $corrVentas;
                                 if (abs($difCorr) < 0.01):
                             ?>
                                 <span style="background:#d1fae5;color:#065f46;font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:5px;">Resuelto</span>
+                                <?php if (abs($corrVentas) > 0.01): ?>
+                                <span title="Venta corregida" style="font-size:.7rem;margin-left:3px;cursor:default;">✏</span>
+                                <?php endif; ?>
                             <?php else: ?>
                                 <?= $fDif($difCorr) ?>
+                                <?php if (abs($corrVentas) > 0.01): ?>
+                                <?php $corrTxt = ($corrVentas > 0 ? '+' : '−') . ' S/ ' . number_format(abs($corrVentas), 2, '.', ','); ?>
+                                <span title="Venta corregida: <?= htmlspecialchars($corrTxt) ?>" style="font-size:.7rem;margin-left:3px;cursor:default;">✏</span>
+                                <?php endif; ?>
                             <?php endif; ?>
                         </td>
                         <td class="text-right" style="font-variant-numeric:tabular-nums;">

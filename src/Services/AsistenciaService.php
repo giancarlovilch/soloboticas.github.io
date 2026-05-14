@@ -103,30 +103,33 @@ class AsistenciaService
         ];
     }
 
-    // ── ADMIN: listar todas las asistencias ───────────────
-    public function adminListar(string $fecha = '', int $postulanteId = 0): array
+    // ── ADMIN: listar slots del pasado con su ficha ───────
+    public function adminListar(string $desde = '', string $hasta = '', int $postulanteId = 0, bool $soloSinCalificar = false): array
     {
-        $registros = $this->repo->getAll($fecha, $postulanteId);
+        $registros = $this->repo->getAllSlots($desde, $hasta, $postulanteId, $soloSinCalificar);
         $usuarios  = $this->repo->getUsuariosActivos();
         $locales   = $this->repo->getLocales();
 
         return [
-            'success'  => true,
-            'message'  => 'OK',
-            'data'     => [
-                'registros' => $registros,
-                'usuarios'  => $usuarios,
-                'locales'   => $locales,
-            ],
+            'success' => true,
+            'message' => 'OK',
+            'data'    => compact('registros', 'usuarios', 'locales'),
         ];
     }
 
-    // ── ADMIN: actualizar un registro ─────────────────────
+    // ── ADMIN: crear o actualizar ficha (upsert) ──────────
     public function adminActualizar(int $id, array $data): array
     {
-        if (!$id) return ['success' => false, 'message' => 'ID inválido'];
-        $this->repo->actualizar($id, $data);
-        return ['success' => true, 'message' => 'Asistencia actualizada'];
+        if ($id > 0) {
+            $this->repo->actualizar($id, $data);
+        } else {
+            $pid   = (int)($data['postulante_id'] ?? 0);
+            $fecha = $data['fecha'] ?? '';
+            $tid   = (int)($data['turno_id'] ?? 0);
+            if (!$pid || !$fecha || !$tid) return ['success' => false, 'message' => 'Faltan datos del slot'];
+            $this->repo->upsertParaAdmin($pid, $fecha, $tid, $data);
+        }
+        return ['success' => true, 'message' => 'Ficha guardada'];
     }
 
     // ── ADMIN: crear registro manual ──────────────────────

@@ -125,6 +125,7 @@ $router->post('/caja/api/pago-digital/{id}/eliminar',    [CajaController::class,
 $router->get('/caja/api/catalogos',                      [CajaController::class, 'apiCatalogos']);
 $router->get('/caja/api/cajas/{id}',                     [CajaController::class, 'apiCajasByLocal']);
 $router->get('/caja/api/saldo/{id}',                     [CajaController::class, 'apiSaldoBase']);
+$router->post('/caja/api/sesion/{id}/corregir-venta',          [CajaController::class, 'corregirVenta']);
 $router->get('/caja/transferir',                              [CajaController::class, 'transferirIndex']);
 $router->post('/caja/api/transferir/solicitar',               [CajaController::class, 'solicitarTransferencia']);
 $router->post('/caja/api/transferir/{id}/confirmar',          [CajaController::class, 'confirmarTransferenciaAction']);

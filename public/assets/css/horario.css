@@ -164,9 +164,9 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
     user-select: none;
 }
 .hor-asiento__nombre { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.hor-asiento--mio      .hor-asiento__nombre { font-weight: 750; color: #dc2626; }
-.hor-asiento--ocupado  .hor-asiento__nombre { font-weight: 100; color: #50617a; }
-.hor-asiento--filtrado .hor-asiento__nombre { font-weight: 750; color: #2563eb; }
+.hor-asiento--mio      .hor-asiento__nombre { font-weight: 750; color: #dc2626; background: yellow;}
+.hor-asiento--ocupado  .hor-asiento__nombre { font-weight: 500; color: #50617a; }
+.hor-asiento--filtrado .hor-asiento__nombre { font-weight: 750; color: #2563eb; background: yellow;}
 
 /* Botón de asignación para admins (aparece en hover del slot libre) */
 .hor-asiento__btn-picker {

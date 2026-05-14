@@ -2,6 +2,7 @@
 /** @var array $sesion */ /** @var array $detalle */ /** @var array|false $venta */
 /** @var array $gastos */ /** @var array $rectifs */ /** @var array $digitales */
 /** @var float $digital_aprobado */ /** @var string|null $vendedor */
+/** @var array $correccionesVenta */ /** @var float $sumCorrDelta */
 $basePath  = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
 $userName  = $userName ?? $_SESSION['user_name'] ?? 'Usuario';
 $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
@@ -18,7 +19,9 @@ $loQueEs     = round($loQueEsFisico + $sum_rectifs, 2);
 
 // LO QUE SE DICE = base + ventas - gastos - digitales declarados ± ajustes esperado
 $saldo_ini        = (float)($sesion['saldo_inicial']         ?? 0);
-$total_ventas     = (float)($detalle['total_ventas_sistema'] ?? ($venta['monto'] ?? 0));
+$correccionesVenta = $correccionesVenta ?? [];
+$sumCorrDelta      = $sumCorrDelta ?? 0.0;
+$total_ventas     = round((float)($detalle['total_ventas_sistema'] ?? ($venta['monto'] ?? 0)) + $sumCorrDelta, 2);
 $total_gastos     = (float)($detalle['total_gastos_sistema'] ?? 0);
 $digital_aprobado = $digital_aprobado ?? 0;
 
@@ -509,6 +512,90 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
         </div>
     </div>
 
+    <!-- ── Corrección de ventas ──────────────────────────── -->
+    <section class="caja-card">
+        <div class="caja-card__header-row">
+            <div>
+                <h2 class="caja-card__title">Corrección de ventas del turno</h2>
+                <p class="caja-card__desc">
+                    Si el total de ventas fue ingresado incorrectamente, registra el valor correcto aquí.
+                    El historial queda guardado para trazabilidad.
+                </p>
+            </div>
+            <button class="caja-btn caja-btn--outline" onclick="toggleSeccion('seccionCorrVenta', this)">
+                Modificar
+            </button>
+        </div>
+
+        <!-- Valor actual -->
+        <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-bottom:.25rem;">
+            <span style="font-size:.82rem;color:#64748b;">Ventas del turno (valor actual):</span>
+            <strong id="ventaActualLabel" style="font-size:1rem;font-variant-numeric:tabular-nums;">
+                <?= $f2($total_ventas) ?>
+            </strong>
+            <?php if (!empty($correccionesVenta)): ?>
+            <span style="font-size:.72rem;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:5px;font-weight:700;">
+                ✏ <?= count($correccionesVenta) ?> corrección<?= count($correccionesVenta) !== 1 ? 'es' : '' ?>
+            </span>
+            <?php endif; ?>
+        </div>
+
+        <div id="seccionCorrVenta" hidden>
+
+        <?php if (!empty($correccionesVenta)): ?>
+        <table class="caja-table" style="margin-bottom:1rem;">
+            <thead>
+                <tr>
+                    <th>Antes</th>
+                    <th>Después</th>
+                    <th class="text-right">Δ</th>
+                    <th>Motivo</th>
+                    <th>Por</th>
+                    <th>Hora</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($correccionesVenta as $cv):
+                $delta = (float)$cv['monto_nuevo'] - (float)$cv['monto_anterior'];
+                $colorDelta = abs($delta) < 0.01 ? '#64748b' : ($delta > 0 ? '#059669' : '#dc2626');
+            ?>
+                <tr>
+                    <td style="font-variant-numeric:tabular-nums;"><?= $f2($cv['monto_anterior']) ?></td>
+                    <td style="font-variant-numeric:tabular-nums;font-weight:700;"><?= $f2($cv['monto_nuevo']) ?></td>
+                    <td class="text-right" style="font-weight:700;color:<?= $colorDelta ?>;font-variant-numeric:tabular-nums;">
+                        <?= $delta >= 0 ? '+' : '−' ?> <?= $f2(abs($delta)) ?>
+                    </td>
+                    <td style="font-size:.8rem;color:#475569;"><?= htmlspecialchars($cv['motivo'] ?? '—') ?></td>
+                    <td style="font-size:.78rem;color:#64748b;"><?= htmlspecialchars($cv['registrado_por'] ?? '—') ?></td>
+                    <td style="font-size:.72rem;color:#94a3b8;white-space:nowrap;"><?= date('d/m H:i', strtotime($cv['fecha_registro'])) ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+            <p style="font-size:.75rem;font-weight:600;color:#475569;margin-bottom:.6rem;">
+                Ingresa el nuevo total de ventas del turno:
+            </p>
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                <div class="caja-input-money" style="max-width:160px;">
+                    <span style="font-weight:700;color:#1e293b;">S/</span>
+                    <input type="number" id="corrVentaMonto" class="caja-input caja-input--money"
+                           min="0" step="0.01" placeholder="0.00"
+                           value="<?= number_format($total_ventas, 2, '.', '') ?>">
+                </div>
+                <input type="text" id="corrVentaMotivo" class="caja-input"
+                       style="flex:1;min-width:160px;" placeholder="Motivo (opcional)" maxlength="300">
+                <button class="caja-btn caja-btn--secondary" onclick="submitCorreccionVenta(<?= $sesion['id_sesion'] ?>)">
+                    Aplicar corrección
+                </button>
+            </div>
+        </div>
+        <div id="corrVentaMsg" class="caja-alert" hidden style="margin-top:.5rem;"></div>
+        </div><!-- /seccionCorrVenta -->
+    </section>
+
     <!-- ── Comentario del turno ─────────────────────────── -->
     <section class="caja-card">
         <h2 class="caja-card__title">Comentario del turno</h2>
@@ -820,6 +907,25 @@ async function guardarRespuesta(sesionId) {
             msgEl.textContent = res.message || 'Error.'; msgEl.style.color = '#dc2626'; msgEl.style.display = 'inline';
         }
     } catch { msgEl.textContent = 'Error de conexión.'; msgEl.style.color = '#dc2626'; msgEl.style.display = 'inline'; }
+}
+
+// ── Corrección de ventas ─────────────────────────────
+async function submitCorreccionVenta(sesionId) {
+    const monto  = parseFloat(document.getElementById('corrVentaMonto')?.value);
+    const motivo = document.getElementById('corrVentaMotivo')?.value?.trim() || '';
+    const msg    = document.getElementById('corrVentaMsg');
+
+    if (isNaN(monto) || monto < 0) { showAlert(msg, 'Ingresa un monto válido (≥ 0).', 'error'); return; }
+
+    try {
+        const r   = await fetch(`${BASE}/caja/api/sesion/${sesionId}/corregir-venta`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body:   JSON.stringify({ monto_nuevo: monto, motivo }),
+        });
+        const res = await r.json();
+        if (res.success) { showAlert(msg, '✓ ' + res.message, 'ok'); setTimeout(() => location.reload(), 900); }
+        else showAlert(msg, res.message, 'error');
+    } catch { showAlert(msg, 'Error de conexión.', 'error'); }
 }
 
 // ── Eliminar cuadre ───────────────────────────────────

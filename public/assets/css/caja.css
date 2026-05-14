@@ -48,7 +48,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--cj-bg)
 .caja-btn-back:hover { background: rgba(255,255,255,0.1); }
 
 /* ── MAIN ─────────────────────────────────────────── */
-.caja-main { max-width: 920px; margin: 1.75rem auto; padding: 0 1rem 3rem; display: flex; flex-direction: column; gap: 1.25rem; }
+.caja-main { max-width: 1100px; margin: 1.75rem auto; padding: 0 1rem 3rem; display: flex; flex-direction: column; gap: 1.25rem; }
 .caja-main--narrow { max-width: 560px; }
 
 /* ── SECCIONES ─────────────────────────────────────── */
