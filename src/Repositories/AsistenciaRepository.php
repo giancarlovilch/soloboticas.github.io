@@ -99,10 +99,11 @@ class AsistenciaRepository
                     p.num_documento,
                     a.local_id, l.descripcion AS local_desc,
                     a.fecha, a.turno_id, a.estado,
-                    a.llegada_puntualidad, a.abrio_puerta, a.aseo_personal,
-                    a.vestimenta, a.unas, a.cabello,
-                    a.salida_puntualidad, a.limpieza_espacio, a.limpieza_local,
-                    a.ayudo_cerrar, a.ordeno_medicamentos, a.comentarios_ficha,
+                    a.llegada_puntualidad, a.area_ordenada_ingreso, a.area_limpia_ingreso,
+                    a.aseo_personal, a.vestimenta, a.unas, a.cabello,
+                    a.salida_puntualidad, a.estado_area_cierre, a.limpieza_area_cierre,
+                    a.area_ordenada_cierre, a.participo_apertura_cierre,
+                    a.uso_celular, a.calificacion_turno, a.comentarios_ficha,
                     a.justificacion, a.observacion,
                     pr.nombres AS registrado_por_nombre
                 FROM {$this->table} a
@@ -123,9 +124,11 @@ class AsistenciaRepository
     {
         $stmt = $this->db->prepare(
             "SELECT a.id_asistencia, a.postulante_id, a.fecha, a.turno_id, a.estado,
-                    a.llegada_puntualidad, a.abrio_puerta, a.aseo_personal, a.vestimenta,
-                    a.unas, a.cabello, a.salida_puntualidad, a.limpieza_espacio,
-                    a.limpieza_local, a.ayudo_cerrar, a.ordeno_medicamentos, a.comentarios_ficha,
+                    a.llegada_puntualidad, a.area_ordenada_ingreso, a.area_limpia_ingreso,
+                    a.aseo_personal, a.vestimenta, a.unas, a.cabello,
+                    a.salida_puntualidad, a.estado_area_cierre, a.limpieza_area_cierre,
+                    a.area_ordenada_cierre, a.participo_apertura_cierre,
+                    a.uso_celular, a.calificacion_turno, a.comentarios_ficha,
                     a.local_id, l.descripcion AS local_desc,
                     pr.nombres AS registrado_por_nombre
              FROM asistencia a
@@ -163,11 +166,12 @@ class AsistenciaRepository
             if ($existId) {
                 $this->db->prepare(
                     "UPDATE asistencia SET estado='FALTA', turno_id=:tid,
-                     llegada_puntualidad=NULL, abrio_puerta=NULL, aseo_personal=NULL,
-                     vestimenta=NULL, unas=NULL, cabello=NULL, salida_puntualidad=NULL,
-                     limpieza_espacio=NULL, limpieza_local=NULL, ayudo_cerrar=NULL,
-                     ordeno_medicamentos=NULL, comentarios_ficha=NULL, registrado_por_id=:reg
-                     WHERE id_asistencia=:id"
+                     llegada_puntualidad=NULL, area_ordenada_ingreso=NULL, area_limpia_ingreso=NULL,
+                     aseo_personal=NULL, vestimenta=NULL, unas=NULL, cabello=NULL,
+                     salida_puntualidad=NULL, estado_area_cierre=NULL, limpieza_area_cierre=NULL,
+                     area_ordenada_cierre=NULL, participo_apertura_cierre=NULL,
+                     uso_celular=NULL, calificacion_turno=NULL, comentarios_ficha=NULL,
+                     registrado_por_id=:reg WHERE id_asistencia=:id"
                 )->execute(['tid' => $turnoId, 'reg' => $registradorId, 'id' => $existId]);
             } else {
                 $this->db->prepare(
@@ -189,21 +193,24 @@ class AsistenciaRepository
                 default        => 'A TIEMPO',
             };
             $fields = [
-                'llegada_puntualidad' => $llegada,
-                'abrio_puerta'        => $yn('abrio_puerta'),
-                'aseo_personal'       => $campos['aseo_personal'] ?? null,
-                'vestimenta'          => $campos['vestimenta']    ?? null,
-                'unas'                => $campos['unas']          ?? null,
-                'cabello'             => $campos['cabello']       ?? null,
-                'estado'              => $estado,
+                'llegada_puntualidad'   => $llegada,
+                'area_ordenada_ingreso' => $yn('area_ordenada_ingreso'),
+                'area_limpia_ingreso'   => $yn('area_limpia_ingreso'),
+                'aseo_personal'         => $campos['aseo_personal'] ?? null,
+                'vestimenta'            => $campos['vestimenta']    ?? null,
+                'unas'                  => $campos['unas']          ?? null,
+                'cabello'               => $campos['cabello']       ?? null,
+                'estado'                => $estado,
             ];
         } else { // SALIDA
             $fields = [
-                'salida_puntualidad'  => $campos['salida_puntualidad']  ?? null,
-                'limpieza_espacio'    => $campos['limpieza_espacio']    ?? null,
-                'limpieza_local'      => $yn('limpieza_local'),
-                'ayudo_cerrar'        => $yn('ayudo_cerrar'),
-                'ordeno_medicamentos' => $campos['ordeno_medicamentos'] ?? null,
+                'salida_puntualidad'       => $campos['salida_puntualidad']       ?? null,
+                'estado_area_cierre'       => $campos['estado_area_cierre']       ?? null,
+                'limpieza_area_cierre'     => $yn('limpieza_area_cierre'),
+                'area_ordenada_cierre'     => $yn('area_ordenada_cierre'),
+                'participo_apertura_cierre'=> $yn('participo_apertura_cierre'),
+                'uso_celular'              => $campos['uso_celular']              ?? null,
+                'calificacion_turno'       => $campos['calificacion_turno']       ?? null,
             ];
         }
 
@@ -281,43 +288,49 @@ class AsistenciaRepository
         $in = fn($v) => ($v === '' || $v === null) ? null : (int)$v;
 
         $sql = "UPDATE {$this->table} SET
-                    estado               = :estado,
-                    llegada_puntualidad  = :lleg,
-                    abrio_puerta         = :abrio,
-                    aseo_personal        = :aseo,
-                    vestimenta           = :vest,
-                    unas                 = :unas,
-                    cabello              = :cab,
-                    salida_puntualidad   = :sal_punt,
-                    limpieza_espacio     = :limp_esp,
-                    limpieza_local       = :limp_loc,
-                    ayudo_cerrar         = :ayudo,
-                    ordeno_medicamentos  = :ordena,
-                    comentarios_ficha    = :coment,
-                    justificacion        = :justif,
-                    observacion          = :obs,
-                    local_id             = :local
+                    estado                    = :estado,
+                    llegada_puntualidad       = :lleg,
+                    area_ordenada_ingreso     = :aoi,
+                    area_limpia_ingreso       = :ali,
+                    aseo_personal             = :aseo,
+                    vestimenta                = :vest,
+                    unas                      = :unas,
+                    cabello                   = :cab,
+                    salida_puntualidad        = :sal_punt,
+                    estado_area_cierre        = :eac,
+                    limpieza_area_cierre      = :lac,
+                    area_ordenada_cierre      = :aoc,
+                    participo_apertura_cierre = :pac,
+                    uso_celular               = :uso_cel,
+                    calificacion_turno        = :calif,
+                    comentarios_ficha         = :coment,
+                    justificacion             = :justif,
+                    observacion               = :obs,
+                    local_id                  = :local
                 WHERE id_asistencia = :id";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
-            'estado'   => $data['estado']       ?? 'FALTA',
-            'lleg'     => $sn($data['llegada_puntualidad']  ?? null),
-            'abrio'    => $in($data['abrio_puerta']         ?? null),
-            'aseo'     => $sn($data['aseo_personal']        ?? null),
-            'vest'     => $sn($data['vestimenta']           ?? null),
-            'unas'     => $sn($data['unas']                 ?? null),
-            'cab'      => $sn($data['cabello']              ?? null),
-            'sal_punt' => $sn($data['salida_puntualidad']   ?? null),
-            'limp_esp' => $sn($data['limpieza_espacio']     ?? null),
-            'limp_loc' => $in($data['limpieza_local']       ?? null),
-            'ayudo'    => $in($data['ayudo_cerrar']         ?? null),
-            'ordena'   => $sn($data['ordeno_medicamentos']  ?? null),
-            'coment'   => $sn($data['comentarios_ficha']    ?? null),
-            'justif'  => $sn($data['justificacion'] ?? null),
-            'obs'     => $data['observacion']  ?? 'PENDIENTE',
-            'local'   => $in($data['local_id'] ?? null),
-            'id'      => $id,
+            'estado'    => $data['estado']                     ?? 'FALTA',
+            'lleg'      => $sn($data['llegada_puntualidad']    ?? null),
+            'aoi'       => $in($data['area_ordenada_ingreso']  ?? null),
+            'ali'       => $in($data['area_limpia_ingreso']    ?? null),
+            'aseo'      => $sn($data['aseo_personal']          ?? null),
+            'vest'      => $sn($data['vestimenta']             ?? null),
+            'unas'      => $sn($data['unas']                   ?? null),
+            'cab'       => $sn($data['cabello']                ?? null),
+            'sal_punt'  => $sn($data['salida_puntualidad']     ?? null),
+            'eac'       => $sn($data['estado_area_cierre']     ?? null),
+            'lac'       => $in($data['limpieza_area_cierre']   ?? null),
+            'aoc'       => $in($data['area_ordenada_cierre']   ?? null),
+            'pac'       => $in($data['participo_apertura_cierre'] ?? null),
+            'uso_cel'   => $sn($data['uso_celular']            ?? null),
+            'calif'     => $sn($data['calificacion_turno']     ?? null),
+            'coment'    => $sn($data['comentarios_ficha']      ?? null),
+            'justif'    => $sn($data['justificacion']          ?? null),
+            'obs'       => $data['observacion']                ?? 'PENDIENTE',
+            'local'     => $in($data['local_id']               ?? null),
+            'id'        => $id,
         ]);
         return $stmt->rowCount() > 0 || true; // siempre true si no hay error
     }
@@ -354,7 +367,7 @@ class AsistenciaRepository
         if ($postulanteId) { $where[] = "hs.postulante_id = :pid"; $params['pid'] = $postulanteId; }
         if ($excludeId)    { $where[] = "hs.postulante_id != :excl"; $params['excl'] = $excludeId; }
         if ($soloSinCalificar) {
-            $where[] = "(a.id_asistencia IS NULL OR (a.llegada_puntualidad IS NULL AND a.salida_puntualidad IS NULL AND (a.estado IS NULL OR a.estado NOT IN ('FALTA'))))";
+            $where[] = "(a.id_asistencia IS NULL OR (a.estado != 'FALTA' AND (a.llegada_puntualidad IS NULL OR a.salida_puntualidad IS NULL)))";
         }
 
         $sql = "SELECT
@@ -366,10 +379,11 @@ class AsistenciaRepository
                     rh.descripcion AS rol_desc,
                     a.id_asistencia,
                     a.estado,
-                    a.llegada_puntualidad, a.abrio_puerta, a.aseo_personal,
-                    a.vestimenta, a.unas, a.cabello,
-                    a.salida_puntualidad, a.limpieza_espacio, a.limpieza_local,
-                    a.ayudo_cerrar, a.ordeno_medicamentos, a.comentarios_ficha,
+                    a.llegada_puntualidad, a.area_ordenada_ingreso, a.area_limpia_ingreso,
+                    a.aseo_personal, a.vestimenta, a.unas, a.cabello,
+                    a.salida_puntualidad, a.estado_area_cierre, a.limpieza_area_cierre,
+                    a.area_ordenada_cierre, a.participo_apertura_cierre,
+                    a.uso_celular, a.calificacion_turno, a.comentarios_ficha,
                     a.justificacion, a.observacion, a.local_id,
                     pr.nombres AS registrado_por_nombre
                 FROM horario_slot hs
@@ -406,23 +420,26 @@ class AsistenciaRepository
         $existId = (int)($existing->fetchColumn() ?: 0);
 
         $fields = [
-            'turno_id'            => $turnoId,
-            'estado'              => $data['estado']              ?? 'FALTA',
-            'llegada_puntualidad' => $sn($data['llegada_puntualidad']  ?? null),
-            'abrio_puerta'        => $in($data['abrio_puerta']         ?? null),
-            'aseo_personal'       => $sn($data['aseo_personal']        ?? null),
-            'vestimenta'          => $sn($data['vestimenta']           ?? null),
-            'unas'                => $sn($data['unas']                 ?? null),
-            'cabello'             => $sn($data['cabello']              ?? null),
-            'salida_puntualidad'  => $sn($data['salida_puntualidad']   ?? null),
-            'limpieza_espacio'    => $sn($data['limpieza_espacio']     ?? null),
-            'limpieza_local'      => $in($data['limpieza_local']       ?? null),
-            'ayudo_cerrar'        => $in($data['ayudo_cerrar']         ?? null),
-            'ordeno_medicamentos' => $sn($data['ordeno_medicamentos']  ?? null),
-            'comentarios_ficha'   => $sn($data['comentarios_ficha']    ?? null),
-            'justificacion'       => $sn($data['justificacion']        ?? null),
-            'observacion'         => $data['observacion']              ?? 'PENDIENTE',
-            'local_id'            => $in($data['local_id']             ?? null),
+            'turno_id'                 => $turnoId,
+            'estado'                   => $data['estado']                     ?? 'FALTA',
+            'llegada_puntualidad'      => $sn($data['llegada_puntualidad']    ?? null),
+            'area_ordenada_ingreso'    => $in($data['area_ordenada_ingreso']  ?? null),
+            'area_limpia_ingreso'      => $in($data['area_limpia_ingreso']    ?? null),
+            'aseo_personal'            => $sn($data['aseo_personal']          ?? null),
+            'vestimenta'               => $sn($data['vestimenta']             ?? null),
+            'unas'                     => $sn($data['unas']                   ?? null),
+            'cabello'                  => $sn($data['cabello']                ?? null),
+            'salida_puntualidad'       => $sn($data['salida_puntualidad']     ?? null),
+            'estado_area_cierre'       => $sn($data['estado_area_cierre']     ?? null),
+            'limpieza_area_cierre'     => $in($data['limpieza_area_cierre']   ?? null),
+            'area_ordenada_cierre'     => $in($data['area_ordenada_cierre']   ?? null),
+            'participo_apertura_cierre'=> $in($data['participo_apertura_cierre'] ?? null),
+            'uso_celular'              => $sn($data['uso_celular']            ?? null),
+            'calificacion_turno'       => $sn($data['calificacion_turno']     ?? null),
+            'comentarios_ficha'        => $sn($data['comentarios_ficha']      ?? null),
+            'justificacion'            => $sn($data['justificacion']          ?? null),
+            'observacion'              => $data['observacion']                ?? 'PENDIENTE',
+            'local_id'                 => $in($data['local_id']               ?? null),
         ];
 
         if ($existId) {

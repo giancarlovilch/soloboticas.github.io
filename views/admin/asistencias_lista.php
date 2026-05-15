@@ -5,12 +5,24 @@
 .mh-rb  { padding:.32rem .65rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.75rem;font-weight:600;
            cursor:pointer;background:#fff;color:#475569;transition:all .13s;line-height:1.2;text-align:center; }
 .mh-rb.active { border-color:#0097A7;background:#f0fdfe;color:#0e7490; }
-.mh-rb.rb-danger { border-color:#fca5a5;color:#991b1b; }
-.mh-rb.rb-danger.active { border-color:#dc2626;background:#fee2e2;color:#991b1b; }
-.mh-sep-enc { font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;
-              border-top:1px solid #f1f5f9;padding-top:.5rem;margin:.6rem 0 .3rem; }
-.mh-field-enc { margin-bottom:.6rem; }
-.mh-field-enc > label { font-size:.68rem;font-weight:700;color:#64748b;display:block;margin-bottom:.2rem; }
+.mh-block-enc { background:#f8fafc;border-radius:9px;padding:.6rem .8rem;margin-bottom:.55rem;border:1px solid #e8edf2; }
+.mh-block-enc__hd { font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:.45rem; }
+.mh-row-2-enc { display:grid;grid-template-columns:1fr 1fr;gap:.45rem; }
+.mh-field-enc { margin-bottom:.5rem; }
+.mh-field-enc > label { font-size:.66rem;font-weight:700;color:#64748b;display:block;margin-bottom:.2rem; }
+/* Variantes de color */
+.mh-rb[data-color="blue"]            { border-color:#bfdbfe;color:#3b82f6; }
+.mh-rb[data-color="green"]           { border-color:#a7f3d0;color:#10b981; }
+.mh-rb[data-color="amber"]           { border-color:#fde68a;color:#d97706; }
+.mh-rb[data-color="orange"]          { border-color:#fed7aa;color:#f97316; }
+.mh-rb[data-color="red"]             { border-color:#fecaca;color:#ef4444; }
+.mh-rb[data-color="purple"]          { border-color:#ddd6fe;color:#8b5cf6; }
+.mh-rb[data-color="blue"].active     { border-color:#3b82f6;background:#dbeafe;color:#1e40af; }
+.mh-rb[data-color="green"].active    { border-color:#10b981;background:#d1fae5;color:#065f46; }
+.mh-rb[data-color="amber"].active    { border-color:#f59e0b;background:#fef3c7;color:#92400e; }
+.mh-rb[data-color="orange"].active   { border-color:#f97316;background:#ffedd5;color:#9a3412; }
+.mh-rb[data-color="red"].active      { border-color:#ef4444;background:#fee2e2;color:#991b1b; }
+.mh-rb[data-color="purple"].active   { border-color:#8b5cf6;background:#ede9fe;color:#5b21b6; }
 </style>
 
 <!-- Modal editar ficha -->
@@ -53,104 +65,99 @@
             </div>
 
             <!-- ENTRADA -->
-            <div class="mh-sep-enc">Entrada</div>
-
-            <div class="mh-field-enc">
-                <label>Puntualidad de llegada</label>
+            <div class="mh-block-enc">
+                <div class="mh-block-enc__hd">⏰ Puntualidad al ingreso</div>
                 <div class="mh-rg">
-                    <button type="button" class="mh-rb" data-field="llegada_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRb(this)">+10 min antes</button>
-                    <button type="button" class="mh-rb" data-field="llegada_puntualidad" data-val="TEMPRANO"     onclick="pickRb(this)">Temprano</button>
-                    <button type="button" class="mh-rb rb-danger" data-field="llegada_puntualidad" data-val="TARDE"        onclick="pickRb(this)">Tarde</button>
-                    <button type="button" class="mh-rb rb-danger" data-field="llegada_puntualidad" data-val="MUY_TARDE"    onclick="pickRb(this)">+10 min tarde</button>
+                    <button type="button" class="mh-rb" data-color="blue"   data-field="llegada_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRb(this)">Muy anticipado</button>
+                    <button type="button" class="mh-rb" data-color="green"  data-field="llegada_puntualidad" data-val="TEMPRANO"     onclick="pickRb(this)">Con anticipación</button>
+                    <button type="button" class="mh-rb" data-color="orange" data-field="llegada_puntualidad" data-val="TARDE"        onclick="pickRb(this)">Retraso leve</button>
+                    <button type="button" class="mh-rb" data-color="red"    data-field="llegada_puntualidad" data-val="MUY_TARDE"    onclick="pickRb(this)">Retraso considerable</button>
                 </div>
             </div>
-            <div class="mh-field-enc">
-                <label>¿Ayudó a abrir la puerta?</label>
-                <div class="mh-rg">
-                    <button type="button" class="mh-rb" data-field="abrio_puerta" data-val="1" onclick="pickRb(this)">Sí</button>
-                    <button type="button" class="mh-rb" data-field="abrio_puerta" data-val="0" onclick="pickRb(this)">No</button>
+            <div class="mh-block-enc">
+                <div class="mh-block-enc__hd">🏪 Estado del área al ingreso</div>
+                <div class="mh-row-2-enc">
+                    <div class="mh-field-enc"><label>¿El área estaba ordenada?</label><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="green" data-field="area_ordenada_ingreso" data-val="1" onclick="pickRb(this)">Sí</button>
+                        <button type="button" class="mh-rb" data-color="red"   data-field="area_ordenada_ingreso" data-val="0" onclick="pickRb(this)">No</button>
+                    </div></div>
+                    <div class="mh-field-enc"><label>¿El área estaba limpia?</label><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="green" data-field="area_limpia_ingreso" data-val="1" onclick="pickRb(this)">Sí</button>
+                        <button type="button" class="mh-rb" data-color="red"   data-field="area_limpia_ingreso" data-val="0" onclick="pickRb(this)">No</button>
+                    </div></div>
                 </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;">
-                <div class="mh-field-enc">
-                    <label>Aseo personal</label>
-                    <div class="mh-rg">
-                        <button type="button" class="mh-rb rb-danger" data-field="aseo_personal" data-val="SUCIO"   onclick="pickRb(this)">Sucio</button>
-                        <button type="button" class="mh-rb" data-field="aseo_personal" data-val="REGULAR" onclick="pickRb(this)">Regular</button>
-                        <button type="button" class="mh-rb" data-field="aseo_personal" data-val="LIMPIO"  onclick="pickRb(this)">Limpio</button>
-                    </div>
-                </div>
-                <div class="mh-field-enc">
-                    <label>Vestimenta</label>
-                    <div class="mh-rg">
-                        <button type="button" class="mh-rb rb-danger" data-field="vestimenta" data-val="SUCIO"   onclick="pickRb(this)">Sucio</button>
-                        <button type="button" class="mh-rb" data-field="vestimenta" data-val="REGULAR" onclick="pickRb(this)">Regular</button>
-                        <button type="button" class="mh-rb" data-field="vestimenta" data-val="LIMPIO"  onclick="pickRb(this)">Limpio</button>
-                    </div>
-                </div>
-                <div class="mh-field-enc">
-                    <label>Uñas</label>
-                    <div class="mh-rg">
-                        <button type="button" class="mh-rb rb-danger" data-field="unas" data-val="SUCIAS"  onclick="pickRb(this)">Sucias</button>
-                        <button type="button" class="mh-rb" data-field="unas" data-val="REGULAR" onclick="pickRb(this)">Regular</button>
-                        <button type="button" class="mh-rb" data-field="unas" data-val="LIMPIO"  onclick="pickRb(this)">Limpio</button>
-                    </div>
-                </div>
-            </div>
-            <div class="mh-field-enc">
-                <label>Cabello</label>
-                <div class="mh-rg">
-                    <button type="button" class="mh-rb" data-field="cabello" data-val="SUELTO"   onclick="pickRb(this)">Suelto</button>
-                    <button type="button" class="mh-rb" data-field="cabello" data-val="RECOGIDO" onclick="pickRb(this)">Recogido</button>
-                    <button type="button" class="mh-rb" data-field="cabello" data-val="MONO"     onclick="pickRb(this)">Con moño</button>
+            <div class="mh-block-enc">
+                <div class="mh-block-enc__hd">👕 Presentación personal</div>
+                <div class="mh-row-2-enc">
+                    <div class="mh-field-enc"><label>Higiene personal</label><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="red"   data-field="aseo_personal" data-val="DEFICIENTE" onclick="pickRb(this)">Deficiente</button>
+                        <button type="button" class="mh-rb" data-color="amber" data-field="aseo_personal" data-val="ACEPTABLE"  onclick="pickRb(this)">Aceptable</button>
+                        <button type="button" class="mh-rb" data-color="green" data-field="aseo_personal" data-val="OPTIMO"     onclick="pickRb(this)">Óptimo</button>
+                    </div></div>
+                    <div class="mh-field-enc"><label>Uniforme e indumentaria</label><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="red"   data-field="vestimenta" data-val="DESCUIDADO"  onclick="pickRb(this)">Descuidado</button>
+                        <button type="button" class="mh-rb" data-color="amber" data-field="vestimenta" data-val="PRESENTABLE" onclick="pickRb(this)">Presentable</button>
+                        <button type="button" class="mh-rb" data-color="green" data-field="vestimenta" data-val="IMPECABLE"   onclick="pickRb(this)">Impecable</button>
+                    </div></div>
+                    <div class="mh-field-enc"><label>Estado de uñas</label><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="red"   data-field="unas" data-val="DESCUIDADAS" onclick="pickRb(this)">Descuidadas</button>
+                        <button type="button" class="mh-rb" data-color="amber" data-field="unas" data-val="ACEPTABLES"  onclick="pickRb(this)">Aceptables</button>
+                        <button type="button" class="mh-rb" data-color="green" data-field="unas" data-val="CUIDADAS"    onclick="pickRb(this)">Cuidadas</button>
+                    </div></div>
+                    <div class="mh-field-enc"><label>Presentación del cabello</label><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="red"   data-field="cabello" data-val="SUELTO"   onclick="pickRb(this)">Suelto</button>
+                        <button type="button" class="mh-rb" data-color="green" data-field="cabello" data-val="RECOGIDO" onclick="pickRb(this)">Recogido</button>
+                        <button type="button" class="mh-rb" data-color="green" data-field="cabello" data-val="MONO"     onclick="pickRb(this)">Con moño</button>
+                    </div></div>
                 </div>
             </div>
 
             <!-- SALIDA -->
-            <div class="mh-sep-enc">Salida</div>
-
-            <div class="mh-field-enc">
-                <label>Puntualidad de salida</label>
+            <div class="mh-block-enc">
+                <div class="mh-block-enc__hd">⏰ Puntualidad al retiro</div>
                 <div class="mh-rg">
-                    <button type="button" class="mh-rb" data-field="salida_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRb(this)">+10 min antes</button>
-                    <button type="button" class="mh-rb" data-field="salida_puntualidad" data-val="TEMPRANO"     onclick="pickRb(this)">Temprano</button>
-                    <button type="button" class="mh-rb rb-danger" data-field="salida_puntualidad" data-val="TARDE"        onclick="pickRb(this)">Tarde</button>
-                    <button type="button" class="mh-rb rb-danger" data-field="salida_puntualidad" data-val="MUY_TARDE"    onclick="pickRb(this)">+10 min tarde</button>
+                    <button type="button" class="mh-rb" data-color="blue"   data-field="salida_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRb(this)">Muy anticipado</button>
+                    <button type="button" class="mh-rb" data-color="green"  data-field="salida_puntualidad" data-val="TEMPRANO"     onclick="pickRb(this)">Con anticipación</button>
+                    <button type="button" class="mh-rb" data-color="orange" data-field="salida_puntualidad" data-val="TARDE"        onclick="pickRb(this)">Retraso leve</button>
+                    <button type="button" class="mh-rb" data-color="red"    data-field="salida_puntualidad" data-val="MUY_TARDE"    onclick="pickRb(this)">Retraso considerable</button>
                 </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-                <div class="mh-field-enc">
-                    <label>Limpieza espacio personal</label>
-                    <div class="mh-rg">
-                        <button type="button" class="mh-rb rb-danger" data-field="limpieza_espacio" data-val="SUCIO"   onclick="pickRb(this)">Sucio</button>
-                        <button type="button" class="mh-rb" data-field="limpieza_espacio" data-val="REGULAR" onclick="pickRb(this)">Regular</button>
-                        <button type="button" class="mh-rb" data-field="limpieza_espacio" data-val="LIMPIO"  onclick="pickRb(this)">Limpio</button>
-                    </div>
+            <div class="mh-block-enc">
+                <div class="mh-block-enc__hd">🧹 Cierre del turno</div>
+                <div class="mh-field-enc"><label>Estado del área de trabajo al cierre</label><div class="mh-rg">
+                    <button type="button" class="mh-rb" data-color="red"   data-field="estado_area_cierre" data-val="DESCUIDADO"  onclick="pickRb(this)">Descuidado</button>
+                    <button type="button" class="mh-rb" data-color="amber" data-field="estado_area_cierre" data-val="PRESENTABLE" onclick="pickRb(this)">Presentable</button>
+                    <button type="button" class="mh-rb" data-color="green" data-field="estado_area_cierre" data-val="IMPECABLE"   onclick="pickRb(this)">Impecable</button>
+                </div></div>
+                <div class="mh-row-2-enc">
+                    <div class="mh-field-enc"><label>¿Realizó la limpieza de su área?</label><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="green" data-field="limpieza_area_cierre" data-val="1" onclick="pickRb(this)">Sí</button>
+                        <button type="button" class="mh-rb" data-color="red"   data-field="limpieza_area_cierre" data-val="0" onclick="pickRb(this)">No</button>
+                    </div></div>
+                    <div class="mh-field-enc"><label>¿Dejó su área ordenada?</label><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="green" data-field="area_ordenada_cierre" data-val="1" onclick="pickRb(this)">Sí</button>
+                        <button type="button" class="mh-rb" data-color="red"   data-field="area_ordenada_cierre" data-val="0" onclick="pickRb(this)">No</button>
+                    </div></div>
                 </div>
-                <div class="mh-field-enc">
-                    <label>Medicamentos</label>
-                    <div class="mh-rg">
-                        <button type="button" class="mh-rb rb-danger" data-field="ordeno_medicamentos" data-val="DESORDENADO" onclick="pickRb(this)">Desordenado</button>
-                        <button type="button" class="mh-rb" data-field="ordeno_medicamentos" data-val="REGULAR"     onclick="pickRb(this)">Regular</button>
-                        <button type="button" class="mh-rb" data-field="ordeno_medicamentos" data-val="ORDENADO"    onclick="pickRb(this)">Ordenado</button>
-                    </div>
-                </div>
+                <div class="mh-field-enc"><label>¿Participó en la apertura y/o cierre del local?</label><div class="mh-rg">
+                    <button type="button" class="mh-rb" data-color="green" data-field="participo_apertura_cierre" data-val="1" onclick="pickRb(this)">Sí</button>
+                    <button type="button" class="mh-rb" data-color="red"   data-field="participo_apertura_cierre" data-val="0" onclick="pickRb(this)">No</button>
+                </div></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-                <div class="mh-field-enc">
-                    <label>¿Limpieza general del local?</label>
-                    <div class="mh-rg">
-                        <button type="button" class="mh-rb" data-field="limpieza_local" data-val="1" onclick="pickRb(this)">Sí</button>
-                        <button type="button" class="mh-rb" data-field="limpieza_local" data-val="0" onclick="pickRb(this)">No</button>
-                    </div>
-                </div>
-                <div class="mh-field-enc">
-                    <label>¿Ayudó a cerrar el local?</label>
-                    <div class="mh-rg">
-                        <button type="button" class="mh-rb" data-field="ayudo_cerrar" data-val="1" onclick="pickRb(this)">Sí</button>
-                        <button type="button" class="mh-rb" data-field="ayudo_cerrar" data-val="0" onclick="pickRb(this)">No</button>
-                    </div>
-                </div>
+            <div class="mh-block-enc">
+                <div class="mh-block-enc__hd">📊 Evaluación del turno</div>
+                <div class="mh-field-enc"><label>Uso del celular personal durante el turno</label><div class="mh-rg">
+                    <button type="button" class="mh-rb" data-color="green"  data-field="uso_celular" data-val="NO_USO"    onclick="pickRb(this)">No usó</button>
+                    <button type="button" class="mh-rb" data-color="amber"  data-field="uso_celular" data-val="OCASIONAL" onclick="pickRb(this)">Uso ocasional</button>
+                    <button type="button" class="mh-rb" data-color="red"    data-field="uso_celular" data-val="FRECUENTE" onclick="pickRb(this)">Uso frecuente</button>
+                </div></div>
+                <div class="mh-field-enc"><label>Calificación general del turno</label><div class="mh-rg">
+                    <button type="button" class="mh-rb" data-color="red"    data-field="calificacion_turno" data-val="MALO"      onclick="pickRb(this)">Malo</button>
+                    <button type="button" class="mh-rb" data-color="orange" data-field="calificacion_turno" data-val="REGULAR"   onclick="pickRb(this)">Regular</button>
+                    <button type="button" class="mh-rb" data-color="green"  data-field="calificacion_turno" data-val="BUENO"     onclick="pickRb(this)">Bueno</button>
+                    <button type="button" class="mh-rb" data-color="purple" data-field="calificacion_turno" data-val="EXCELENTE" onclick="pickRb(this)">Excelente</button>
+                </div></div>
             </div>
 
             <!-- Comentarios + admin fields -->

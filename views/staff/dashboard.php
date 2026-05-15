@@ -53,24 +53,17 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
         <div class="staff-date"><?= $diaLabel ?></div>
     </section>
 
-    <!-- ── Encuestas ────────────────────────────────────── -->
-    <section class="staff-card" style="text-align:center;">
-        <h2 class="staff-section-title">Fichas del equipo</h2>
-        <p style="font-size:0.82rem;color:#64748b;margin-bottom:1rem;">
-            Califica los turnos de tus compañeros y consulta tu propio record mensual.
+    <!-- ── Economía ────────────────────────────────── -->
+    <section class="staff-card" style="text-align:center;background:linear-gradient(135deg,#fff0f6 0%,#fce7f3 100%);border:1.5px solid #fbcfe8;">
+        <h2 class="staff-section-title" style="color:#9d174d;">Mi economía</h2>
+        <p style="font-size:0.82rem;color:#be185d;margin-bottom:1rem;">
+            Consulta los pagos que has recibido por tus turnos trabajados.
         </p>
-        <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;">
-            <a href="<?= $basePath ?>/staff/mi-horario?modo=pendientes"
-               class="staff-btn-marcar staff-btn-marcar--entrada"
-               style="display:inline-block;text-decoration:none;padding:.75rem 1.5rem;">
-                📋 Encuestas pendientes →
-            </a>
-            <a href="<?= $basePath ?>/staff/mi-horario?modo=mis-encuestas"
-               class="staff-btn-marcar"
-               style="display:inline-block;text-decoration:none;padding:.75rem 1.5rem;background:#7c3aed;">
-                👤 Mis encuestas →
-            </a>
-        </div>
+        <a href="<?= $basePath ?>/staff/economia"
+           class="staff-btn-marcar"
+           style="display:inline-block;text-decoration:none;padding:.75rem 2rem;background:#ec4899;border-color:#ec4899;">
+            Ver mis pagos →
+        </a>
     </section>
 
     <!-- ── Horarios semanales ────────────────────────── -->
@@ -99,6 +92,25 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
         </a>
     </section>
 
+    <!-- ── Encuestas ────────────────────────────────────── -->
+    <section class="staff-card" style="text-align:center;">
+        <h2 class="staff-section-title">Fichas del equipo</h2>
+        <p style="font-size:0.82rem;color:#64748b;margin-bottom:1rem;">
+            Califica los turnos de tus compañeros y consulta tu propio record mensual.
+        </p>
+        <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;">
+            <a href="<?= $basePath ?>/staff/mi-horario?modo=pendientes"
+               class="staff-btn-marcar staff-btn-marcar--entrada"
+               style="display:inline-block;text-decoration:none;padding:.75rem 1.5rem;">
+                📋 Encuestas pendientes →
+            </a>
+            <a href="<?= $basePath ?>/staff/mi-horario?modo=mis-encuestas"
+               class="staff-btn-marcar"
+               style="display:inline-block;text-decoration:none;padding:.75rem 1.5rem;background:#7c3aed;">
+                👤 Mis encuestas →
+            </a>
+        </div>
+    </section>
 
 </main>
 

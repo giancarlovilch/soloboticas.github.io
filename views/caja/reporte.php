@@ -297,7 +297,7 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
     <section class="caja-card">
         <div class="caja-card__header-row">
             <div>
-                <h2 class="caja-card__title">Ajustes de cierre</h2>
+                <h2 class="caja-card__title">Ajustes de arqueo</h2>
                 <p class="caja-card__desc">Registra diferencias justificadas. El monto ajusta la base del siguiente turno automáticamente.</p>
             </div>
             <button class="caja-btn caja-btn--outline" onclick="toggleSeccion('seccionRect', this)">
@@ -342,7 +342,7 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
         <?php endif; ?>
 
         <div class="caja-rect-form" style="grid-template-columns:100px 110px 1fr 140px auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
-            <span style="font-size:.82rem;font-weight:600;color:#475569;align-self:center;">Efectivo</span>
+            <span style="font-size:.82rem;font-weight:600;color:#475569;align-self:center;">Efectivo / Saldo</span>
             <select id="rectAccion" class="caja-input" onchange="rectAccionChanged(this)">
                 <option value="AGREGAR">Agregar</option>
                 <option value="QUITAR">Quitar</option>
@@ -386,10 +386,10 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
     <section class="caja-card">
         <div class="caja-card__header-row">
             <div>
-                <h2 class="caja-card__title">Correcciones al saldo esperado</h2>
+                <h2 class="caja-card__title">Correcciones de gastos</h2>
                 <p class="caja-card__desc">
                     Registra cobros o pagos omitidos en el turno.
-                    <strong>Agregar</strong> suma al saldo esperado · <strong>Quitar</strong> resta del saldo esperado.
+                    <strong>Agregar</strong> suma al gasto esperado · <strong>Quitar</strong> resta del gasto esperado.
                 </p>
             </div>
             <button class="caja-btn caja-btn--outline" onclick="toggleSeccion('seccionAjuste', this)">

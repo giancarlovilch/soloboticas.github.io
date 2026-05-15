@@ -9,6 +9,8 @@ $navActive = [
     'postulantes' => ($page === 'postulantes' || $page === 'update'),
     'status'      => ($page === 'status'),
     'asistencias' => ($page === 'asistencias'),
+    'economia'    => ($page === 'economia'),
+    'bonos'       => ($page === 'bonos'),
 ];
 ?>
 
@@ -109,6 +111,20 @@ $navActive = [
                     </a>
                 </li>
 
+                <li class="list__item <?= $navActive['economia'] ? 'list__item--active' : '' ?>">
+                    <a href="?page=economia" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Economía</span>
+                    </a>
+                </li>
+
+                <li class="list__item <?= $navActive['bonos'] ? 'list__item--active' : '' ?>">
+                    <a href="?page=bonos" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Bonos</span>
+                    </a>
+                </li>
+
                 <li class="list__item">
                     <a href="<?= $basePath ?>/admin/reportes" class="list__button">
                         <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
@@ -146,6 +162,12 @@ $navActive = [
                         break;
                     case 'asistencias':
                         require_once __DIR__ . '/asistencias_lista.php';
+                        break;
+                    case 'economia':
+                        require_once __DIR__ . '/economia_lista.php';
+                        break;
+                    case 'bonos':
+                        require_once __DIR__ . '/bonos_lista.php';
                         break;
                     case 'update':
                         if (isset($p) && !empty($p)) {

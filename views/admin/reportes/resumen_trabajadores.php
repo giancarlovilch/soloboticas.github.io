@@ -4,19 +4,40 @@ $meses    = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','
 [$anioF, $nmesF] = explode('-', $filtroMes);
 $mesLabel = $meses[(int)$nmesF - 1] . ' ' . $anioF;
 $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
+
+// Determina calificación dominante del mes
+$califDominante = function(array $enc): ?string {
+    $scores = [
+        'EXCELENTE' => (int)($enc['calif_excelente'] ?? 0),
+        'BUENO'     => (int)($enc['calif_bueno']     ?? 0),
+        'REGULAR'   => (int)($enc['calif_regular']   ?? 0),
+        'MALO'      => (int)($enc['calif_malo']       ?? 0),
+    ];
+    $max = max($scores);
+    if ($max === 0) return null;
+    return array_search($max, $scores);
+};
+
+$califStyle = [
+    'EXCELENTE' => ['bg'=>'#ede9fe','color'=>'#5b21b6'],
+    'BUENO'     => ['bg'=>'#d1fae5','color'=>'#065f46'],
+    'REGULAR'   => ['bg'=>'#ffedd5','color'=>'#9a3412'],
+    'MALO'      => ['bg'=>'#fee2e2','color'=>'#991b1b'],
+];
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resumen por trabajador | Solo Boticas</title>
+    <title>Resumen por Trabajador | Solo Boticas</title>
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/normalize.css">
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/caja.css">
     <style>
-        .rt-section { font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;padding:.4rem .75rem;background:#f8fafc;border-bottom:1px solid #e2e8f0; }
-        .rt-num     { font-variant-numeric:tabular-nums;font-weight:700; }
-        .rt-zero    { color:#cbd5e1; }
+        .rt-num  { font-variant-numeric:tabular-nums;font-weight:700; }
+        .rt-zero { color:#cbd5e1; }
+        .rt-badge { display:inline-block;font-size:.63rem;font-weight:700;padding:1px 6px;border-radius:10px; }
+        .rt-warn  { color:#dc2626;font-weight:700; }
         @media print { .no-print{display:none!important;} body{background:#fff;} }
     </style>
 </head>
@@ -37,7 +58,7 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
     </div>
 </header>
 
-<main class="caja-main" style="max-width:1100px;">
+<main class="caja-main" style="max-width:1200px;">
 
     <!-- Filtro -->
     <section class="caja-card no-print">
@@ -65,6 +86,11 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
                         style="background:#f0fdfe;color:#0e7490;border-bottom:2px solid #0e7490;">
                         Asistencia
                     </th>
+                    <!-- Encuestas -->
+                    <th colspan="4" class="text-center"
+                        style="background:#faf5ff;color:#7c3aed;border-bottom:2px solid #7c3aed;">
+                        Encuestas
+                    </th>
                     <!-- Ventas -->
                     <th colspan="2" class="text-center"
                         style="background:#f0fdf4;color:#059669;border-bottom:2px solid #059669;">
@@ -82,14 +108,23 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
                     </th>
                 </tr>
                 <tr>
-                    <th style="background:#f0fdfe;color:#64748b;font-size:.62rem;">Total días</th>
+                    <!-- Asistencia sub -->
+                    <th style="background:#f0fdfe;color:#64748b;font-size:.62rem;">Total</th>
                     <th style="background:#f0fdfe;color:#065f46;font-size:.62rem;">A tiempo</th>
                     <th style="background:#f0fdfe;color:#d97706;font-size:.62rem;">Tarde</th>
                     <th style="background:#f0fdfe;color:#1e40af;font-size:.62rem;">Extra/Temp.</th>
                     <th style="background:#fee2e2;color:#991b1b;font-size:.62rem;">Faltas</th>
+                    <!-- Encuestas sub -->
+                    <th style="background:#faf5ff;color:#7c3aed;font-size:.62rem;">Fichas</th>
+                    <th style="background:#faf5ff;color:#7c3aed;font-size:.62rem;">Calif. dom.</th>
+                    <th style="background:#faf5ff;color:#dc2626;font-size:.62rem;">Llegadas tard.</th>
+                    <th style="background:#faf5ff;color:#dc2626;font-size:.62rem;">Celular freq.</th>
+                    <!-- Ventas sub -->
                     <th style="background:#f0fdf4;color:#64748b;font-size:.62rem;">Turnos</th>
                     <th style="background:#f0fdf4;color:#059669;font-size:.62rem;">Prom. venta</th>
+                    <!-- Limpieza sub -->
                     <th style="background:#fffbeb;color:#d97706;font-size:.62rem;">Veces</th>
+                    <!-- BCP sub -->
                     <th style="background:#eff6ff;color:#64748b;font-size:.62rem;">Turnos caja</th>
                     <th style="background:#eff6ff;color:#1e40af;font-size:.62rem;">Prom. ops. BCP</th>
                 </tr>
@@ -99,23 +134,29 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
             $hayDatos = false;
             foreach ($trabajadores as $t):
                 $pid  = $t['id'];
-                $ast  = $asistMap[$pid]  ?? null;
-                $ven  = $ventasMap[$pid] ?? null;
-                $bcp  = $bcpMap[$pid]    ?? null;
-                if (!$ast && !$ven && !$bcp) continue;
+                $ast  = $asistMap[$pid]    ?? null;
+                $ven  = $ventasMap[$pid]   ?? null;
+                $bcp  = $bcpMap[$pid]      ?? null;
+                $enc  = $encuestaMap[$pid] ?? null;
+                if (!$ast && !$ven && !$bcp && !$enc) continue;
                 $hayDatos = true;
 
-                $faltas = (int)($ast['faltas'] ?? 0);
+                $faltas         = (int)($ast['faltas'] ?? 0);
+                $llegTarde      = (int)($enc['llegadas_tarde']   ?? 0);
+                $celFrec        = (int)($enc['celular_frecuente'] ?? 0);
+                $totalFichas    = (int)($enc['total_fichas']      ?? 0);
+                $domCalif       = $enc ? $califDominante($enc) : null;
             ?>
             <tr style="<?= $faltas > 0 ? 'background:#fff8f8;' : '' ?>">
-                <td style="font-weight:600;color:#1e293b;">
+                <td style="font-weight:600;color:#1e293b;white-space:nowrap;">
                     <?= htmlspecialchars($t['nombre']) ?>
                     <?php if ($faltas > 0): ?>
-                        <span style="font-size:.65rem;background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:10px;font-weight:700;margin-left:4px;">
+                        <span class="rt-badge" style="background:#fee2e2;color:#dc2626;margin-left:4px;">
                             <?= $faltas ?> falta<?= $faltas > 1 ? 's' : '' ?>
                         </span>
                     <?php endif; ?>
                 </td>
+
                 <!-- Asistencia -->
                 <td class="text-center rt-num"><?= (int)($ast['total']   ?? 0) ?: '<span class="rt-zero">0</span>' ?></td>
                 <td class="text-center" style="color:#065f46;font-weight:700;"><?= (int)($ast['a_tiempo'] ?? 0) ?: '<span class="rt-zero">0</span>' ?></td>
@@ -128,6 +169,31 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
                         <span class="rt-zero">0</span>
                     <?php endif; ?>
                 </td>
+
+                <!-- Encuestas -->
+                <td class="text-center rt-num" style="color:#7c3aed;">
+                    <?= $totalFichas ?: '<span class="rt-zero">—</span>' ?>
+                </td>
+                <td class="text-center">
+                    <?php if ($domCalif && isset($califStyle[$domCalif])): ?>
+                        <span class="rt-badge" style="background:<?= $califStyle[$domCalif]['bg'] ?>;color:<?= $califStyle[$domCalif]['color'] ?>">
+                            <?= ucfirst(strtolower($domCalif)) ?>
+                        </span>
+                    <?php else: ?>
+                        <span class="rt-zero">—</span>
+                    <?php endif; ?>
+                </td>
+                <td class="text-center">
+                    <?= $llegTarde > 0
+                        ? "<span class=\"rt-warn\">{$llegTarde}</span>"
+                        : '<span class="rt-zero">0</span>' ?>
+                </td>
+                <td class="text-center">
+                    <?= $celFrec > 0
+                        ? "<span class=\"rt-warn\">{$celFrec}</span>"
+                        : '<span class="rt-zero">0</span>' ?>
+                </td>
+
                 <!-- Ventas -->
                 <?php
                 $turnosVenta = (int)($ven['turnos_venta'] ?? 0);
@@ -137,15 +203,17 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
                 <td class="text-right rt-num" style="color:#059669;">
                     <?= $promVenta > 0 ? $f2($promVenta) : '<span class="rt-zero">—</span>' ?>
                 </td>
+
                 <!-- Limpieza -->
                 <?php $limpieza = (int)($limpiezaMap[$pid] ?? 0); ?>
                 <td class="text-center rt-num" style="color:#d97706;">
                     <?= $limpieza > 0 ? $limpieza : '<span class="rt-zero">—</span>' ?>
                 </td>
+
                 <!-- BCP -->
                 <?php
-                $turnosCaja = (int)($bcp['turnos_caja']    ?? 0);
-                $totalOps   = (int)($bcp['total_ops_bcp']  ?? 0);
+                $turnosCaja = (int)($bcp['turnos_caja']   ?? 0);
+                $totalOps   = (int)($bcp['total_ops_bcp'] ?? 0);
                 $promOps    = $turnosCaja > 0 ? round($totalOps / $turnosCaja, 1) : 0;
                 ?>
                 <td class="text-center rt-num"><?= $turnosCaja ?: '<span class="rt-zero">—</span>' ?></td>
@@ -155,11 +223,16 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
             </tr>
             <?php endforeach; ?>
             <?php if (!$hayDatos): ?>
-                <tr><td colspan="11" class="caja-table__empty">Sin actividad registrada en <?= htmlspecialchars($mesLabel) ?>.</td></tr>
+                <tr><td colspan="15" class="caja-table__empty">Sin actividad registrada en <?= htmlspecialchars($mesLabel) ?>.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
         </div>
+        <p style="font-size:.68rem;color:#94a3b8;margin-top:.75rem;">
+            <strong>Calif. dom.</strong> = calificación de turno más frecuente del mes ·
+            <strong>Llegadas tard.</strong> = veces con retraso leve o considerable ·
+            <strong>Celular freq.</strong> = veces con uso frecuente del celular
+        </p>
     </section>
 
 </main>

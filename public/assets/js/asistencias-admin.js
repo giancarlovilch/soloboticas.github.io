@@ -190,17 +190,20 @@ function abrirModalEdit(r) {
         ? `Editar ficha — ${r.trabajador_nombre}`
         : `Calificar turno — ${r.trabajador_nombre}`;
 
-    preselectRb('llegada_puntualidad',  r.llegada_puntualidad);
-    preselectRb('abrio_puerta',         r.abrio_puerta);
-    preselectRb('aseo_personal',        r.aseo_personal);
-    preselectRb('vestimenta',           r.vestimenta);
-    preselectRb('unas',                 r.unas);
-    preselectRb('cabello',              r.cabello);
-    preselectRb('salida_puntualidad',   r.salida_puntualidad);
-    preselectRb('limpieza_espacio',     r.limpieza_espacio);
-    preselectRb('limpieza_local',       r.limpieza_local);
-    preselectRb('ayudo_cerrar',         r.ayudo_cerrar);
-    preselectRb('ordeno_medicamentos',  r.ordeno_medicamentos);
+    preselectRb('llegada_puntualidad',        r.llegada_puntualidad);
+    preselectRb('area_ordenada_ingreso',      r.area_ordenada_ingreso);
+    preselectRb('area_limpia_ingreso',        r.area_limpia_ingreso);
+    preselectRb('aseo_personal',              r.aseo_personal);
+    preselectRb('vestimenta',                 r.vestimenta);
+    preselectRb('unas',                       r.unas);
+    preselectRb('cabello',                    r.cabello);
+    preselectRb('salida_puntualidad',         r.salida_puntualidad);
+    preselectRb('estado_area_cierre',         r.estado_area_cierre);
+    preselectRb('limpieza_area_cierre',       r.limpieza_area_cierre);
+    preselectRb('area_ordenada_cierre',       r.area_ordenada_cierre);
+    preselectRb('participo_apertura_cierre',  r.participo_apertura_cierre);
+    preselectRb('uso_celular',                r.uso_celular);
+    preselectRb('calificacion_turno',         r.calificacion_turno);
 
     document.getElementById('editModal').hidden = false;
 }
@@ -226,17 +229,20 @@ async function guardarEdit() {
         justificacion:        document.getElementById('editJustif').value || null,
         observacion:          document.getElementById('editObs').value,
         comentarios_ficha:    document.getElementById('editComentarios').value || null,
-        llegada_puntualidad:  sv('llegada_puntualidad'),
-        abrio_puerta:         yn('abrio_puerta'),
-        aseo_personal:        sv('aseo_personal'),
-        vestimenta:           sv('vestimenta'),
-        unas:                 sv('unas'),
-        cabello:              sv('cabello'),
-        salida_puntualidad:   sv('salida_puntualidad'),
-        limpieza_espacio:     sv('limpieza_espacio'),
-        limpieza_local:       yn('limpieza_local'),
-        ayudo_cerrar:         yn('ayudo_cerrar'),
-        ordeno_medicamentos:  sv('ordeno_medicamentos'),
+        llegada_puntualidad:       sv('llegada_puntualidad'),
+        area_ordenada_ingreso:     yn('area_ordenada_ingreso'),
+        area_limpia_ingreso:       yn('area_limpia_ingreso'),
+        aseo_personal:             sv('aseo_personal'),
+        vestimenta:                sv('vestimenta'),
+        unas:                      sv('unas'),
+        cabello:                   sv('cabello'),
+        salida_puntualidad:        sv('salida_puntualidad'),
+        estado_area_cierre:        sv('estado_area_cierre'),
+        limpieza_area_cierre:      yn('limpieza_area_cierre'),
+        area_ordenada_cierre:      yn('area_ordenada_cierre'),
+        participo_apertura_cierre: yn('participo_apertura_cierre'),
+        uso_celular:               sv('uso_celular'),
+        calificacion_turno:        sv('calificacion_turno'),
     };
 
     try {

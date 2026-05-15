@@ -122,17 +122,18 @@ class ReporteController extends Controller
              WHERE c.activo = 1 ORDER BY l.descripcion, c.descripcion"
         )->fetchAll();
 
-        // Totales rápidos
-        $totalFaltante  = 0;
-        $totalSobrante  = 0;
-        $countFaltante  = 0;
-        $countSobrante  = 0;
-        $countConforme  = 0;
+        // Totales basados en difCorr (valor real tras rectificaciones y correcciones)
+        $totalFaltante = 0;
+        $totalSobrante = 0;
+        $countFaltante = 0;
+        $countSobrante = 0;
         foreach ($registros as $r) {
-            $dif = (float)($r['diferencia'] ?? 0);
-            if (abs($dif) < 0.01)      $countConforme++;
-            elseif ($dif < 0) { $countFaltante++; $totalFaltante += abs($dif); }
-            else               { $countSobrante++; $totalSobrante += $dif; }
+            $difCorr = (float)($r['diferencia']      ?? 0)
+                     + (float)($r['sum_rectifs']      ?? 0)
+                     + (float)($r['sum_ajustes']      ?? 0)
+                     - (float)($r['sum_corr_ventas']  ?? 0);
+            if ($difCorr < -0.01)     { $countFaltante++; $totalFaltante += abs($difCorr); }
+            elseif ($difCorr > 0.01)  { $countSobrante++; $totalSobrante += $difCorr; }
         }
 
         require_once __DIR__ . '/../../views/admin/reportes/arqueos.php';
@@ -253,7 +254,7 @@ class ReporteController extends Controller
              LEFT  JOIN local l       ON a.local_id           = l.id_local
              LEFT  JOIN postulante pr ON a.registrado_por_id  = pr.id_postulante
              WHERE {$where}
-             ORDER BY a.fecha DESC, p.nombres ASC, a.hora_ingreso ASC"
+             ORDER BY a.fecha DESC, p.nombres ASC, a.turno_id ASC"
         );
         $registros->execute($params);
         $registros = $registros->fetchAll();
@@ -362,6 +363,27 @@ class ReporteController extends Controller
         );
         $stmtB->execute(['desde' => $desde, 'hasta' => $hasta]);
         $bcpMap = array_column($stmtB->fetchAll(), null, 'postulante_id');
+
+        // 6. Métricas de encuestas (nuevo sistema de fichas)
+        $stmtE = $db->prepare(
+            "SELECT postulante_id,
+                    COUNT(*)                                          AS total_fichas,
+                    SUM(calificacion_turno = 'EXCELENTE')            AS calif_excelente,
+                    SUM(calificacion_turno = 'BUENO')                AS calif_bueno,
+                    SUM(calificacion_turno = 'REGULAR')              AS calif_regular,
+                    SUM(calificacion_turno = 'MALO')                 AS calif_malo,
+                    SUM(llegada_puntualidad IN ('TARDE','MUY_TARDE')) AS llegadas_tarde,
+                    SUM(salida_puntualidad  IN ('TARDE','MUY_TARDE')) AS salidas_tarde,
+                    SUM(uso_celular = 'FRECUENTE')                   AS celular_frecuente,
+                    SUM(aseo_personal IN ('DEFICIENTE'))             AS present_deficiente
+             FROM asistencia
+             WHERE fecha BETWEEN :desde AND :hasta
+               AND estado != 'FALTA'
+               AND (llegada_puntualidad IS NOT NULL OR salida_puntualidad IS NOT NULL)
+             GROUP BY postulante_id"
+        );
+        $stmtE->execute(['desde' => $desde, 'hasta' => $hasta]);
+        $encuestaMap = array_column($stmtE->fetchAll(), null, 'postulante_id');
 
         require_once __DIR__ . '/../../views/admin/reportes/resumen_trabajadores.php';
     }

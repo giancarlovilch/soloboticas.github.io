@@ -1,9 +1,12 @@
+<?php
+$basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reportes | Solo Boticas</title>
+    <title>Centro de Reportes | Solo Boticas</title>
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/normalize.css">
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/caja.css">
     <link rel="icon" type="image/x-icon" href="<?= $basePath ?>/assets/img/logo.ico">
@@ -27,7 +30,7 @@
         }
         .rep-card__icon  { font-size: 2.4rem; line-height: 1; }
         .rep-card__title { font-size: 1.05rem; font-weight: 700; color: #1e293b; }
-        .rep-card__desc  { font-size: 0.82rem; color: #64748b; line-height: 1.5; }
+        .rep-card__desc  { font-size: 0.82rem; color: #64748b; line-height: 1.5; flex: 1; }
         .rep-card__badge {
             align-self: flex-start;
             font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
@@ -39,7 +42,6 @@
     </style>
 </head>
 <body style="background:#f1f5f9;min-height:100vh;">
-<?php $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : ''; ?>
 
 <header class="caja-header">
     <div class="caja-header__brand">
@@ -69,69 +71,62 @@
 
     <div class="rep-grid">
 
-        <!-- ── Resultado de Arqueos ─── -->
         <a href="<?= $basePath ?>/admin/reportes/arqueos" class="rep-card">
             <div class="rep-card__icon">🧾</div>
             <div class="rep-card__title">Resultado de Arqueos</div>
             <div class="rep-card__desc">
-                Lista todos los cierres de caja con su resultado (conforme, superávit o déficit),
-                cajera, vendedor, caja, turno y fecha.
+                Cierres de caja con diferencia bruta y valor corregido (tras rectificaciones
+                y ajustes). KPIs de superávit y déficit basados en el valor real con corrección.
             </div>
             <span class="rep-card__badge">Caja</span>
         </a>
 
-        <!-- ── Resumen por trabajador ─── -->
         <a href="<?= $basePath ?>/admin/reportes/resumen-trabajadores" class="rep-card">
             <div class="rep-card__icon">👥</div>
             <div class="rep-card__title">Resumen por Trabajador</div>
             <div class="rep-card__desc">
-                Vista consolidada mensual: asistencias (faltas, tardanzas), ventas acumuladas
-                como vendedor/a y operaciones BCP realizadas como cajera.
+                Vista consolidada mensual por persona: asistencias, faltas, tardanzas,
+                calificación dominante de turno, uso del celular, ventas y operaciones BCP.
             </div>
             <span class="rep-card__badge">RRHH · Caja</span>
         </a>
 
-        <!-- ── Asistencias ─── -->
         <a href="<?= $basePath ?>/admin/reportes/asistencias" class="rep-card">
             <div class="rep-card__icon">📋</div>
-            <div class="rep-card__title">Asistencias</div>
+            <div class="rep-card__title">Asistencias y Encuestas</div>
             <div class="rep-card__desc">
-                Registro mensual de entradas, salidas, horas trabajadas, estado y checklist
-                de cada trabajador. Filtrable por mes y persona.
+                Registro mensual de fichas por turno: puntualidad de llegada y salida,
+                presentación personal, calificación general del turno y uso del celular.
+                Filtrable por mes y trabajador.
             </div>
             <span class="rep-card__badge">RRHH</span>
         </a>
 
-        <!-- ── Coberturas de horario ─── -->
         <a href="<?= $basePath ?>/admin/reportes/coberturas" class="rep-card">
             <div class="rep-card__icon">🔄</div>
             <div class="rep-card__title">Coberturas de Horario</div>
             <div class="rep-card__desc">
-                Quién cubrió a quién, cuántas veces cada trabajador cubrió (status 3)
-                o fue reemplazado (status 2) en el mes. Incluye comentarios del motivo.
+                Quién cubrió a quién y cuántas veces. Balance de coberturas dadas versus
+                recibidas por trabajador. Incluye detalle de cada evento con comentarios.
             </div>
             <span class="rep-card__badge" style="background:#e0f7fa;color:#0097A7;">Horario</span>
         </a>
 
-        <!-- ── Próximos reportes (pronto) ─── -->
-        <div class="rep-card rep-card--soon">
-            <div class="rep-card__icon">📅</div>
-            <div class="rep-card__title">Asistencias por período</div>
-            <div class="rep-card__desc">Resumen de asistencias, tardanzas y faltas por trabajador en un rango de fechas.</div>
-            <span class="rep-card__badge" style="background:#f1f5f9;color:#94a3b8;">Próximamente</span>
-        </div>
-
         <div class="rep-card rep-card--soon">
             <div class="rep-card__icon">💸</div>
             <div class="rep-card__title">Faltantes por cajero</div>
-            <div class="rep-card__desc">Acumulado mensual de déficits por cada cajero para descuentos y evaluación.</div>
+            <div class="rep-card__desc">
+                Acumulado mensual de déficits por cada cajero para descuentos y evaluación de desempeño.
+            </div>
             <span class="rep-card__badge" style="background:#f1f5f9;color:#94a3b8;">Próximamente</span>
         </div>
 
         <div class="rep-card rep-card--soon">
             <div class="rep-card__icon">📲</div>
             <div class="rep-card__title">Cobros electrónicos</div>
-            <div class="rep-card__desc">Detalle de Yapes, Visas y transferencias por sesión, cajero y vendedor.</div>
+            <div class="rep-card__desc">
+                Detalle de Yapes, Visas y transferencias por sesión, cajero y vendedor.
+            </div>
             <span class="rep-card__badge" style="background:#f1f5f9;color:#94a3b8;">Próximamente</span>
         </div>
 

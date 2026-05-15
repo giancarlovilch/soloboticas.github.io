@@ -113,14 +113,32 @@ if ($modo === 'pendientes') {
         .mh-modal__footer button { border:none;border-radius:7px;padding:.5rem 1.1rem;font-size:.82rem;font-weight:700;cursor:pointer; }
 
         /* Radio button groups */
-        .mh-field { margin-bottom:.9rem; }
-        .mh-field__label { font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:.35rem; }
-        .mh-rg { display:flex;gap:.35rem;flex-wrap:wrap; }
-        .mh-rb { padding:.38rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;background:#fff;color:#475569;transition:all .15s;line-height:1.3;text-align:center; }
+        .mh-field { margin-bottom:.7rem; }
+        .mh-field__label { font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:.3rem; }
+        .mh-rg { display:flex;gap:.3rem;flex-wrap:wrap; }
+        .mh-rb { padding:.38rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;background:#fff;color:#475569;transition:all .13s;line-height:1.3;text-align:center; }
         .mh-rb small { display:block;font-size:.62rem;font-weight:400;color:#94a3b8;margin-top:1px; }
         .mh-rb.active { border-color:#0097A7;background:#f0fdfe;color:#0e7490; }
-        .mh-rb.active small { color:#0097A7; }
-        .mh-sep { font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:.75rem;margin:.75rem 0 .5rem; }
+
+        /* Bloques de sección */
+        .mh-block { background:#f8fafc;border-radius:10px;padding:.7rem .85rem;margin-bottom:.65rem;border:1px solid #e8edf2; }
+        .mh-block__hd { font-size:.67rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:.55rem;display:flex;align-items:center;gap:.35rem; }
+        .mh-row-2 { display:grid;grid-template-columns:1fr 1fr;gap:.5rem; }
+
+        /* Variantes de color para botones (data-color) */
+        .mh-rb[data-color="blue"]   { border-color:#bfdbfe;color:#3b82f6; }
+        .mh-rb[data-color="green"]  { border-color:#a7f3d0;color:#10b981; }
+        .mh-rb[data-color="amber"]  { border-color:#fde68a;color:#d97706; }
+        .mh-rb[data-color="orange"] { border-color:#fed7aa;color:#f97316; }
+        .mh-rb[data-color="red"]    { border-color:#fecaca;color:#ef4444; }
+        .mh-rb[data-color="purple"] { border-color:#ddd6fe;color:#8b5cf6; }
+        .mh-rb[data-color="blue"].active   { border-color:#3b82f6;background:#dbeafe;color:#1e40af; }
+        .mh-rb[data-color="green"].active  { border-color:#10b981;background:#d1fae5;color:#065f46; }
+        .mh-rb[data-color="amber"].active  { border-color:#f59e0b;background:#fef3c7;color:#92400e; }
+        .mh-rb[data-color="orange"].active { border-color:#f97316;background:#ffedd5;color:#9a3412; }
+        .mh-rb[data-color="red"].active    { border-color:#ef4444;background:#fee2e2;color:#991b1b; }
+        .mh-rb[data-color="purple"].active { border-color:#8b5cf6;background:#ede9fe;color:#5b21b6; }
+
         .mh-pwd { display:flex;flex-direction:column;gap:.2rem;margin-top:.75rem;border-top:1px solid #f1f5f9;padding-top:.75rem; }
         .mh-pwd label { font-size:.75rem;font-weight:600;color:#475569; }
         .mh-pwd input { padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;outline:none;width:100%;box-sizing:border-box; }
@@ -196,74 +214,107 @@ if ($modo === 'pendientes') {
         <div id="mhErr" class="mh-err"></div>
 
         <div id="mhSecEntrada">
-            <div class="mh-field">
-                <span class="mh-field__label">Puntualidad de llegada</span>
+            <div class="mh-block">
+                <div class="mh-block__hd">⏰ Puntualidad al ingreso</div>
                 <div class="mh-rg">
-                    <button type="button" class="mh-rb" data-field="llegada_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRadio(this)">Muy temprano <small>+10 min antes</small></button>
-                    <button type="button" class="mh-rb" data-field="llegada_puntualidad" data-val="TEMPRANO"     onclick="pickRadio(this)">Temprano <small>menos de 10 min</small></button>
-                    <button type="button" class="mh-rb" data-field="llegada_puntualidad" data-val="TARDE"        onclick="pickRadio(this)" style="border-color:#dc2626;color:#991b1b;">Tarde <small>menos de 10 min</small></button>
-                    <button type="button" class="mh-rb" data-field="llegada_puntualidad" data-val="MUY_TARDE"    onclick="pickRadio(this)" style="border-color:#dc2626;color:#991b1b;">Muy tarde <small>+10 min después</small></button>
+                    <button type="button" class="mh-rb" data-color="blue"   data-field="llegada_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRadio(this)">Muy anticipado <small>+10 min antes</small></button>
+                    <button type="button" class="mh-rb" data-color="green"  data-field="llegada_puntualidad" data-val="TEMPRANO"     onclick="pickRadio(this)">Con anticipación <small>menos de 10 min</small></button>
+                    <button type="button" class="mh-rb" data-color="orange" data-field="llegada_puntualidad" data-val="TARDE"        onclick="pickRadio(this)">Retraso leve <small>menos de 10 min</small></button>
+                    <button type="button" class="mh-rb" data-color="red"    data-field="llegada_puntualidad" data-val="MUY_TARDE"    onclick="pickRadio(this)">Retraso considerable <small>+10 min tarde</small></button>
                 </div>
             </div>
-            <div class="mh-field">
-                <span class="mh-field__label">¿Ayudó a abrir la puerta principal?</span>
-                <div class="mh-rg">
-                    <button type="button" class="mh-rb" data-field="abrio_puerta" data-val="1" onclick="pickRadio(this)">Sí</button>
-                    <button type="button" class="mh-rb" data-field="abrio_puerta" data-val="0" onclick="pickRadio(this)">No</button>
+            <div class="mh-block">
+                <div class="mh-block__hd">🏪 Estado del área al ingreso</div>
+                <div class="mh-row-2">
+                    <div class="mh-field">
+                        <span class="mh-field__label">¿El área estaba ordenada?</span>
+                        <div class="mh-rg">
+                            <button type="button" class="mh-rb" data-color="green" data-field="area_ordenada_ingreso" data-val="1" onclick="pickRadio(this)">Sí</button>
+                            <button type="button" class="mh-rb" data-color="red"   data-field="area_ordenada_ingreso" data-val="0" onclick="pickRadio(this)">No</button>
+                        </div>
+                    </div>
+                    <div class="mh-field">
+                        <span class="mh-field__label">¿El área estaba limpia?</span>
+                        <div class="mh-rg">
+                            <button type="button" class="mh-rb" data-color="green" data-field="area_limpia_ingreso" data-val="1" onclick="pickRadio(this)">Sí</button>
+                            <button type="button" class="mh-rb" data-color="red"   data-field="area_limpia_ingreso" data-val="0" onclick="pickRadio(this)">No</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="mh-sep">Presentación personal</div>
-            <div class="mh-field"><span class="mh-field__label">Aseo personal</span><div class="mh-rg">
-                <button type="button" class="mh-rb" data-field="aseo_personal" data-val="SUCIO"   onclick="pickRadio(this)">Sucio</button>
-                <button type="button" class="mh-rb" data-field="aseo_personal" data-val="REGULAR" onclick="pickRadio(this)">Regular</button>
-                <button type="button" class="mh-rb" data-field="aseo_personal" data-val="LIMPIO"  onclick="pickRadio(this)">Limpio</button>
-            </div></div>
-            <div class="mh-field"><span class="mh-field__label">Vestimenta</span><div class="mh-rg">
-                <button type="button" class="mh-rb" data-field="vestimenta" data-val="SUCIO"   onclick="pickRadio(this)">Sucio</button>
-                <button type="button" class="mh-rb" data-field="vestimenta" data-val="REGULAR" onclick="pickRadio(this)">Regular</button>
-                <button type="button" class="mh-rb" data-field="vestimenta" data-val="LIMPIO"  onclick="pickRadio(this)">Limpio</button>
-            </div></div>
-            <div class="mh-field"><span class="mh-field__label">Uñas</span><div class="mh-rg">
-                <button type="button" class="mh-rb" data-field="unas" data-val="SUCIAS"  onclick="pickRadio(this)">Sucias</button>
-                <button type="button" class="mh-rb" data-field="unas" data-val="REGULAR" onclick="pickRadio(this)">Regular</button>
-                <button type="button" class="mh-rb" data-field="unas" data-val="LIMPIO"  onclick="pickRadio(this)">Limpio</button>
-            </div></div>
-            <div class="mh-field"><span class="mh-field__label">Cabello</span><div class="mh-rg">
-                <button type="button" class="mh-rb" data-field="cabello" data-val="SUELTO"   onclick="pickRadio(this)">Suelto</button>
-                <button type="button" class="mh-rb" data-field="cabello" data-val="RECOGIDO" onclick="pickRadio(this)">Recogido</button>
-                <button type="button" class="mh-rb" data-field="cabello" data-val="MONO"     onclick="pickRadio(this)">Con moño</button>
-            </div></div>
+            <div class="mh-block">
+                <div class="mh-block__hd">👕 Presentación personal</div>
+                <div class="mh-field"><span class="mh-field__label">Higiene personal</span><div class="mh-rg">
+                    <button type="button" class="mh-rb" data-color="red"   data-field="aseo_personal" data-val="DEFICIENTE" onclick="pickRadio(this)">Deficiente</button>
+                    <button type="button" class="mh-rb" data-color="amber" data-field="aseo_personal" data-val="ACEPTABLE"  onclick="pickRadio(this)">Aceptable</button>
+                    <button type="button" class="mh-rb" data-color="green" data-field="aseo_personal" data-val="OPTIMO"     onclick="pickRadio(this)">Óptimo</button>
+                </div></div>
+                <div class="mh-field"><span class="mh-field__label">Uniforme e indumentaria</span><div class="mh-rg">
+                    <button type="button" class="mh-rb" data-color="red"   data-field="vestimenta" data-val="DESCUIDADO"  onclick="pickRadio(this)">Descuidado</button>
+                    <button type="button" class="mh-rb" data-color="amber" data-field="vestimenta" data-val="PRESENTABLE" onclick="pickRadio(this)">Presentable</button>
+                    <button type="button" class="mh-rb" data-color="green" data-field="vestimenta" data-val="IMPECABLE"   onclick="pickRadio(this)">Impecable</button>
+                </div></div>
+                <div class="mh-row-2">
+                    <div class="mh-field"><span class="mh-field__label">Estado de uñas</span><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="red"   data-field="unas" data-val="DESCUIDADAS" onclick="pickRadio(this)">Descuidadas</button>
+                        <button type="button" class="mh-rb" data-color="amber" data-field="unas" data-val="ACEPTABLES"  onclick="pickRadio(this)">Aceptables</button>
+                        <button type="button" class="mh-rb" data-color="green" data-field="unas" data-val="CUIDADAS"    onclick="pickRadio(this)">Cuidadas</button>
+                    </div></div>
+                    <div class="mh-field"><span class="mh-field__label">Presentación del cabello</span><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="red"   data-field="cabello" data-val="SUELTO"   onclick="pickRadio(this)">Suelto</button>
+                        <button type="button" class="mh-rb" data-color="green" data-field="cabello" data-val="RECOGIDO" onclick="pickRadio(this)">Recogido</button>
+                        <button type="button" class="mh-rb" data-color="green" data-field="cabello" data-val="MONO"     onclick="pickRadio(this)">Con moño</button>
+                    </div></div>
+                </div>
+            </div>
         </div>
 
         <div id="mhSecSalida" hidden>
-            <div class="mh-field">
-                <span class="mh-field__label">Puntualidad de salida</span>
+            <div class="mh-block">
+                <div class="mh-block__hd">⏰ Puntualidad al retiro</div>
                 <div class="mh-rg">
-                    <button type="button" class="mh-rb" data-field="salida_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRadio(this)">Muy temprano <small>+10 min antes</small></button>
-                    <button type="button" class="mh-rb" data-field="salida_puntualidad" data-val="TEMPRANO"     onclick="pickRadio(this)">Temprano <small>menos de 10 min</small></button>
-                    <button type="button" class="mh-rb" data-field="salida_puntualidad" data-val="TARDE"        onclick="pickRadio(this)">Tarde <small>menos de 10 min</small></button>
-                    <button type="button" class="mh-rb" data-field="salida_puntualidad" data-val="MUY_TARDE"    onclick="pickRadio(this)">Muy tarde <small>+10 min después</small></button>
+                    <button type="button" class="mh-rb" data-color="blue"   data-field="salida_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRadio(this)">Muy anticipado <small>+10 min antes</small></button>
+                    <button type="button" class="mh-rb" data-color="green"  data-field="salida_puntualidad" data-val="TEMPRANO"     onclick="pickRadio(this)">Con anticipación <small>menos de 10 min</small></button>
+                    <button type="button" class="mh-rb" data-color="orange" data-field="salida_puntualidad" data-val="TARDE"        onclick="pickRadio(this)">Retraso leve <small>menos de 10 min</small></button>
+                    <button type="button" class="mh-rb" data-color="red"    data-field="salida_puntualidad" data-val="MUY_TARDE"    onclick="pickRadio(this)">Retraso considerable <small>+10 min tarde</small></button>
                 </div>
             </div>
-            <div class="mh-sep">Cierre del turno</div>
-            <div class="mh-field"><span class="mh-field__label">Limpieza de su espacio personal</span><div class="mh-rg">
-                <button type="button" class="mh-rb" data-field="limpieza_espacio" data-val="SUCIO"   onclick="pickRadio(this)">Sucio</button>
-                <button type="button" class="mh-rb" data-field="limpieza_espacio" data-val="REGULAR" onclick="pickRadio(this)">Regular</button>
-                <button type="button" class="mh-rb" data-field="limpieza_espacio" data-val="LIMPIO"  onclick="pickRadio(this)">Limpio</button>
-            </div></div>
-            <div class="mh-field"><span class="mh-field__label">¿Hizo limpieza general del local?</span><div class="mh-rg">
-                <button type="button" class="mh-rb" data-field="limpieza_local" data-val="1" onclick="pickRadio(this)">Sí</button>
-                <button type="button" class="mh-rb" data-field="limpieza_local" data-val="0" onclick="pickRadio(this)">No</button>
-            </div></div>
-            <div class="mh-field"><span class="mh-field__label">¿Ayudó a cerrar el local?</span><div class="mh-rg">
-                <button type="button" class="mh-rb" data-field="ayudo_cerrar" data-val="1" onclick="pickRadio(this)">Sí</button>
-                <button type="button" class="mh-rb" data-field="ayudo_cerrar" data-val="0" onclick="pickRadio(this)">No</button>
-            </div></div>
-            <div class="mh-field"><span class="mh-field__label">Medicamentos</span><div class="mh-rg">
-                <button type="button" class="mh-rb" data-field="ordeno_medicamentos" data-val="DESORDENADO" onclick="pickRadio(this)">Desordenado</button>
-                <button type="button" class="mh-rb" data-field="ordeno_medicamentos" data-val="REGULAR"     onclick="pickRadio(this)">Regular</button>
-                <button type="button" class="mh-rb" data-field="ordeno_medicamentos" data-val="ORDENADO"    onclick="pickRadio(this)">Ordenado</button>
-            </div></div>
+            <div class="mh-block">
+                <div class="mh-block__hd">🧹 Cierre del turno</div>
+                <div class="mh-field"><span class="mh-field__label">Estado del área de trabajo al cierre</span><div class="mh-rg">
+                    <button type="button" class="mh-rb" data-color="red"   data-field="estado_area_cierre" data-val="DESCUIDADO"  onclick="pickRadio(this)">Descuidado</button>
+                    <button type="button" class="mh-rb" data-color="amber" data-field="estado_area_cierre" data-val="PRESENTABLE" onclick="pickRadio(this)">Presentable</button>
+                    <button type="button" class="mh-rb" data-color="green" data-field="estado_area_cierre" data-val="IMPECABLE"   onclick="pickRadio(this)">Impecable</button>
+                </div></div>
+                <div class="mh-row-2">
+                    <div class="mh-field"><span class="mh-field__label">¿Realizó la limpieza de su área?</span><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="green" data-field="limpieza_area_cierre" data-val="1" onclick="pickRadio(this)">Sí</button>
+                        <button type="button" class="mh-rb" data-color="red"   data-field="limpieza_area_cierre" data-val="0" onclick="pickRadio(this)">No</button>
+                    </div></div>
+                    <div class="mh-field"><span class="mh-field__label">¿Dejó su área ordenada?</span><div class="mh-rg">
+                        <button type="button" class="mh-rb" data-color="green" data-field="area_ordenada_cierre" data-val="1" onclick="pickRadio(this)">Sí</button>
+                        <button type="button" class="mh-rb" data-color="red"   data-field="area_ordenada_cierre" data-val="0" onclick="pickRadio(this)">No</button>
+                    </div></div>
+                </div>
+                <div class="mh-field"><span class="mh-field__label">¿Participó en la apertura y/o cierre del local?</span><div class="mh-rg">
+                    <button type="button" class="mh-rb" data-color="green" data-field="participo_apertura_cierre" data-val="1" onclick="pickRadio(this)">Sí</button>
+                    <button type="button" class="mh-rb" data-color="red"   data-field="participo_apertura_cierre" data-val="0" onclick="pickRadio(this)">No</button>
+                </div></div>
+            </div>
+            <div class="mh-block">
+                <div class="mh-block__hd">📊 Evaluación del turno</div>
+                <div class="mh-field"><span class="mh-field__label">Uso del celular personal durante el turno</span><div class="mh-rg">
+                    <button type="button" class="mh-rb" data-color="green"  data-field="uso_celular" data-val="NO_USO"    onclick="pickRadio(this)">No usó el celular</button>
+                    <button type="button" class="mh-rb" data-color="amber"  data-field="uso_celular" data-val="OCASIONAL" onclick="pickRadio(this)">Uso ocasional</button>
+                    <button type="button" class="mh-rb" data-color="red"    data-field="uso_celular" data-val="FRECUENTE" onclick="pickRadio(this)">Uso frecuente</button>
+                </div></div>
+                <div class="mh-field"><span class="mh-field__label">Calificación general del turno</span><div class="mh-rg">
+                    <button type="button" class="mh-rb" data-color="red"    data-field="calificacion_turno" data-val="MALO"      onclick="pickRadio(this)">Malo</button>
+                    <button type="button" class="mh-rb" data-color="orange" data-field="calificacion_turno" data-val="REGULAR"   onclick="pickRadio(this)">Regular</button>
+                    <button type="button" class="mh-rb" data-color="green"  data-field="calificacion_turno" data-val="BUENO"     onclick="pickRadio(this)">Bueno</button>
+                    <button type="button" class="mh-rb" data-color="purple" data-field="calificacion_turno" data-val="EXCELENTE" onclick="pickRadio(this)">Excelente</button>
+                </div></div>
+            </div>
         </div>
 
         <div class="mh-sep">Comentarios</div>
@@ -300,6 +351,7 @@ if ($modo === 'pendientes') {
     <!-- Filtros -->
     <form method="GET" class="mh-filtros">
         <input type="hidden" name="modo" value="pendientes">
+        <input type="hidden" name="filtro" value="1">
         <input type="date" name="desde" value="<?= htmlspecialchars($desde) ?>" onchange="this.form.submit()">
         <span style="color:#94a3b8;font-size:.8rem;">hasta</span>
         <input type="date" name="hasta" value="<?= htmlspecialchars($hasta) ?>" onchange="this.form.submit()">
@@ -355,19 +407,22 @@ if ($modo === 'pendientes') {
             $rowBg    = !$asist ? '#fafafa' : ($esFalta ? '#fff5f5' : '');
 
             $asistData = $asist ? [
-                'llegada_puntualidad' => $asist['llegada_puntualidad'],
-                'abrio_puerta'        => $asist['abrio_puerta'],
-                'aseo_personal'       => $asist['aseo_personal'],
-                'vestimenta'          => $asist['vestimenta'],
-                'unas'                => $asist['unas'],
-                'cabello'             => $asist['cabello'],
-                'salida_puntualidad'  => $asist['salida_puntualidad'],
-                'limpieza_espacio'    => $asist['limpieza_espacio'],
-                'limpieza_local'      => $asist['limpieza_local'],
-                'ayudo_cerrar'        => $asist['ayudo_cerrar'],
-                'ordeno_medicamentos' => $asist['ordeno_medicamentos'],
-                'comentarios_ficha'   => $asist['comentarios_ficha'],
-                'id_asistencia'       => $asist['id_asistencia'],
+                'llegada_puntualidad'       => $asist['llegada_puntualidad'],
+                'area_ordenada_ingreso'     => $asist['area_ordenada_ingreso'],
+                'area_limpia_ingreso'       => $asist['area_limpia_ingreso'],
+                'aseo_personal'             => $asist['aseo_personal'],
+                'vestimenta'                => $asist['vestimenta'],
+                'unas'                      => $asist['unas'],
+                'cabello'                   => $asist['cabello'],
+                'salida_puntualidad'        => $asist['salida_puntualidad'],
+                'estado_area_cierre'        => $asist['estado_area_cierre'],
+                'limpieza_area_cierre'      => $asist['limpieza_area_cierre'],
+                'area_ordenada_cierre'      => $asist['area_ordenada_cierre'],
+                'participo_apertura_cierre' => $asist['participo_apertura_cierre'],
+                'uso_celular'               => $asist['uso_celular'],
+                'calificacion_turno'        => $asist['calificacion_turno'],
+                'comentarios_ficha'         => $asist['comentarios_ficha'],
+                'id_asistencia'             => $asist['id_asistencia'],
             ] : null;
             $asistJson = htmlspecialchars(json_encode($asistData), ENT_QUOTES);
             $diasLabel = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
@@ -634,18 +689,21 @@ function abrirModal(seccion, btn) {
     if (exist) {
         document.getElementById('mhComentarios').value = exist.comentarios_ficha || '';
         if (seccion === 'ENTRADA') {
-            preselect('llegada_puntualidad', exist.llegada_puntualidad);
-            preselect('abrio_puerta', exist.abrio_puerta);
-            preselect('aseo_personal', exist.aseo_personal);
-            preselect('vestimenta', exist.vestimenta);
-            preselect('unas', exist.unas);
-            preselect('cabello', exist.cabello);
+            preselect('llegada_puntualidad',    exist.llegada_puntualidad);
+            preselect('area_ordenada_ingreso',  exist.area_ordenada_ingreso);
+            preselect('area_limpia_ingreso',    exist.area_limpia_ingreso);
+            preselect('aseo_personal',          exist.aseo_personal);
+            preselect('vestimenta',             exist.vestimenta);
+            preselect('unas',                   exist.unas);
+            preselect('cabello',                exist.cabello);
         } else {
-            preselect('salida_puntualidad', exist.salida_puntualidad);
-            preselect('limpieza_espacio', exist.limpieza_espacio);
-            preselect('limpieza_local', exist.limpieza_local);
-            preselect('ayudo_cerrar', exist.ayudo_cerrar);
-            preselect('ordeno_medicamentos', exist.ordeno_medicamentos);
+            preselect('salida_puntualidad',        exist.salida_puntualidad);
+            preselect('estado_area_cierre',        exist.estado_area_cierre);
+            preselect('limpieza_area_cierre',      exist.limpieza_area_cierre);
+            preselect('area_ordenada_cierre',      exist.area_ordenada_cierre);
+            preselect('participo_apertura_cierre', exist.participo_apertura_cierre);
+            preselect('uso_celular',               exist.uso_celular);
+            preselect('calificacion_turno',        exist.calificacion_turno);
         }
     }
     document.getElementById('mhModal').removeAttribute('hidden');
@@ -663,19 +721,23 @@ async function confirmarRegistro() {
         seccion: _seccion, password,
         comentarios_ficha: document.getElementById('mhComentarios').value.trim() || null,
     };
+    const yn = (k) => _radioVals[k] !== undefined ? parseInt(_radioVals[k]) : null;
     if (_seccion === 'ENTRADA') {
-        payload.llegada_puntualidad = _radioVals['llegada_puntualidad'] || null;
-        payload.abrio_puerta        = _radioVals['abrio_puerta'] !== undefined ? parseInt(_radioVals['abrio_puerta']) : null;
-        payload.aseo_personal       = _radioVals['aseo_personal'] || null;
-        payload.vestimenta          = _radioVals['vestimenta'] || null;
-        payload.unas                = _radioVals['unas'] || null;
-        payload.cabello             = _radioVals['cabello'] || null;
+        payload.llegada_puntualidad    = _radioVals['llegada_puntualidad'] || null;
+        payload.area_ordenada_ingreso  = yn('area_ordenada_ingreso');
+        payload.area_limpia_ingreso    = yn('area_limpia_ingreso');
+        payload.aseo_personal          = _radioVals['aseo_personal'] || null;
+        payload.vestimenta             = _radioVals['vestimenta'] || null;
+        payload.unas                   = _radioVals['unas'] || null;
+        payload.cabello                = _radioVals['cabello'] || null;
     } else {
-        payload.salida_puntualidad  = _radioVals['salida_puntualidad'] || null;
-        payload.limpieza_espacio    = _radioVals['limpieza_espacio'] || null;
-        payload.limpieza_local      = _radioVals['limpieza_local'] !== undefined ? parseInt(_radioVals['limpieza_local']) : null;
-        payload.ayudo_cerrar        = _radioVals['ayudo_cerrar'] !== undefined ? parseInt(_radioVals['ayudo_cerrar']) : null;
-        payload.ordeno_medicamentos = _radioVals['ordeno_medicamentos'] || null;
+        payload.salida_puntualidad        = _radioVals['salida_puntualidad'] || null;
+        payload.estado_area_cierre        = _radioVals['estado_area_cierre'] || null;
+        payload.limpieza_area_cierre      = yn('limpieza_area_cierre');
+        payload.area_ordenada_cierre      = yn('area_ordenada_cierre');
+        payload.participo_apertura_cierre = yn('participo_apertura_cierre');
+        payload.uso_celular               = _radioVals['uso_celular'] || null;
+        payload.calificacion_turno        = _radioVals['calificacion_turno'] || null;
     }
     try {
         const r = await fetch(`${BASE}/staff/api/asistencia/registrar`, {

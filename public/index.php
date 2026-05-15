@@ -137,6 +137,7 @@ $router->get('/staff/mi-horario',              [StaffController::class, 'miHorar
 $router->post('/staff/api/asistencia/{id}/editar',   [StaffController::class, 'editarAsistencia']);
 $router->post('/staff/api/asistencia/registrar',         [StaffController::class, 'registrarAsistencia']);
 $router->post('/staff/api/asistencia/{id}/revertir',     [StaffController::class, 'revertirFalta']);
+$router->get('/staff/economia',           [StaffController::class,       'economia']);
 $router->get('/staff/info',               [StaffController::class,       'info']);
 $router->get('/staff/api/historial',      [StaffController::class,       'historial']);
 $router->get('/staff/api/checklist',      [StaffController::class,       'getChecklist']);
@@ -181,6 +182,10 @@ $router->post('/admin/postulante/eliminar',[AdminController::class, 'eliminarPos
 // APIS
 $router->get('/admin/api/postulante-detalle', [AdminController::class, 'apiDetallePostulante']);
 $router->post('/admin/postulante/actualizar', [AdminController::class, 'actualizarPostulante']);
+$router->post('/admin/api/tarifa-base/agregar',      [AdminController::class, 'addTarifaBase']);
+$router->post('/admin/api/tarifa-base/{id}/eliminar',[AdminController::class, 'eliminarTarifaBase']);
+$router->post('/admin/api/bono/agregar',             [AdminController::class, 'addBono']);
+$router->post('/admin/api/bono/{id}/eliminar',       [AdminController::class, 'eliminarBono']);
 /**
  * EJECUCIÓN: El dispatch DEBE ir siempre AL FINAL[cite: 3, 8]
  */
