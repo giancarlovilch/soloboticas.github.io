@@ -73,7 +73,35 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
 
         .eco-empty { text-align:center;padding:2rem;color:#94a3b8; }
 
-        @media(max-width:600px){ .eco-kpis{grid-template-columns:repeat(2,1fr);} }
+        /* Sección bonos info */
+        .eco-bonos-box  { background:#fff;border:1.5px solid #fbcfe8;border-radius:12px;
+                          padding:1.1rem 1.25rem;margin-bottom:1.5rem; }
+        .eco-bonos-hd   { display:flex;align-items:center;justify-content:space-between;
+                          cursor:pointer;user-select:none; }
+        .eco-bonos-hd h3 { font-size:.82rem;font-weight:800;text-transform:uppercase;
+                           letter-spacing:.07em;color:#9d174d;margin:0; }
+        .eco-bonos-hd span { font-size:.75rem;color:#be185d;transition:transform .2s; }
+        .eco-bonos-body { margin-top:1rem; }
+        .eco-bonos-body.hidden { display:none; }
+        .eco-rol-grid   { display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem;margin-bottom:1rem; }
+        .eco-rol-card   { background:#fff0f6;border:1px solid #fbcfe8;border-radius:9px;
+                          padding:.75rem .9rem;text-align:center; }
+        .eco-rol-card__num   { font-size:1.2rem;font-weight:800;color:#9d174d; }
+        .eco-rol-card__label { font-size:.62rem;font-weight:700;text-transform:uppercase;
+                               letter-spacing:.06em;color:#be185d;margin-top:2px; }
+        .eco-bono-group { margin-bottom:.9rem; }
+        .eco-bono-group__title { font-size:.68rem;font-weight:700;text-transform:uppercase;
+                                 letter-spacing:.06em;color:#64748b;margin-bottom:.4rem; }
+        .eco-bono-table { width:100%;border-collapse:collapse;font-size:.78rem; }
+        .eco-bono-table th { background:#f8fafc;padding:.3rem .65rem;font-size:.62rem;font-weight:700;
+                             text-transform:uppercase;letter-spacing:.05em;color:#64748b;
+                             border-bottom:1.5px solid #f1f5f9;text-align:left; }
+        .eco-bono-table td { padding:.35rem .65rem;border-bottom:1px solid #f8fafc;vertical-align:middle; }
+        .eco-bono-table tr:last-child td { border-bottom:none; }
+        .eco-bono-monto { font-weight:700;color:#059669; }
+
+        @media(max-width:600px){ .eco-kpis{grid-template-columns:repeat(2,1fr);}
+                                  .eco-rol-grid{grid-template-columns:repeat(3,1fr);} }
     </style>
 </head>
 <body style="background:#fdf2f8;min-height:100vh;">
@@ -93,6 +121,83 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
 </header>
 
 <main class="eco-wrap">
+
+    <!-- Sección informativa: Bonos y Tarifas -->
+    <div class="eco-bonos-box">
+        <div class="eco-bonos-hd" onclick="toggleBonos(this)">
+            <h3>Cómo se calculan tus ingresos</h3>
+            <span id="bonosChevron">▼</span>
+        </div>
+        <div class="eco-bonos-body hidden" id="bonosBody">
+
+            <!-- Tarifa base por rol -->
+            <div class="eco-rol-grid" style="margin-top:.5rem;">
+                <?php foreach (['CAJERA' => 'Cajera', 'VENDEDORA' => 'Vendedora', 'ALMACENERA' => 'Almacenera'] as $cod => $label):
+                    $t = $tarifasInfo[$cod] ?? null; ?>
+                <div class="eco-rol-card">
+                    <div class="eco-rol-card__num">S/ <?= $t ? number_format((float)$t['monto'], 2, '.', '') : '—' ?></div>
+                    <div class="eco-rol-card__label"><?= $label ?></div>
+                    <div style="font-size:.62rem;color:#94a3b8;margin-top:2px;">por turno</div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+
+            <p style="font-size:.72rem;color:#94a3b8;margin-bottom:.85rem;">
+                Tarifa base por turno trabajado. Las cajeras y vendedoras pueden ganar un bono adicional según su desempeño.
+            </p>
+
+            <!-- Bono Ventas -->
+            <?php if (!empty($bonosVInfo)): ?>
+            <div class="eco-bono-group">
+                <div class="eco-bono-group__title">Bono por ventas — Vendedora</div>
+                <table class="eco-bono-table">
+                    <thead>
+                        <tr>
+                            <th>Desde</th>
+                            <th>Hasta</th>
+                            <th>Bono</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($bonosVInfo as $b): ?>
+                        <tr>
+                            <td>S/ <?= number_format((float)$b['desde'], 2, '.', ',') ?></td>
+                            <td><?= $b['hasta'] !== null ? 'S/ ' . number_format((float)$b['hasta'], 2, '.', ',') : 'Sin límite' ?></td>
+                            <td class="eco-bono-monto">S/ <?= number_format((float)$b['monto_bono'], 2, '.', ',') ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+
+            <!-- Bono Operaciones BCP -->
+            <?php if (!empty($bonosOInfo)): ?>
+            <div class="eco-bono-group">
+                <div class="eco-bono-group__title">Bono por operaciones BCP — Cajera</div>
+                <table class="eco-bono-table">
+                    <thead>
+                        <tr>
+                            <th>Desde</th>
+                            <th>Hasta</th>
+                            <th>Bono</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($bonosOInfo as $b): ?>
+                        <tr>
+                            <td><?= (int)$b['desde'] ?> ops</td>
+                            <td><?= $b['hasta'] !== null ? (int)$b['hasta'] . ' ops' : 'Sin límite' ?></td>
+                            <td class="eco-bono-monto">S/ <?= number_format((float)$b['monto_bono'], 2, '.', ',') ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+
+        </div>
+    </div>
 
     <!-- Navegación mensual -->
     <div class="eco-nav">
@@ -277,5 +382,14 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
 </main>
 
 <script src="<?= $basePath ?>/assets/js/session-guard.js"></script>
+<script>
+function toggleBonos(hd) {
+    const body    = document.getElementById('bonosBody');
+    const chevron = document.getElementById('bonosChevron');
+    const open    = !body.classList.contains('hidden');
+    body.classList.toggle('hidden', open);
+    chevron.textContent = open ? '▼' : '▲';
+}
+</script>
 </body>
 </html>

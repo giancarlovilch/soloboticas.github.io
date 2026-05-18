@@ -182,8 +182,8 @@ $act = [
             <div style="display:flex;align-items:center;gap:.75rem;">
                 <label style="font-size:0.82rem;color:#334155;font-weight:500;white-space:nowrap;">N° de operaciones realizadas</label>
                 <input type="number" id="act_num_ops_bcp" class="caja-input caja-input--money"
-                       min="0" step="1" placeholder="0"
-                       value="<?= (int)($detalle['num_operaciones_bcp'] ?? 0) ?>"
+                       min="0" step="1" placeholder="Ej: 5" required
+                       value="<?= isset($detalle['num_operaciones_bcp']) ? (int)$detalle['num_operaciones_bcp'] : '' ?>"
                        style="max-width:100px;">
             </div>
         </div>

@@ -167,6 +167,7 @@ $router->get('/admin/reportes/arqueos',    [ReporteController::class, 'arqueos']
 $router->get('/admin/reportes/coberturas',   [ReporteController::class, 'coberturas']);
 $router->get('/admin/reportes/asistencias',       [ReporteController::class, 'asistencias']);
 $router->get('/admin/reportes/resumen-trabajadores', [ReporteController::class, 'resumenTrabajadores']);
+$router->get('/admin/reportes/graficas',             [ReporteController::class, 'graficas']);
 
 // --- RUTAS DE ADMINISTRACIÓN (INTRANET) ---
 // Registramos las rutas de API antes del dispatch

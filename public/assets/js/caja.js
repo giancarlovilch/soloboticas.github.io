@@ -4,6 +4,25 @@
 
 // ── Utilidades ────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
+
+// ── Toast central ─────────────────────────────────────
+let _cjToastTimer = null;
+function mostrarToastCaja(txt, tipo = 'error') {
+    let toast = document.getElementById('cjToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'cjToast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = txt;
+    toast.className   = `cj-toast cj-toast--${tipo}`;
+    void toast.offsetWidth;
+    toast.classList.add('cj-toast--visible');
+    clearTimeout(_cjToastTimer);
+    _cjToastTimer = setTimeout(() => {
+        toast.classList.remove('cj-toast--visible');
+    }, 2500);
+}
 const fmtS = (n) => 'S/ ' + (isNaN(n) ? '0.00' : Math.abs(n).toFixed(2));
 const parseS = (id) => parseFloat($( id)?.value) || 0;
 
@@ -236,6 +255,12 @@ async function guardarSesion(cerrar = false) {
 
     if (!sesionId) { showAlert(msg, 'No hay sesión activa.'); return; }
 
+    const opsEl = $('act_num_ops_bcp');
+    if (opsEl && opsEl.value === '') {
+        mostrarToastCaja('Ingresa el N° de operaciones BCP\n(escribe 0 si no hubo ninguna)');
+        return;
+    }
+
     btn.disabled    = true;
     btn.textContent = 'Guardando...';
     hideAlert(msg);
@@ -249,7 +274,7 @@ async function guardarSesion(cerrar = false) {
             billetes:            parseS('act_billetes'),
             caja_fuerte:         parseS('act_caja_fuerte'),
             agente_bcp:          parseS('act_agente_bcp'),
-            num_operaciones_bcp: parseInt($('act_num_ops_bcp')?.value || '0') || 0,
+            num_operaciones_bcp: parseInt(opsEl?.value ?? '0'),
         },
         gastos: collectGastos(),
     };

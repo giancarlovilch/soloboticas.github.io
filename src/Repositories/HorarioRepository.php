@@ -282,6 +282,74 @@ class HorarioRepository
         )->execute(['origen' => $origenId, 'destino' => $destinoId]);
     }
 
+    // ── ESPEJO ────────────────────────────────────────────
+
+    /** 2.ª semana futura ABIERTA = espejo (no editable directamente) */
+    public function getSemanaEspejo(): ?array
+    {
+        $stmt = $this->db->query(
+            "SELECT * FROM semana
+             WHERE fecha_inicio > CURDATE() AND estado = 'ABIERTA'
+             ORDER BY fecha_inicio ASC
+             LIMIT 1 OFFSET 1"
+        );
+        return $stmt->fetch() ?: null;
+    }
+
+    private function esEspejo(int $semanaId): bool
+    {
+        $espejo = $this->getSemanaEspejo();
+        return $espejo !== null && (int)$espejo['id_semana'] === $semanaId;
+    }
+
+    /**
+     * Propaga un cambio de slot (asignar/liberar) al slot equivalente del espejo.
+     * Solo actúa si el slot pertenece a la 1.ª semana futura (editable).
+     */
+    private function propagarEspejo(int $slotId, ?int $postulanteId): void
+    {
+        $espejo = $this->getSemanaEspejo();
+        if (!$espejo) return;
+
+        $slot = $this->getSlotById($slotId);
+        if (!$slot) return;
+
+        // Solo propagar desde la semana editable
+        $proxima = $this->getSemanaProxima();
+        if (!$proxima || (int)$slot['semana_id'] !== (int)$proxima['id_semana']) return;
+
+        $stmt = $this->db->prepare(
+            "SELECT id_slot FROM horario_slot
+             WHERE semana_id      = :eid
+               AND local_id       = :lid
+               AND turno_id       = :tid
+               AND DAYOFWEEK(fecha_dia) = DAYOFWEEK(:fdia)
+               AND rol_horario_id = :rid
+               AND slot_num       = :snum
+             LIMIT 1"
+        );
+        $stmt->execute([
+            'eid'  => $espejo['id_semana'],
+            'lid'  => $slot['local_id'],
+            'tid'  => $slot['turno_id'],
+            'fdia' => $slot['fecha_dia'],
+            'rid'  => $slot['rol_horario_id'],
+            'snum' => $slot['slot_num'],
+        ]);
+        $espejoSlotId = $stmt->fetchColumn();
+        if (!$espejoSlotId) return;
+
+        if ($postulanteId !== null) {
+            $this->db->prepare(
+                "UPDATE horario_slot SET postulante_id = :pid, fecha_asignacion = NOW() WHERE id_slot = :id"
+            )->execute(['pid' => $postulanteId, 'id' => $espejoSlotId]);
+        } else {
+            $this->db->prepare(
+                "UPDATE horario_slot SET postulante_id = NULL, fecha_asignacion = NULL WHERE id_slot = :id"
+            )->execute(['id' => $espejoSlotId]);
+        }
+    }
+
     /** Semanas pasadas (cerradas) para el historial, últimas 20 */
     public function getSemanasHistorial(int $limit = 20): array
     {
@@ -323,6 +391,12 @@ class HorarioRepository
         // Verificar que el slot existe y está libre
         $slot = $this->getSlotById($slotId);
         if (!$slot) return 'Slot no encontrado';
+
+        // Bloquear edición directa del espejo
+        if ($this->esEspejo($semanaId) || $this->esEspejo((int)$slot['semana_id'])) {
+            return 'La semana espejo se actualiza automáticamente; no puede editarse directamente';
+        }
+
         if ($slot['postulante_id'] && $slot['postulante_id'] != $postulanteId) {
             return 'Este turno ya está tomado por otra persona';
         }
@@ -381,6 +455,9 @@ class HorarioRepository
              WHERE id_slot = :id"
         )->execute(['pid' => $postulanteId, 'id' => $slotId]);
 
+        // Propagar al espejo
+        $this->propagarEspejo($slotId, $postulanteId);
+
         return 'ok';
     }
 
@@ -388,6 +465,11 @@ class HorarioRepository
     {
         $slot = $this->getSlotById($slotId);
         if (!$slot) return 'Slot no encontrado';
+
+        // Bloquear edición directa del espejo
+        if ($this->esEspejo((int)$slot['semana_id'])) {
+            return 'La semana espejo se actualiza automáticamente; no puede editarse directamente';
+        }
 
         $stmt = $this->db->prepare(
             "UPDATE horario_slot
@@ -398,8 +480,12 @@ class HorarioRepository
 
         if ($stmt->rowCount() === 0) return 'Solo puedes liberar tus propios turnos';
 
+        // Propagar al espejo antes del cascade (para que el estado sea consistente)
         if ($slot['rol_puesto'] !== 'LIMPIEZA') {
+            $this->propagarEspejo($slotId, null);
             $this->limpiezaCascade($postulanteId, (int)$slot['semana_id'], (int)$slot['local_id'], (int)$slot['turno_id'], $slot['fecha_dia']);
+        } else {
+            $this->propagarEspejo($slotId, null);
         }
 
         return 'ok';
@@ -433,6 +519,37 @@ class HorarioRepository
                    AND hs.fecha_dia     = :fdia
                    AND rh.codigo        = 'LIMPIEZA'"
             )->execute(['sid' => $semanaId, 'pid' => $postulanteId, 'lid' => $localId, 'tid' => $turnoId, 'fdia' => $fechaDia]);
+        }
+
+        // Si la semana modificada es la editable, propagar cascade también al espejo
+        $espejo  = $this->getSemanaEspejo();
+        $proxima = $this->getSemanaProxima();
+        if (!$espejo || !$proxima || $semanaId !== (int)$proxima['id_semana']) return;
+
+        $checkE = $this->db->prepare(
+            "SELECT COUNT(*) FROM horario_slot hs
+             INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+             WHERE hs.semana_id     = :sid
+               AND hs.postulante_id = :pid
+               AND hs.local_id      = :lid
+               AND hs.turno_id      = :tid
+               AND DAYOFWEEK(hs.fecha_dia) = DAYOFWEEK(:fdia)
+               AND rh.codigo       != 'LIMPIEZA'"
+        );
+        $checkE->execute(['sid' => $espejo['id_semana'], 'pid' => $postulanteId, 'lid' => $localId, 'tid' => $turnoId, 'fdia' => $fechaDia]);
+
+        if ((int)$checkE->fetchColumn() === 0) {
+            $this->db->prepare(
+                "UPDATE horario_slot hs
+                 INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+                 SET hs.postulante_id = NULL, hs.fecha_asignacion = NULL
+                 WHERE hs.semana_id     = :sid
+                   AND hs.postulante_id = :pid
+                   AND hs.local_id      = :lid
+                   AND hs.turno_id      = :tid
+                   AND DAYOFWEEK(hs.fecha_dia) = DAYOFWEEK(:fdia)
+                   AND rh.codigo        = 'LIMPIEZA'"
+            )->execute(['sid' => $espejo['id_semana'], 'pid' => $postulanteId, 'lid' => $localId, 'tid' => $turnoId, 'fdia' => $fechaDia]);
         }
     }
 
@@ -518,6 +635,12 @@ class HorarioRepository
 
         $slot = $this->getSlotById($slotId);
         if (!$slot) return 'Slot no encontrado';
+
+        // Bloquear edición directa del espejo
+        if ($this->esEspejo((int)$slot['semana_id'])) {
+            return 'La semana espejo se actualiza automáticamente; no puede editarse directamente';
+        }
+
         if (!$slot['postulante_id']) return 'El slot ya está libre';
 
         $removidoId = $slot['postulante_id'];
@@ -536,6 +659,9 @@ class HorarioRepository
             'admin'   => $adminId,
             'removido'=> $removidoId,
         ]);
+
+        // Propagar al espejo
+        $this->propagarEspejo($slotId, null);
 
         if ($slot['rol_puesto'] !== 'LIMPIEZA') {
             $this->limpiezaCascade($removidoId, (int)$slot['semana_id'], (int)$slot['local_id'], (int)$slot['turno_id'], $slot['fecha_dia']);

@@ -86,11 +86,15 @@ class HorarioController extends Controller
         );
         $semanas = $stmtF->fetchAll();
 
-        // Si viene ?semana= y es futura, cargarla; si no, la próxima por defecto
+        // Si viene ?semana= y es futura (y no es el espejo), cargarla; si no, la próxima por defecto
         $semana = null;
+        $espejo = $this->repo->getSemanaEspejo();
         if (!empty($_GET['semana'])) {
             $candidata = $this->repo->getSemanaById((int)$_GET['semana']);
-            if ($candidata && $candidata['fecha_inicio'] > date('Y-m-d')) {
+            if ($candidata
+                && $candidata['fecha_inicio'] > date('Y-m-d')
+                && (!$espejo || (int)$candidata['id_semana'] !== (int)$espejo['id_semana'])
+            ) {
                 $semana = $candidata;
             }
         }

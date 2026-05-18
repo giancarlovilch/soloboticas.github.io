@@ -112,6 +112,16 @@ $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
             <span class="rep-card__badge" style="background:#e0f7fa;color:#0097A7;">Horario</span>
         </a>
 
+        <a href="<?= $basePath ?>/admin/reportes/graficas" class="rep-card">
+            <div class="rep-card__icon">📈</div>
+            <div class="rep-card__title">Gráficas Operacionales</div>
+            <div class="rep-card__desc">
+                Operaciones Agente BCP por día desglosadas por cajera y total global.
+                Ventas diarias por caja y total. Identifica días de baja actividad en los últimos 30 días.
+            </div>
+            <span class="rep-card__badge" style="background:#e0f7fa;color:#0097A7;">Caja · Visual</span>
+        </a>
+
         <div class="rep-card rep-card--soon">
             <div class="rep-card__icon">💸</div>
             <div class="rep-card__title">Faltantes por cajero</div>

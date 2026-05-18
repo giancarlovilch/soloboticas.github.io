@@ -821,7 +821,12 @@ class CajaRepository
         return true;
     }
 
-    /** Propaga saldo_proximo_dia al siguiente turno abierto de la misma caja */
+    /**
+     * Propaga saldo_proximo_dia al siguiente turno de la misma caja.
+     * Cubre todos los estados no definitivos (no solo ABIERTA/PENDIENTE_VENTA).
+     * Si la sesión siguiente ya tiene cuadre guardado (CERRADA/EN_REVISION/etc.),
+     * recalcula total_esperado, diferencia y resultado_cuadre para mantener consistencia.
+     */
     public function propagarBase(int $sesionId): float
     {
         $cajaStmt = $this->db->prepare("SELECT caja_id FROM sesion_caja WHERE id_sesion = :sid");
@@ -834,15 +839,69 @@ class CajaRepository
         $saldoStmt->execute(['sid' => $sesionId]);
         $saldo = (float)$saldoStmt->fetchColumn();
 
-        $this->db->prepare(
-            "UPDATE sesion_caja
-             SET saldo_inicial = :sal
-             WHERE caja_id = :cid
+        // Sesión inmediatamente posterior de la misma caja (cualquier estado, salvo APROBADA)
+        $nextStmt = $this->db->prepare(
+            "SELECT id_sesion, estado FROM sesion_caja
+             WHERE caja_id   = :cid
                AND id_sesion > :sid
-               AND estado IN ('ABIERTA','PENDIENTE_VENTA')
+               AND estado   != 'APROBADA'
              ORDER BY id_sesion ASC
              LIMIT 1"
-        )->execute(['sal' => $saldo, 'cid' => $cajaId, 'sid' => $sesionId]);
+        );
+        $nextStmt->execute(['cid' => $cajaId, 'sid' => $sesionId]);
+        $next = $nextStmt->fetch();
+
+        if (!$next) return $saldo;
+
+        $nextId     = (int)$next['id_sesion'];
+        $nextEstado = $next['estado'];
+
+        // Actualizar base
+        $this->db->prepare("UPDATE sesion_caja SET saldo_inicial = :sal WHERE id_sesion = :sid")
+                 ->execute(['sal' => $saldo, 'sid' => $nextId]);
+
+        // Si ya tiene cuadre guardado, recalcular con la nueva base
+        if (in_array($nextEstado, ['CERRADA', 'EN_REVISION', 'OBSERVADA', 'RECHAZADA'])) {
+            $dcStmt = $this->db->prepare("SELECT * FROM detalle_cuadre WHERE sesion_id = :sid");
+            $dcStmt->execute(['sid' => $nextId]);
+            $dc = $dcStmt->fetch();
+
+            if ($dc) {
+                $ventas          = (float)($dc['total_ventas_sistema'] ?? 0);
+                $gastos          = (float)($dc['total_gastos_sistema'] ?? 0);
+                $digitalAprobado = $this->sumDigitalDeclarado($nextId);
+                $efectivoFisico  = (float)($dc['total_efectivo_contado'] ?? 0);
+
+                $nuevoEsperado = round($saldo + $ventas - $gastos - $digitalAprobado, 2);
+                $nuevaDif      = round($efectivoFisico - $nuevoEsperado, 2);
+                $nuevoResult   = abs($nuevaDif) < 0.01 ? 'CONSISTENTE'
+                               : ($nuevaDif > 0       ? 'SOBRANTE'    : 'FALTANTE');
+
+                $this->db->prepare(
+                    "UPDATE detalle_cuadre SET
+                        total_esperado_sistema = :esp,
+                        diferencia             = :dif,
+                        resultado_cuadre       = :res
+                     WHERE sesion_id = :sid"
+                )->execute([
+                    'esp' => $nuevoEsperado,
+                    'dif' => $nuevaDif,
+                    'res' => $nuevoResult,
+                    'sid' => $nextId,
+                ]);
+
+                $this->db->prepare(
+                    "UPDATE sesion_caja SET
+                        saldo_final_sistema = :esp,
+                        diferencia_final    = :dif
+                     WHERE id_sesion = :sid"
+                )->execute([
+                    'esp' => $nuevoEsperado,
+                    'dif' => $nuevaDif,
+                    'sid' => $nextId,
+                ]);
+            }
+        }
 
         return $saldo;
     }

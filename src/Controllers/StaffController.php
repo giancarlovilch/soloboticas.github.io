@@ -369,6 +369,43 @@ class StaffController extends Controller
         $mesSiguiente = date('Y-m', strtotime($desde . ' +1 month'));
         $mesActual    = date('Y-m');
 
+        // ── Tarifas y bonos vigentes (para sección informativa) ──
+        $hoyStr = date('Y-m-d');
+
+        $stmtTar = $db->prepare(
+            "SELECT t1.* FROM tarifa_base_rol t1
+             WHERE t1.fecha_vigencia = (
+                 SELECT MAX(t2.fecha_vigencia) FROM tarifa_base_rol t2
+                 WHERE t2.rol_codigo = t1.rol_codigo AND t2.fecha_vigencia <= :hoy
+             )
+             ORDER BY FIELD(t1.rol_codigo,'CAJERA','VENDEDORA','ALMACENERA')"
+        );
+        $stmtTar->execute(['hoy' => $hoyStr]);
+        $tarifasInfo = [];
+        foreach ($stmtTar->fetchAll() as $t) {
+            $tarifasInfo[$t['rol_codigo']] = $t;
+        }
+
+        foreach (['VENTAS' => 'bonosVInfo', 'OPERACIONES_BCP' => 'bonosOInfo'] as $tipo => $varName) {
+            $vigMax = $db->prepare(
+                "SELECT MAX(fecha_vigencia) FROM configuracion_bono
+                 WHERE tipo = :tipo AND fecha_vigencia <= :hoy"
+            );
+            $vigMax->execute(['tipo' => $tipo, 'hoy' => $hoyStr]);
+            $fechaVig = $vigMax->fetchColumn();
+
+            $$varName = [];
+            if ($fechaVig) {
+                $stmtB = $db->prepare(
+                    "SELECT * FROM configuracion_bono
+                     WHERE tipo = :tipo AND fecha_vigencia = :vig
+                     ORDER BY desde ASC"
+                );
+                $stmtB->execute(['tipo' => $tipo, 'vig' => $fechaVig]);
+                $$varName = $stmtB->fetchAll();
+            }
+        }
+
         require_once __DIR__ . '/../../views/staff/economia.php';
     }
 

@@ -28,6 +28,116 @@ class ReporteController extends Controller
         require_once __DIR__ . '/../../views/admin/reportes/index.php';
     }
 
+    // ── GET /admin/reportes/graficas ───────────────────────
+    public function graficas(): void
+    {
+        $this->requireAdmin();
+        $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $userName = $_SESSION['user_name'] ?? 'Administrador';
+
+        $db    = Database::getConnection();
+        $hasta = $_GET['hasta'] ?? date('Y-m-d');
+        $desde = $_GET['desde'] ?? date('Y-m-d', strtotime('-13 days', strtotime($hasta)));
+
+        $colors = ['#0097A7','#f59e0b','#10b981','#8b5cf6','#ef4444','#3b82f6','#ec4899','#f97316','#84cc16'];
+
+        // ── Operaciones BCP por cajera ───────────────────
+        $stmtOps = $db->prepare(
+            "SELECT sc.fecha_operacion AS fecha,
+                    p.nombres AS cajera,
+                    SUM(dc.num_operaciones_bcp) AS ops
+             FROM sesion_caja sc
+             INNER JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
+             INNER JOIN postulante p ON p.id_postulante = sc.postulante_apertura_id
+             WHERE sc.fecha_operacion BETWEEN :desde AND :hasta
+               AND sc.estado IN ('CERRADA','EN_REVISION','APROBADA','OBSERVADA','RECHAZADA')
+             GROUP BY sc.fecha_operacion, sc.postulante_apertura_id
+             ORDER BY sc.fecha_operacion ASC, p.nombres ASC"
+        );
+        $stmtOps->execute(['desde' => $desde, 'hasta' => $hasta]);
+
+        $opsByDate = [];
+        $cajerasSet = [];
+        foreach ($stmtOps->fetchAll() as $r) {
+            $opsByDate[$r['fecha']][$r['cajera']] = (int)$r['ops'];
+            $cajerasSet[$r['cajera']] = true;
+        }
+        $cajeras = array_keys($cajerasSet);
+        sort($cajeras);
+        $opsDateLabels = array_keys($opsByDate);
+        sort($opsDateLabels);
+
+        $opsDatasets = [];
+        foreach ($cajeras as $i => $cajera) {
+            $data = [];
+            foreach ($opsDateLabels as $f) {
+                $data[] = $opsByDate[$f][$cajera] ?? 0;
+            }
+            $c = $colors[$i % count($colors)];
+            $opsDatasets[] = ['label' => $cajera, 'data' => $data,
+                'borderColor' => $c, 'backgroundColor' => $c . '22', 'tension' => 0.3, 'pointRadius' => 3];
+        }
+        $opsTotal = [];
+        foreach ($opsDateLabels as $f) {
+            $opsTotal[] = array_sum($opsByDate[$f]);
+        }
+        array_unshift($opsDatasets, ['label' => 'Total', 'data' => $opsTotal,
+            'borderColor' => '#1e293b', 'backgroundColor' => '#1e293b18',
+            'tension' => 0.3, 'pointRadius' => 3, 'borderWidth' => 2.5]);
+
+        // ── Ventas diarias por caja ──────────────────────
+        $stmtV = $db->prepare(
+            "SELECT sc.fecha_operacion AS fecha,
+                    ca.descripcion AS caja,
+                    COALESCE(SUM(rv.monto), 0) AS ventas
+             FROM sesion_caja sc
+             INNER JOIN caja ca ON ca.id_caja = sc.caja_id
+             LEFT JOIN reporte_venta rv ON rv.sesion_id = sc.id_sesion
+             WHERE sc.fecha_operacion BETWEEN :desde AND :hasta
+               AND sc.estado IN ('CERRADA','EN_REVISION','APROBADA','OBSERVADA','RECHAZADA')
+             GROUP BY sc.fecha_operacion, sc.caja_id
+             ORDER BY sc.fecha_operacion ASC, ca.descripcion ASC"
+        );
+        $stmtV->execute(['desde' => $desde, 'hasta' => $hasta]);
+
+        $ventasByDate = [];
+        $cajasSet = [];
+        foreach ($stmtV->fetchAll() as $r) {
+            $ventasByDate[$r['fecha']][$r['caja']] = (float)$r['ventas'];
+            $cajasSet[$r['caja']] = true;
+        }
+        $cajas = array_keys($cajasSet);
+        sort($cajas);
+        $ventasDateLabels = array_keys($ventasByDate);
+        sort($ventasDateLabels);
+
+        $ventasDatasets = [];
+        foreach ($cajas as $i => $caja) {
+            $data = [];
+            foreach ($ventasDateLabels as $f) {
+                $data[] = round($ventasByDate[$f][$caja] ?? 0, 2);
+            }
+            $c = $colors[$i % count($colors)];
+            $ventasDatasets[] = ['label' => $caja, 'data' => $data,
+                'borderColor' => $c, 'backgroundColor' => $c . '22', 'tension' => 0.3, 'pointRadius' => 3];
+        }
+        $ventasTotal = [];
+        foreach ($ventasDateLabels as $f) {
+            $ventasTotal[] = round(array_sum($ventasByDate[$f]), 2);
+        }
+        array_unshift($ventasDatasets, ['label' => 'Total', 'data' => $ventasTotal,
+            'borderColor' => '#1e293b', 'backgroundColor' => '#1e293b18',
+            'tension' => 0.3, 'pointRadius' => 3, 'borderWidth' => 2.5]);
+
+        // ── KPIs rápidos ─────────────────────────────────
+        $totalOps    = array_sum($opsTotal);
+        $promOps     = count($opsDateLabels) ? round($totalOps / count($opsDateLabels)) : 0;
+        $totalVentas = array_sum($ventasTotal);
+        $promVentas  = count($ventasDateLabels) ? round($totalVentas / count($ventasDateLabels), 2) : 0;
+
+        require_once __DIR__ . '/../../views/admin/reportes/graficas.php';
+    }
+
     // ── GET /admin/reportes/arqueos ────────────────────────
     public function arqueos(): void
     {
