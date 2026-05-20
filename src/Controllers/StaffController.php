@@ -243,23 +243,52 @@ class StaffController extends Controller
         $stmtPagos->execute(['pid' => $postulanteId, 'desde' => $desde, 'hasta' => $hasta]);
         $pagos = $stmtPagos->fetchAll();
 
-        // ── 2. Slots asistidos del mes ────────────────────
+        // ── 1b. Descuentos vía ajuste_esperado (cuadres cerrados) ────
+        $stmtDesc = $db->prepare(
+            "SELECT ae.id_ajuste, ae.monto, ae.accion, ae.descripcion, ae.fecha,
+                    sc.fecha_operacion, sc.turno_id, sc.id_sesion,
+                    l.descripcion AS local_desc,
+                    p.nombres     AS admin_nombre
+             FROM ajuste_esperado ae
+             INNER JOIN sesion_caja sc ON sc.id_sesion   = ae.sesion_id
+             INNER JOIN caja ca        ON ca.id_caja     = sc.caja_id
+             INNER JOIN local l        ON l.id_local     = ca.local_id
+             INNER JOIN postulante p   ON p.id_postulante = ae.postulante_id
+             WHERE ae.tipo      = 'PERSONAL'
+               AND ae.tipo_pago = 'DESCUENTO'
+               AND ae.ref_id    = :pid
+               AND DATE(ae.fecha) BETWEEN :desde AND :hasta
+             ORDER BY ae.fecha DESC"
+        );
+        $stmtDesc->execute(['pid' => $postulanteId, 'desde' => $desde, 'hasta' => $hasta]);
+        $descuentosAdj = $stmtDesc->fetchAll();
+
+        // ── 2. Slots trabajados del mes (certificados y no certificados) ──
         $stmtSlots = $db->prepare(
             "SELECT hs.id_slot, hs.fecha_dia, hs.turno_id, hs.local_id,
                     rh.codigo      AS rol_codigo,
                     rh.descripcion AS rol_desc,
-                    l.descripcion  AS local_desc
+                    l.descripcion  AS local_desc,
+                    CASE WHEN (a.llegada_puntualidad IS NOT NULL OR a.salida_puntualidad IS NOT NULL)
+                         THEN 1 ELSE 0 END AS certificado
              FROM horario_slot hs
              INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
              INNER JOIN local l        ON hs.local_id       = l.id_local
-             INNER JOIN asistencia a   ON a.postulante_id   = hs.postulante_id
+             LEFT JOIN asistencia a    ON a.postulante_id   = hs.postulante_id
                                       AND a.fecha           = hs.fecha_dia
                                       AND (a.turno_id = hs.turno_id OR a.turno_id IS NULL)
                                       AND a.estado != 'FALTA'
-                                      AND (a.llegada_puntualidad IS NOT NULL OR a.salida_puntualidad IS NOT NULL)
              WHERE hs.postulante_id = :pid
                AND hs.fecha_dia BETWEEN :desde AND :hasta
+               AND hs.fecha_dia <= CURDATE()
                AND rh.codigo IN ('CAJERA','VENDEDORA','ALMACENERA')
+               AND NOT EXISTS (
+                   SELECT 1 FROM asistencia af
+                   WHERE af.postulante_id = hs.postulante_id
+                     AND af.fecha         = hs.fecha_dia
+                     AND (af.turno_id = hs.turno_id OR af.turno_id IS NULL)
+                     AND af.estado = 'FALTA'
+               )
              ORDER BY hs.fecha_dia DESC, hs.turno_id ASC"
         );
         $stmtSlots->execute(['pid' => $postulanteId, 'desde' => $desde, 'hasta' => $hasta]);
@@ -293,41 +322,37 @@ class StaffController extends Controller
             return (float)($s->fetchColumn() ?: 0);
         };
 
-        $getSesion = function(int $localId, int $turnoId, string $fecha) use ($db): ?array {
+        // Busca la sesión donde el trabajador participó con el rol dado en ese local+turno+fecha.
+        // Evita el bug de múltiples cajas por local: en vez de tomar la última por ID,
+        // busca directamente en sesion_participante la sesión correcta del trabajador.
+        $getSesionParticipante = function(int $pid, string $rolPart, int $localId, int $turnoId, string $fecha) use ($db): ?array {
             $s = $db->prepare(
                 "SELECT sc.id_sesion, dc.num_operaciones_bcp,
                         COALESCE(rv.monto, 0) AS ventas
-                 FROM sesion_caja sc
-                 INNER JOIN caja ca ON ca.id_caja = sc.caja_id
+                 FROM sesion_participante sp
+                 INNER JOIN sesion_caja sc ON sc.id_sesion   = sp.sesion_id
+                 INNER JOIN caja ca        ON ca.id_caja     = sc.caja_id
                  LEFT JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
                  LEFT JOIN reporte_venta rv  ON rv.sesion_id = sc.id_sesion
-                 WHERE ca.local_id = :lid AND sc.turno_id = :tid
-                   AND sc.fecha_operacion = :fecha
+                 WHERE sp.postulante_id    = :pid
+                   AND sp.rol_participacion = :rol
+                   AND ca.local_id         = :lid
+                   AND sc.turno_id         = :tid
+                   AND sc.fecha_operacion  = :fecha
                    AND sc.estado IN ('CERRADA','APROBADA')
-                 ORDER BY sc.id_sesion DESC LIMIT 1"
+                 LIMIT 1"
             );
-            $s->execute(['lid'=>$localId,'tid'=>$turnoId,'fecha'=>$fecha]);
+            $s->execute(['pid'=>$pid,'rol'=>$rolPart,'lid'=>$localId,'tid'=>$turnoId,'fecha'=>$fecha]);
             $r = $s->fetch();
             return $r ?: null;
         };
 
-        $getVentasVendedora = function(int $pid, int $sesionId) use ($db): float {
-            $s = $db->prepare(
-                "SELECT COALESCE(rv.monto, 0) AS ventas
-                 FROM sesion_participante sp
-                 INNER JOIN reporte_venta rv ON rv.sesion_id = sp.sesion_id
-                 WHERE sp.postulante_id = :pid AND sp.sesion_id = :sid
-                   AND sp.rol_participacion = 'VENDEDORA'
-                 LIMIT 1"
-            );
-            $s->execute(['pid'=>$pid,'sid'=>$sesionId]);
-            return (float)($s->fetchColumn() ?: 0);
-        };
-
         // ── 3. Calcular ingresos por slot ─────────────────
-        $ingresos = [];
+        $ingresos      = [];
         $totalIngresos = 0.0;
         $totalBonos    = 0.0;
+        $totalIngCert  = 0.0;
+        $totalIngNoCert = 0.0;
 
         foreach ($slots as $slot) {
             $rol   = $slot['rol_codigo'];
@@ -337,14 +362,13 @@ class StaffController extends Controller
             $bonoO = 0.0;
 
             if (in_array($rol, ['CAJERA','VENDEDORA'])) {
-                $sesion = $getSesion($slot['local_id'], $slot['turno_id'], $fecha);
+                $sesion = $getSesionParticipante($postulanteId, $rol, $slot['local_id'], $slot['turno_id'], $fecha);
                 if ($sesion) {
                     if ($rol === 'CAJERA') {
                         $ops   = (float)($sesion['num_operaciones_bcp'] ?? 0);
                         $bonoO = $getBono('OPERACIONES_BCP', $ops, $fecha);
                     } else {
-                        $ventas = $getVentasVendedora($postulanteId, $sesion['id_sesion']);
-                        $bonoV  = $getBono('VENTAS', $ventas, $fecha);
+                        $bonoV = $getBono('VENTAS', (float)($sesion['ventas'] ?? 0), $fecha);
                     }
                 }
             }
@@ -353,11 +377,16 @@ class StaffController extends Controller
             $totalIngresos += $total;
             $totalBonos    += $bonoV + $bonoO;
 
+            $esCertificado = (bool)($slot['certificado'] ?? false);
+            if ($esCertificado) $totalIngCert   += $total;
+            else                $totalIngNoCert += $total;
+
             $ingresos[] = array_merge($slot, [
-                'base'       => $base,
-                'bono_v'     => $bonoV,
-                'bono_o'     => $bonoO,
-                'total'      => $total,
+                'base'         => $base,
+                'bono_v'       => $bonoV,
+                'bono_o'       => $bonoO,
+                'total'        => $total,
+                'certificado'  => $esCertificado,
             ]);
         }
 

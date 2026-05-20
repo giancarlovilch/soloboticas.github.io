@@ -165,7 +165,7 @@ function buildTipoPagoSelect() {
     return `<select class="caja-input caja-gasto__tipopago" style="max-width:130px">
         <option value="PAGO_TOTAL">Pago total</option>
         <option value="ADELANTO">Adelanto</option>
-        <option value="OTROS">Otros</option>
+        <option value="DESCUENTO">Descuento</option>
     </select>`;
 }
 

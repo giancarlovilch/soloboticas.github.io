@@ -168,8 +168,8 @@ class CajaRepository
         return $stmt->fetchAll();
     }
 
-    /** Sesiones recientes con filtros de local y mes */
-    public function getSesionesRecientes(int $localId = 0, string $mes = ''): array
+    /** Sesiones recientes con filtros de caja, cajera y mes */
+    public function getSesionesRecientes(int $cajaId = 0, int $cajeraId = 0, string $mes = ''): array
     {
         if (!$mes) $mes = date('Y-m');
         [$anio, $nmes] = explode('-', $mes);
@@ -179,18 +179,24 @@ class CajaRepository
         $where  = "sc.fecha_operacion BETWEEN :desde AND :hasta";
         $params = ['desde' => $desdeFecha, 'hasta' => $hastaFecha];
 
-        if ($localId > 0) {
-            $where .= " AND l.id_local = :lid";
-            $params['lid'] = $localId;
+        if ($cajaId > 0) {
+            $where .= " AND sc.caja_id = :cid";
+            $params['cid'] = $cajaId;
+        }
+        if ($cajeraId > 0) {
+            $where .= " AND sc.postulante_apertura_id = :cajera";
+            $params['cajera'] = $cajeraId;
         }
 
         $sql = "SELECT sc.id_sesion, sc.estado, sc.saldo_inicial,
                        sc.fecha_operacion, sc.fecha_apertura,
-                       c.descripcion AS caja_desc, l.id_local,
+                       c.id_caja, c.descripcion AS caja_desc, l.id_local,
                        l.descripcion AS local_desc,
                        t.descripcion AS turno_desc,
+                       p.id_postulante AS cajera_id,
                        p.nombres AS cajera_nombre,
                        pv.nombres AS vendedor_nombre,
+                       dc.num_operaciones_bcp,
                        (SELECT prev.id_sesion
                         FROM sesion_caja prev
                         INNER JOIN caja pc ON prev.caja_id = pc.id_caja
@@ -206,12 +212,32 @@ class CajaRepository
                 LEFT JOIN sesion_participante sp ON sp.sesion_id = sc.id_sesion
                     AND sp.rol_participacion = 'VENDEDORA'
                 LEFT JOIN postulante pv ON sp.postulante_id = pv.id_postulante
+                LEFT JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
                 WHERE {$where}
                 ORDER BY sc.fecha_operacion DESC, sc.fecha_apertura DESC";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
+    }
+
+    public function getCajasActivas(): array
+    {
+        return $this->db->query(
+            "SELECT c.id_caja AS id, c.descripcion, l.descripcion AS local_desc
+             FROM caja c INNER JOIN local l ON l.id_local = c.local_id
+             WHERE c.activo = 1 ORDER BY l.descripcion, c.descripcion"
+        )->fetchAll();
+    }
+
+    public function getCajerasActivas(): array
+    {
+        return $this->db->query(
+            "SELECT DISTINCT p.id_postulante AS id, p.nombres
+             FROM sesion_caja sc
+             INNER JOIN postulante p ON p.id_postulante = sc.postulante_apertura_id
+             ORDER BY p.nombres"
+        )->fetchAll();
     }
 
     // ── Detalle cuadre — activos físicos (LO QUE ES) ──────

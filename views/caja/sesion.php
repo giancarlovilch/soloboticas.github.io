@@ -277,7 +277,7 @@ $act = [
                         <select class="caja-input caja-gasto__tipopago" style="max-width:130px">
                             <option value="PAGO_TOTAL" <?= ($g['tipo_pago'] ?? 'PAGO_TOTAL') === 'PAGO_TOTAL' ? 'selected' : '' ?>>Pago total</option>
                             <option value="ADELANTO"   <?= ($g['tipo_pago'] ?? '') === 'ADELANTO'    ? 'selected' : '' ?>>Adelanto</option>
-                            <option value="OTROS"      <?= ($g['tipo_pago'] ?? '') === 'OTROS'       ? 'selected' : '' ?>>Otros</option>
+                            <option value="DESCUENTO"  <?= ($g['tipo_pago'] ?? '') === 'DESCUENTO'   ? 'selected' : '' ?>>Descuento</option>
                         </select>
                     <?php elseif ($modo === 'LOCAL'): ?>
                         <select class="caja-input caja-gasto__local" style="max-width:120px">

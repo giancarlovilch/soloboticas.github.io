@@ -1,15 +1,18 @@
 <?php
 /** @var array $pendientes */ /** @var array $abiertas */ /** @var array $recientes */
-/** @var array $locales */ /** @var int $filtroLocal */ /** @var string $filtroMes */
-$basePath    = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
-$userName    = $userName    ?? $_SESSION['user_name'] ?? 'Usuario';
-$userRol     = $userRol     ?? $_SESSION['user_rol']  ?? 'STAFF';
-$pendientes  = $pendientes  ?? [];
-$abiertas    = $abiertas    ?? [];
-$recientes   = $recientes   ?? [];
-$locales     = $locales     ?? [];
-$filtroLocal = $filtroLocal ?? 0;
-$filtroMes   = $filtroMes   ?? date('Y-m');
+/** @var array $cajas */ /** @var array $cajeras */
+/** @var int $filtroCaja */ /** @var int $filtroCajera */ /** @var string $filtroMes */
+$basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+$userName     = $userName     ?? $_SESSION['user_name'] ?? 'Usuario';
+$userRol      = $userRol      ?? $_SESSION['user_rol']  ?? 'STAFF';
+$pendientes   = $pendientes   ?? [];
+$abiertas     = $abiertas     ?? [];
+$recientes    = $recientes    ?? [];
+$cajas        = $cajas        ?? [];
+$cajeras      = $cajeras      ?? [];
+$filtroCaja   = $filtroCaja   ?? 0;
+$filtroCajera = $filtroCajera ?? 0;
+$filtroMes    = $filtroMes    ?? date('Y-m');
 
 $estadoLabel = [
     'ABIERTA'         => ['label' => 'Turno abierto',     'cls' => 'estado-abierta'],
@@ -141,11 +144,19 @@ $estadoLabel = [
             <h2>Registro de arqueos</h2>
             <!-- Filtros -->
             <form method="GET" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
-                <select name="local" class="caja-input" style="max-width:160px;" onchange="this.form.submit()">
-                    <option value="0">Todos los locales</option>
-                    <?php foreach ($locales as $l): ?>
-                        <option value="<?= $l['id'] ?>" <?= $filtroLocal == $l['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($l['descripcion']) ?>
+                <select name="caja" class="caja-input" style="max-width:140px;" onchange="this.form.submit()">
+                    <option value="0">Todas las cajas</option>
+                    <?php foreach ($cajas as $c): ?>
+                        <option value="<?= $c['id'] ?>" <?= $filtroCaja == $c['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($c['descripcion']) ?> · <?= htmlspecialchars($c['local_desc']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <select name="cajera" class="caja-input" style="max-width:150px;" onchange="this.form.submit()">
+                    <option value="0">Todas las cajeras</option>
+                    <?php foreach ($cajeras as $cj): ?>
+                        <option value="<?= $cj['id'] ?>" <?= $filtroCajera == $cj['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($cj['nombres']) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -164,6 +175,7 @@ $estadoLabel = [
                         <th>Turno</th>
                         <th>Cajera</th>
                         <th>Vendedor/a</th>
+                        <th class="text-center">Ops. BCP</th>
                         <th>Anterior</th>
                         <th class="text-center">Estado</th>
                         <th class="text-center">Acción</th>
@@ -187,6 +199,13 @@ $estadoLabel = [
                         <td><?= htmlspecialchars($s['turno_desc']) ?></td>
                         <td><?= htmlspecialchars($s['cajera_nombre']) ?></td>
                         <td><?= $s['vendedor_nombre'] ? htmlspecialchars($s['vendedor_nombre']) : '<span style="color:#cbd5e1">—</span>' ?></td>
+                        <td class="text-center">
+                            <?php if ($s['num_operaciones_bcp'] !== null): ?>
+                                <span style="font-weight:700;color:#0369a1;"><?= (int)$s['num_operaciones_bcp'] ?></span>
+                            <?php else: ?>
+                                <span style="color:#cbd5e1;">—</span>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <?php if ($s['sesion_anterior_id']): ?>
                                 <a href="<?= $basePath ?>/caja/reporte/<?= $s['sesion_anterior_id'] ?>"
@@ -210,7 +229,7 @@ $estadoLabel = [
                     </tr>
                 <?php endforeach; ?>
                 <?php if (empty($recientes)): ?>
-                    <tr><td colspan="9" class="caja-table__empty">No hay cuadres en este período.</td></tr>
+                    <tr><td colspan="10" class="caja-table__empty">No hay cuadres en este período.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>

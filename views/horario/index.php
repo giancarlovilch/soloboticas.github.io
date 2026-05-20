@@ -271,6 +271,24 @@ if ($semana) {
         </div>
     </div>
 </div>
+
+<!-- ── Admin: modal liberar slot ─────────────────────────── -->
+<div id="liberarAdminOverlay" class="hor-picker-overlay" hidden>
+    <div class="hor-picker">
+        <div class="hor-picker__header">
+            <h3>Quitar del turno</h3>
+            <button onclick="cerrarModalLiberar()">✕</button>
+        </div>
+        <p id="liberarAdminNombre" style="font-size:.85rem;color:#475569;margin:.25rem 0 .75rem;padding:0 .1rem;"></p>
+        <input id="liberarAdminPwd" type="password" class="hor-picker__select"
+               placeholder="Tu contraseña de administrador"
+               onkeydown="if(event.key==='Enter') confirmarLiberarAdmin()">
+        <div class="hor-picker__footer">
+            <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;" onclick="cerrarModalLiberar()">Cancelar</button>
+            <button class="hor-btn" style="background:#ef4444;color:#fff;border:none;" onclick="confirmarLiberarAdmin()">Quitar</button>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <script>

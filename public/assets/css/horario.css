@@ -189,6 +189,26 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
     transform: scale(1.1);
 }
 
+.hor-asiento__btn-liberar {
+    position: absolute;
+    top: -4px; left: -4px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.65rem;
+    line-height: 16px; text-align: center;
+    border: none; cursor: pointer; padding: 0;
+    opacity: 0;
+    transition: opacity .15s, transform .15s;
+    z-index: 10;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.hor-asiento--ocupado:hover .hor-asiento__btn-liberar {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
 /* Libre: fondo claro con el color del rol visible */
 .hor-asiento--libre {
     background: color-mix(in srgb, var(--rol-color, #e2e8f0) 8%, white);

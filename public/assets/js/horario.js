@@ -81,6 +81,7 @@ function renderSlots(slots) {
         el.onclick             = null;
         el.querySelector('.hor-asiento__nombre').textContent = '…';
         quitarBtnPicker(el);
+        quitarBtnLiberar(el);
     });
 
     // Pintar según los datos del servidor
@@ -109,8 +110,9 @@ function renderSlots(slots) {
                 const esFiltrado = _filtroId && parseInt(s.postulante_id) === _filtroId;
                 el.className           = 'hor-asiento ' + (esFiltrado ? 'hor-asiento--filtrado' : 'hor-asiento--ocupado');
                 el.title               = `Ocupado por ${nombre}`;
-                el.style.pointerEvents = 'none';
+                el.style.pointerEvents = ES_ADMIN ? 'auto' : 'none';
                 el.onclick             = null;
+                if (ES_ADMIN) agregarBtnLiberar(el, nombre);
             }
             quitarBtnPicker(el);
         } else {
@@ -144,6 +146,67 @@ function agregarBtnPicker(el) {
 
 function quitarBtnPicker(el) {
     el.querySelector('.hor-asiento__btn-picker')?.remove();
+}
+
+// ── Botón liberar (admin, slots ocupados por otro) ────
+let _liberarSlotEl = null;
+
+function agregarBtnLiberar(el, nombre) {
+    if (el.querySelector('.hor-asiento__btn-liberar')) return;
+    const btn = document.createElement('button');
+    btn.className   = 'hor-asiento__btn-liberar';
+    btn.title       = `Quitar a ${nombre}`;
+    btn.textContent = '✕';
+    btn.addEventListener('click', e => {
+        e.stopPropagation();
+        abrirModalLiberar(el, nombre);
+    });
+    el.appendChild(btn);
+}
+
+function quitarBtnLiberar(el) {
+    el.querySelector('.hor-asiento__btn-liberar')?.remove();
+}
+
+function abrirModalLiberar(el, nombre) {
+    _liberarSlotEl = el;
+    const overlay = document.getElementById('liberarAdminOverlay');
+    if (!overlay) return;
+    document.getElementById('liberarAdminNombre').textContent = `Vas a quitar a ${nombre} de este turno.`;
+    document.getElementById('liberarAdminPwd').value = '';
+    overlay.hidden = false;
+    setTimeout(() => document.getElementById('liberarAdminPwd').focus(), 50);
+}
+
+function cerrarModalLiberar() {
+    document.getElementById('liberarAdminOverlay').hidden = true;
+    _liberarSlotEl = null;
+}
+
+async function confirmarLiberarAdmin() {
+    const password = document.getElementById('liberarAdminPwd').value.trim();
+    if (!password) { mostrarToast('Ingresa tu contraseña', 'info'); return; }
+
+    const el     = _liberarSlotEl;
+    const slotId = el?.dataset.slotid;
+    if (!slotId) return;
+
+    cerrarModalLiberar();
+    el.classList.add('hor-asiento--loading');
+
+    try {
+        const r   = await fetch(`${BASE}/horario/api/slot/${slotId}/liberar-admin`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ password }),
+        });
+        const res = await r.json();
+        await cargarSlots();
+        if (!res.success) mostrarToast(res.message || 'No se pudo quitar al trabajador.', 'error');
+    } catch {
+        el.classList.remove('hor-asiento--loading');
+        mostrarToast('Error de conexión.', 'error');
+    }
 }
 
 // ── Resumen de disponibles ─────────────────────────────

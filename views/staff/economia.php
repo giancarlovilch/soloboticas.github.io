@@ -9,7 +9,7 @@ $turnoLabel= [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
 $tipoPagoInfo = [
     'PAGO_TOTAL' => ['label' => 'Pago total', 'bg' => '#d1fae5', 'color' => '#065f46'],
     'ADELANTO'   => ['label' => 'Adelanto',   'bg' => '#fef3c7', 'color' => '#92400e'],
-    'OTROS'      => ['label' => 'Otros',      'bg' => '#ede9fe', 'color' => '#5b21b6'],
+    'DESCUENTO'  => ['label' => 'Descuento',  'bg' => '#fee2e2', 'color' => '#991b1b'],
 ];
 $estadoInfo = [
     'PAGADO'                  => ['label' => 'Pagado',     'bg' => '#d1fae5', 'color' => '#065f46'],
@@ -209,18 +209,22 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
     </div>
 
     <!-- KPIs -->
+    <?php
+    $nCert   = count(array_filter($ingresos, fn($i) => $i['certificado']));
+    $nNoCert = count($ingresos) - $nCert;
+    ?>
     <div class="eco-kpis">
         <div class="eco-kpi">
-            <div class="eco-kpi__num"><?= $f2($totalIngresos) ?></div>
-            <div class="eco-kpi__label">Ingresos del mes</div>
+            <div class="eco-kpi__num"><?= $f2($totalIngCert) ?></div>
+            <div class="eco-kpi__label">Ingresos certificados</div>
         </div>
         <div class="eco-kpi">
-            <div class="eco-kpi__num"><?= $f2($totalBonos) ?></div>
-            <div class="eco-kpi__label">Bonos acumulados</div>
+            <div class="eco-kpi__num" style="color:#b45309;"><?= $f2($totalIngNoCert) ?></div>
+            <div class="eco-kpi__label">Sin certificar</div>
         </div>
         <div class="eco-kpi">
-            <div class="eco-kpi__num"><?= count($ingresos) ?></div>
-            <div class="eco-kpi__label">Turnos trabajados</div>
+            <div class="eco-kpi__num"><?= $nCert ?> / <?= count($ingresos) ?></div>
+            <div class="eco-kpi__label">Turnos certificados</div>
         </div>
         <div class="eco-kpi">
             <div class="eco-kpi__num"><?= $f2($totalPagado) ?></div>
@@ -230,16 +234,40 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
 
     <!-- ── Cuadre del mes ───────────────────────────── -->
     <?php
-    $saldo = $totalIngresos - $totalPagado;
+    // Pagos reales recibidos (excluye DESCUENTO, que no es dinero entregado)
+    $totalPagadoReal = array_sum(array_column(
+        array_filter($pagos, fn($p) =>
+            in_array($p['estado'], ['PAGADO','CONFIRMADO_BENEFICIARIO','APROBADO']) &&
+            ($p['tipo_pago'] ?? '') !== 'DESCUENTO'
+        ), 'monto'
+    ));
+
+    // Descuentos de pago_personal (dinero descontado de sueldo en turno activo)
+    $totalDescuentosPP = array_sum(array_column(
+        array_filter($pagos, fn($p) =>
+            in_array($p['estado'], ['PAGADO','CONFIRMADO_BENEFICIARIO','APROBADO']) &&
+            ($p['tipo_pago'] ?? '') === 'DESCUENTO'
+        ), 'monto'
+    ));
+
+    // Descuentos vía ajuste_esperado: AGREGAR resta, QUITAR suma (devuelve)
+    $netDescuentosAdj = 0.0;
+    foreach ($descuentosAdj ?? [] as $d) {
+        $netDescuentosAdj += $d['accion'] === 'AGREGAR' ? -(float)$d['monto'] : (float)$d['monto'];
+    }
+    // netDescuentos > 0 = deducción neta, < 0 = devolución neta
+    $netDescuentos = $totalDescuentosPP - $netDescuentosAdj;
+
+    $saldo    = $totalIngCert - $totalPagadoReal - $netDescuentos;
     $saldoAbs = abs($saldo);
     if ($saldo > 0.01) {
         $saldoBg = '#fef3c7'; $saldoColor = '#92400e';
-        $saldoMsg = 'Saldo pendiente de pago';
-        $saldoSub = 'La empresa te debe este monto por el mes de ' . $mesLabel;
+        $saldoMsg = 'Saldo contable pendiente';
+        $saldoSub = 'La empresa te debe este monto por ingresos certificados de ' . $mesLabel;
     } elseif ($saldo < -0.01) {
         $saldoBg = '#ede9fe'; $saldoColor = '#5b21b6';
         $saldoMsg = 'Has recibido pagos adelantados';
-        $saldoSub = 'Recibiste S/ ' . number_format($saldoAbs,2,'.',',' ) . ' más que tus ingresos del mes';
+        $saldoSub = 'Recibiste S/ ' . number_format($saldoAbs,2,'.',',' ) . ' más que tus ingresos certificados';
     } else {
         $saldoBg = '#d1fae5'; $saldoColor = '#065f46';
         $saldoMsg = '¡Mes cuadrado!';
@@ -250,20 +278,31 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
     <div style="background:#fff;border:1px solid #fbcfe8;border-radius:12px;overflow:hidden;margin-bottom:1.5rem;">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;">
             <div style="padding:1rem;border-right:1px solid #fdf2f8;">
-                <div style="font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#be185d;margin-bottom:.3rem;">Ingresos del mes</div>
-                <div style="font-size:1.15rem;font-weight:800;color:#0097A7;font-variant-numeric:tabular-nums;"><?= $f2($totalIngresos) ?></div>
+                <div style="font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#be185d;margin-bottom:.3rem;">Ingresos certificados</div>
+                <div style="font-size:1.15rem;font-weight:800;color:#0097A7;font-variant-numeric:tabular-nums;"><?= $f2($totalIngCert) ?></div>
             </div>
             <div style="padding:1rem;border-right:1px solid #fdf2f8;">
                 <div style="font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#be185d;margin-bottom:.3rem;">Pagos recibidos</div>
-                <div style="font-size:1.15rem;font-weight:800;color:#9d174d;font-variant-numeric:tabular-nums;"><?= $f2($totalPagado) ?></div>
+                <div style="font-size:1.15rem;font-weight:800;color:#9d174d;font-variant-numeric:tabular-nums;"><?= $f2($totalPagadoReal) ?></div>
+                <?php if ($netDescuentos > 0.01): ?>
+                <div style="font-size:.7rem;font-weight:700;color:#991b1b;margin-top:.2rem;">− <?= $f2($netDescuentos) ?> descuento</div>
+                <?php elseif ($netDescuentos < -0.01): ?>
+                <div style="font-size:.7rem;font-weight:700;color:#065f46;margin-top:.2rem;">+ <?= $f2(abs($netDescuentos)) ?> devuelto</div>
+                <?php endif; ?>
             </div>
             <div style="padding:1rem;">
-                <div style="font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#be185d;margin-bottom:.3rem;">Saldo</div>
+                <div style="font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#be185d;margin-bottom:.3rem;">Saldo contable</div>
                 <div style="font-size:1.15rem;font-weight:800;color:<?= $saldoColor ?>;font-variant-numeric:tabular-nums;">
                     <?= ($saldo >= 0 ? '+' : '−') . ' ' . $f2($saldoAbs) ?>
                 </div>
             </div>
         </div>
+        <?php if ($totalIngNoCert > 0.01): ?>
+        <div style="background:#fffbeb;padding:.5rem 1rem;text-align:center;border-top:1px solid #fef3c7;">
+            <span style="font-size:.75rem;font-weight:700;color:#b45309;">+ <?= $f2($totalIngNoCert) ?> sin certificar</span>
+            <span style="font-size:.7rem;color:#b45309;opacity:.8;margin-left:.4rem;">· Completa las encuestas de <?= $nNoCert ?> turno<?= $nNoCert !== 1 ? 's' : '' ?> para sumar al saldo contable</span>
+        </div>
+        <?php endif; ?>
         <div style="background:<?= $saldoBg ?>;padding:.6rem 1rem;text-align:center;border-top:1px solid #fdf2f8;">
             <span style="font-size:.8rem;font-weight:700;color:<?= $saldoColor ?>;"><?= $saldoMsg ?></span>
             <span style="font-size:.72rem;color:<?= $saldoColor ?>;opacity:.75;margin-left:.5rem;"><?= $saldoSub ?></span>
@@ -319,11 +358,60 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
     </div>
     <?php endif; ?>
 
-    <!-- ── Tabla 2: Ingresos diarios ────────────────── -->
-    <p class="eco-sec-title">Ingresos por turno trabajado</p>
-    <?php if (empty($ingresos)): ?>
-    <div class="eco-empty">Sin turnos registrados en <?= $mesLabel ?>.</div>
-    <?php else: ?>
+    <!-- ── Tabla 1b: Historial de descuentos (ajustes admin) ── -->
+    <?php if (!empty($descuentosAdj ?? [])): ?>
+    <p class="eco-sec-title">Historial de descuentos</p>
+    <div class="eco-table-wrap">
+        <table class="eco-table">
+            <thead>
+                <tr>
+                    <th>Fecha registro</th>
+                    <th>Cuadre · Local</th>
+                    <th>Acción</th>
+                    <th>Nota</th>
+                    <th class="text-right">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($descuentosAdj as $d):
+                $esAplicado = $d['accion'] === 'AGREGAR';
+                $dow = $diasLabel[(int)date('w', strtotime($d['fecha']))];
+            ?>
+            <tr>
+                <td style="white-space:nowrap;">
+                    <strong style="color:#1e293b;"><?= $dow ?></strong>
+                    <span class="eco-sub"><?= date('d/m/Y', strtotime($d['fecha'])) ?></span>
+                </td>
+                <td>
+                    <span style="font-size:.8rem;">Cuadre #<?= $d['id_sesion'] ?></span>
+                    <span class="eco-sub"><?= htmlspecialchars($d['local_desc']) ?></span>
+                </td>
+                <td>
+                    <?php if ($esAplicado): ?>
+                        <span class="eco-badge" style="background:#fee2e2;color:#991b1b;">Descuento aplicado</span>
+                    <?php else: ?>
+                        <span class="eco-badge" style="background:#d1fae5;color:#065f46;">Descuento liberado</span>
+                    <?php endif; ?>
+                </td>
+                <td style="font-size:.78rem;color:#475569;"><?= htmlspecialchars($d['descripcion'] ?? '') ?></td>
+                <td class="text-right">
+                    <span class="eco-monto" style="color:<?= $esAplicado ? '#991b1b' : '#065f46' ?>">
+                        <?= $esAplicado ? '−' : '+' ?> <?= $f2($d['monto']) ?>
+                    </span>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+
+    <!-- ── Tabla 2: Ingresos por turno trabajado ────── -->
+    <?php
+    $ingCert   = array_values(array_filter($ingresos, fn($i) =>  $i['certificado']));
+    $ingNoCert = array_values(array_filter($ingresos, fn($i) => !$i['certificado']));
+
+    $renderTablaIngresos = function(array $filas, float $total) use ($f2, $diasLabel, $turnoLabel): void { ?>
     <div class="eco-table-wrap">
         <table class="eco-table">
             <thead>
@@ -338,7 +426,7 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
                 </tr>
             </thead>
             <tbody>
-            <?php foreach ($ingresos as $ing):
+            <?php foreach ($filas as $ing):
                 $dow = $diasLabel[(int)date('w', strtotime($ing['fecha_dia']))];
             ?>
             <tr>
@@ -368,15 +456,35 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="3" class="text-right" style="font-size:.75rem;">Total · <?= $mesLabel ?></td>
-                    <td class="text-right"><?= $f2(array_sum(array_column($ingresos,'base'))) ?></td>
-                    <td class="text-right"><?= $f2(array_sum(array_column($ingresos,'bono_v'))) ?></td>
-                    <td class="text-right"><?= $f2(array_sum(array_column($ingresos,'bono_o'))) ?></td>
-                    <td class="text-right"><?= $f2($totalIngresos) ?></td>
+                    <td colspan="3" class="text-right" style="font-size:.75rem;">Subtotal</td>
+                    <td class="text-right"><?= $f2(array_sum(array_column($filas,'base'))) ?></td>
+                    <td class="text-right"><?= $f2(array_sum(array_column($filas,'bono_v'))) ?></td>
+                    <td class="text-right"><?= $f2(array_sum(array_column($filas,'bono_o'))) ?></td>
+                    <td class="text-right"><?= $f2($total) ?></td>
                 </tr>
             </tfoot>
         </table>
     </div>
+    <?php }; ?>
+
+    <?php if (empty($ingresos)): ?>
+    <p class="eco-sec-title">Ingresos por turno trabajado</p>
+    <div class="eco-empty">Sin turnos registrados en <?= $mesLabel ?>.</div>
+    <?php else: ?>
+
+    <?php if (!empty($ingCert)): ?>
+    <p class="eco-sec-title" style="color:#065f46;">✓ Ingresos certificados</p>
+    <?php $renderTablaIngresos($ingCert, $totalIngCert); ?>
+    <?php endif; ?>
+
+    <?php if (!empty($ingNoCert)): ?>
+    <p class="eco-sec-title" style="color:#b45309;margin-top:1.25rem;">⚠ Ingresos sin certificar</p>
+    <p style="font-size:.78rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:.5rem .75rem;margin-bottom:.6rem;">
+        Estos turnos no tienen encuesta completada. Pide al supervisor que la registre para que pasen a ingresos certificados.
+    </p>
+    <?php $renderTablaIngresos($ingNoCert, $totalIngNoCert); ?>
+    <?php endif; ?>
+
     <?php endif; ?>
 
 </main>

@@ -221,7 +221,7 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
             <thead><tr><th>Tipo</th><th>Detalle</th><th>Comprobante</th><th class="text-right">Monto</th></tr></thead>
             <tbody>
             <?php
-            $tipoPagoLabel = ['ADELANTO' => 'Adelanto', 'PAGO_TOTAL' => 'Pago total', 'OTROS' => 'Otros'];
+            $tipoPagoLabel = ['ADELANTO' => 'Adelanto', 'PAGO_TOTAL' => 'Pago total', 'DESCUENTO' => 'Descuento'];
             $tipoDocLabel  = ['BOLETA' => 'Boleta', 'FACTURA' => 'Factura', 'NOTA_DE_VENTA' => 'Nota de venta'];
             foreach ($gastos as $g):
                 $modo = $g['modo_ref'] ?? '';
@@ -413,7 +413,7 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
                 $t = $aj['tipo'] ?? 'COBRO';
 
                 if ($t === 'COBRO')    $detalle = htmlspecialchars($aj['modo_desc'] ?? '');
-                elseif ($t === 'PERSONAL') $detalle = htmlspecialchars($aj['staff_desc'] ?? '') . ($aj['tipo_pago'] ? ' · ' . ($aj['tipo_pago'] === 'ADELANTO' ? 'Adelanto' : 'Pago total') : '');
+                elseif ($t === 'PERSONAL') $detalle = htmlspecialchars($aj['staff_desc'] ?? '') . ($aj['tipo_pago'] ? ' · ' . (['ADELANTO'=>'Adelanto','PAGO_TOTAL'=>'Pago total','DESCUENTO'=>'Descuento'][$aj['tipo_pago']] ?? $aj['tipo_pago']) : '');
                 elseif ($t === 'LOCAL')    $detalle = htmlspecialchars($aj['local_desc'] ?? '') . ($aj['concepto_desc'] ? ' · ' . htmlspecialchars($aj['concepto_desc']) : '');
                 elseif ($t === 'COMPRA')   $detalle = ['BOLETA'=>'Boleta','FACTURA'=>'Factura','NOTA_DE_VENTA'=>'Nota de venta'][$aj['tipo_documento'] ?? ''] ?? '';
                 else                       $detalle = htmlspecialchars($aj['descripcion'] ?? '');
@@ -792,7 +792,7 @@ function ajTipoChanged(sel) {
         const opts = AJ_STAFF.map(s => `<option value="${s.id}">${s.nombre_completo}</option>`).join('');
         html = `<select id="ajRef" class="caja-input" style="flex:1"><option value="">— Personal —</option>${opts}</select>
                 <select id="ajTipoPago" class="caja-input" style="max-width:130px">
-                    <option value="PAGO_TOTAL">Pago total</option><option value="ADELANTO">Adelanto</option>
+                    <option value="PAGO_TOTAL">Pago total</option><option value="ADELANTO">Adelanto</option><option value="DESCUENTO">Descuento</option>
                 </select>
                 <input type="text" id="ajDesc" class="caja-input" style="max-width:140px" placeholder="Descripción (opc.)" maxlength="200">`;
     } else if (tipo === 'LOCAL') {

@@ -50,13 +50,15 @@ class CajaController extends Controller
         $userName     = $_SESSION['user_name'] ?? 'Usuario';
         $userRol      = $_SESSION['user_rol']  ?? 'STAFF';
 
-        $filtroLocal = isset($_GET['local']) ? (int)$_GET['local'] : 0;
-        $filtroMes   = $_GET['mes'] ?? date('Y-m');
+        $filtroCaja   = isset($_GET['caja'])   ? (int)$_GET['caja']   : 0;
+        $filtroCajera = isset($_GET['cajera']) ? (int)$_GET['cajera'] : 0;
+        $filtroMes    = $_GET['mes'] ?? date('Y-m');
 
         $pendientes = $this->repo->getSesionesByEstado('PENDIENTE_VENTA');
         $abiertas   = $this->repo->getSesionesByEstado('ABIERTA');
-        $recientes  = $this->repo->getSesionesRecientes($filtroLocal, $filtroMes);
-        $locales    = $this->repo->getLocales();
+        $recientes  = $this->repo->getSesionesRecientes($filtroCaja, $filtroCajera, $filtroMes);
+        $cajas      = $this->repo->getCajasActivas();
+        $cajeras    = $this->repo->getCajerasActivas();
 
         require_once __DIR__ . '/../../views/caja/index.php';
     }
