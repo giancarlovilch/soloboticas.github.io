@@ -287,7 +287,7 @@ setInterval(async () => {
     const yaIds = new Set([...lista.querySelectorAll('[data-id]')].map(el => parseInt(el.dataset.id)));
     let nuevos = 0;
     for (const p of pagos) {
-        if (yaIds.has(p.id)) continue;
+        if (yaIds.has(parseInt(p.id))) continue;
         nuevos++;
         const div = document.createElement('div');
         div.className = 'ps-pago';
