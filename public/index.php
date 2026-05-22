@@ -162,6 +162,9 @@ $router->post('/admin/database/upload',          [DatabaseController::class, 'up
 
 // --- MÓDULO DE REPORTES ---
 require_once __DIR__ . '/../src/Controllers/ReporteController.php';
+
+// --- LECTOR DE PAGOS BBVA (app móvil) ---
+require_once __DIR__ . '/../src/Controllers/PagoBBVAController.php';
 $router->get('/admin/reportes',         [ReporteController::class, 'index']);
 $router->get('/admin/reportes/arqueos',    [ReporteController::class, 'arqueos']);
 $router->get('/admin/reportes/coberturas',   [ReporteController::class, 'coberturas']);
@@ -187,6 +190,12 @@ $router->post('/admin/api/tarifa-base/agregar',      [AdminController::class, 'a
 $router->post('/admin/api/tarifa-base/{id}/eliminar',[AdminController::class, 'eliminarTarifaBase']);
 $router->post('/admin/api/bono/agregar',             [AdminController::class, 'addBono']);
 $router->post('/admin/api/bono/{id}/eliminar',       [AdminController::class, 'eliminarBono']);
+// BBVA — Vista y API
+$router->get('/admin/bbva-pagos',      [PagoBBVAController::class, 'vista']);
+$router->post('/api/bbva/pago',        [PagoBBVAController::class, 'registrar']);
+$router->post('/api/bbva/pagos/lote',  [PagoBBVAController::class, 'registrarLote']);
+$router->get('/api/bbva/pagos',        [PagoBBVAController::class, 'listar']);
+
 /**
  * EJECUCIÓN: El dispatch DEBE ir siempre AL FINAL[cite: 3, 8]
  */

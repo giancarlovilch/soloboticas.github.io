@@ -132,6 +132,13 @@ $navActive = [
                     </a>
                 </li>
 
+                <li class="list__item">
+                    <a href="<?= $basePath ?>/admin/bbva-pagos" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Pagos BBVA</span>
+                    </a>
+                </li>
+
                 <p class="nav__section">Sistema</p>
 
                 <li class="list__item">
