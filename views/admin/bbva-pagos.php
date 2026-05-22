@@ -10,7 +10,7 @@ $pagos    = $pagos ?? [];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pagos BBVA QR | SoloBoticas</title>
+    <title>Pagos PLIN QR | SoloBoticas</title>
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/normalize.css">
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/dashboard.css">
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/caja.css">
@@ -68,7 +68,7 @@ $pagos    = $pagos ?? [];
         <div class="caja-header__logo" style="background:#004481;">QR</div>
         <div>
             <p class="caja-header__company">Grupo KGyR S.A.C</p>
-            <p class="caja-header__app"><strong>Pagos BBVA</strong> — Cobros por QR</p>
+            <p class="caja-header__app"><strong>Pagos PLIN</strong> — Cobros por QR (raw)</p>
         </div>
     </div>
     <div class="caja-header__right">
@@ -88,7 +88,7 @@ $pagos    = $pagos ?? [];
         </div>
         <div style="text-align:right;">
             <p class="bbva-label">Fuente</p>
-            <p style="font-size:1rem;font-weight:600;">App LectorPagosBBVA</p>
+            <p style="font-size:1rem;font-weight:600;">App LectorPagosBBVA (PLIN)</p>
             <p style="font-size:.78rem;opacity:.7;margin-top:.25rem;">Notificaciones QR · Android</p>
         </div>
     </div>

@@ -163,8 +163,9 @@ $router->post('/admin/database/upload',          [DatabaseController::class, 'up
 // --- MÓDULO DE REPORTES ---
 require_once __DIR__ . '/../src/Controllers/ReporteController.php';
 
-// --- LECTOR DE PAGOS BBVA (app móvil) ---
+// --- LECTOR DE PAGOS BBVA/PLIN (app móvil) ---
 require_once __DIR__ . '/../src/Controllers/PagoBBVAController.php';
+require_once __DIR__ . '/../src/Controllers/PlinController.php';
 $router->get('/admin/reportes',         [ReporteController::class, 'index']);
 $router->get('/admin/reportes/arqueos',    [ReporteController::class, 'arqueos']);
 $router->get('/admin/reportes/coberturas',   [ReporteController::class, 'coberturas']);
@@ -190,11 +191,20 @@ $router->post('/admin/api/tarifa-base/agregar',      [AdminController::class, 'a
 $router->post('/admin/api/tarifa-base/{id}/eliminar',[AdminController::class, 'eliminarTarifaBase']);
 $router->post('/admin/api/bono/agregar',             [AdminController::class, 'addBono']);
 $router->post('/admin/api/bono/{id}/eliminar',       [AdminController::class, 'eliminarBono']);
-// BBVA — Vista y API
+// BBVA/PLIN — Vista admin y API recepción (rutas originales intactas para el celular)
 $router->get('/admin/bbva-pagos',      [PagoBBVAController::class, 'vista']);
 $router->post('/api/bbva/pago',        [PagoBBVAController::class, 'registrar']);
 $router->post('/api/bbva/pagos/lote',  [PagoBBVAController::class, 'registrarLote']);
 $router->get('/api/bbva/pagos',        [PagoBBVAController::class, 'listar']);
+
+// PLIN — Módulo de sesiones y reclamación
+$router->get('/plin',                                    [PlinController::class, 'index']);
+$router->get('/plin/sesion/{id}',                        [PlinController::class, 'sesion']);
+$router->post('/plin/api/sesion',                        [PlinController::class, 'apiCrearSesion']);
+$router->get('/plin/api/sesion/{id}/pagos-libres',       [PlinController::class, 'apiPagosLibres']);
+$router->post('/plin/api/sesion/{id}/reclamar/{pagoId}', [PlinController::class, 'apiReclamar']);
+$router->post('/plin/api/sesion/{id}/cerrar',            [PlinController::class, 'apiCerrarSesion']);
+$router->get('/plin/api/sesion/{id}/reclamados',         [PlinController::class, 'apiReclamados']);
 
 /**
  * EJECUCIÓN: El dispatch DEBE ir siempre AL FINAL[cite: 3, 8]

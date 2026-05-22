@@ -47,16 +47,16 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
 
 <main class="staff-main">
 
-    <!-- ── Pagos BBVA ────────────────────────────────────── -->
-    <section class="staff-card" style="text-align:center;background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1.5px solid #bfdbfe;">
-        <h2 class="staff-section-title" style="color:#1e40af;">Pagos BBVA QR</h2>
-        <p style="font-size:0.82rem;color:#1d4ed8;margin-bottom:1rem;">
-            Historial de cobros recibidos por QR desde la app móvil.
+    <!-- ── Pagos PLIN ────────────────────────────────────── -->
+    <section class="staff-card" style="text-align:center;background:linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%);border:1.5px solid #c4b5fd;">
+        <h2 class="staff-section-title" style="color:#6d28d9;">Cobros PLIN</h2>
+        <p style="font-size:0.82rem;color:#7c3aed;margin-bottom:1rem;">
+            Reclama los pagos QR recibidos y asígnalos a tu caja.
         </p>
-        <a href="<?= $basePath ?>/admin/bbva-pagos"
+        <a href="<?= $basePath ?>/plin"
            class="staff-btn-marcar"
-           style="display:inline-block;text-decoration:none;padding:.75rem 2rem;background:#1d4ed8;border-color:#1d4ed8;">
-            Ver pagos →
+           style="display:inline-block;text-decoration:none;padding:.75rem 2rem;background:#6d28d9;border-color:#6d28d9;">
+            Ir a PLIN →
         </a>
     </section>
 
