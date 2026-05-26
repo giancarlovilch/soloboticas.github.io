@@ -197,14 +197,17 @@ $router->post('/api/bbva/pago',        [PagoBBVAController::class, 'registrar'])
 $router->post('/api/bbva/pagos/lote',  [PagoBBVAController::class, 'registrarLote']);
 $router->get('/api/bbva/pagos',        [PagoBBVAController::class, 'listar']);
 
-// PLIN — Módulo de sesiones y reclamación
-$router->get('/plin',                                    [PlinController::class, 'index']);
-$router->get('/plin/sesion/{id}',                        [PlinController::class, 'sesion']);
-$router->post('/plin/api/sesion',                        [PlinController::class, 'apiCrearSesion']);
-$router->get('/plin/api/sesion/{id}/pagos-libres',       [PlinController::class, 'apiPagosLibres']);
-$router->post('/plin/api/sesion/{id}/reclamar/{pagoId}', [PlinController::class, 'apiReclamar']);
-$router->post('/plin/api/sesion/{id}/cerrar',            [PlinController::class, 'apiCerrarSesion']);
-$router->get('/plin/api/sesion/{id}/reclamados',         [PlinController::class, 'apiReclamados']);
+// PLIN — Visor público de transacciones
+$router->get('/plin',            [PlinController::class, 'index']);
+$router->get('/plin/api/visor',  [PlinController::class, 'apiVisor']);
+
+// SoloBank — Vales de cierres enviados desde Python
+require_once __DIR__ . '/../src/Controllers/SoloBankController.php';
+$router->post('/api/solobank/vale',                        [SoloBankController::class, 'recibirVale']);
+$router->get('/api/solobank/vales/disponibles',            [SoloBankController::class, 'apiDisponibles']);
+$router->post('/caja/api/sesion/{id}/solobank',            [SoloBankController::class, 'usarVale']);
+$router->post('/caja/api/solobank-mov/{id}/quitar',        [SoloBankController::class, 'quitarVale']);
+$router->get('/admin/solobank-vales',                      [SoloBankController::class, 'vistaAdmin']);
 
 /**
  * EJECUCIÓN: El dispatch DEBE ir siempre AL FINAL[cite: 3, 8]

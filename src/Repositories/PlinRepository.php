@@ -243,4 +243,30 @@ class PlinRepository
             "SELECT COUNT(*) FROM pagos_bbva WHERE sesion_plin_id IS NULL"
         )->fetchColumn();
     }
+
+    // ── Visor público ──────────────────────────────────────
+
+    public function getPagosPorFecha(string $fecha, int $sinceId = 0): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT id, cliente, monto, fecha_notif, subtexto, app_origen
+            FROM pagos_bbva
+            WHERE DATE(fecha_notif) = :fecha
+              AND id > :since_id
+            ORDER BY timestamp_notif DESC
+        ");
+        $stmt->execute(['fecha' => $fecha, 'since_id' => $sinceId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getTotalPorFecha(string $fecha): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT COALESCE(SUM(monto), 0) AS total, COUNT(*) AS cantidad
+            FROM pagos_bbva
+            WHERE DATE(fecha_notif) = :fecha
+        ");
+        $stmt->execute(['fecha' => $fecha]);
+        return $stmt->fetch();
+    }
 }

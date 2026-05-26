@@ -44,10 +44,40 @@ class CajaRepository
 
     public function getModosPago(): array
     {
-        // id_modo = 1 es EFECTIVO (uso interno), no se muestra al usuario
+        // id_modo = 1 es EFECTIVO; SoloBank tiene su propio UI — ambos excluidos
         return $this->db->query(
-            "SELECT id_modo, descripcion FROM modo WHERE activo = 1 AND id_modo != 1 ORDER BY id_modo"
+            "SELECT id_modo, descripcion FROM modo
+              WHERE activo = 1 AND id_modo != 1 AND descripcion != 'SoloBank'
+              ORDER BY id_modo"
         )->fetchAll();
+    }
+
+    public function getSoloBankModoId(): int
+    {
+        $row = $this->db->query(
+            "SELECT id_modo FROM modo WHERE descripcion = 'SoloBank' LIMIT 1"
+        )->fetch();
+        if ($row) return (int) $row['id_modo'];
+        $this->db->exec("INSERT INTO modo (descripcion, activo) VALUES ('SoloBank', 1)");
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function addPagoSoloBank(int $sesionId, int $registradorId, string $codigoVale, float $monto): int
+    {
+        $modoId = $this->getSoloBankModoId();
+        $this->db->prepare("
+            INSERT INTO movimiento_sesion
+                (sesion_id, tipo_movimiento_id, modo_id, postulante_registro_id,
+                 monto, numero_operacion, estado)
+            VALUES (:sid, 1, :modo, :reg, :mon, :num, 'PENDIENTE')
+        ")->execute([
+            'sid'  => $sesionId,
+            'modo' => $modoId,
+            'reg'  => $registradorId,
+            'mon'  => $monto,
+            'num'  => $codigoVale,
+        ]);
+        return (int) $this->db->lastInsertId();
     }
 
     public function getTiposEgreso(): array

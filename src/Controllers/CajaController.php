@@ -111,6 +111,11 @@ class CajaController extends Controller
         $modos       = $this->repo->getModosPago();
         $gastos      = $this->repo->getGastosSesion($id);
 
+        // Vales SoloBank disponibles para seleccionar
+        require_once __DIR__ . '/../Repositories/SoloBankRepository.php';
+        $sbRepo      = new SoloBankRepository();
+        $soloBankVales = $sbRepo->getValesDisponibles();
+
         // Cargar detalle_cuadre si existe (activos ya guardados)
         $db     = \Database::getConnection();
         $dcStmt = $db->prepare("SELECT * FROM detalle_cuadre WHERE sesion_id = :sid");

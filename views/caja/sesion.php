@@ -240,6 +240,34 @@ $act = [
             <span>Total digital registrado (pendiente de aprobación):</span>
             <strong id="totalDigital">S/ 0.00</strong>
         </div>
+
+        <!-- SoloBank -->
+        <div style="margin-top:1rem;padding-top:.75rem;border-top:1px solid #e2e8f0;">
+            <p style="font-size:.8rem;font-weight:700;color:#003da6;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.4px;">
+                📋 Vale SoloBank
+            </p>
+            <div id="sbFormWrap" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                <select id="sbSelect" class="caja-input" style="flex:1;min-width:220px;" onchange="sbSelectChanged()">
+                    <option value="">— Seleccionar vale —</option>
+                    <?php foreach ($soloBankVales ?? [] as $v):
+                        $label = htmlspecialchars($v['caja']) . ' · '
+                               . date('d/m', strtotime($v['fecha'])) . ' ' . htmlspecialchars($v['turno'])
+                               . ' · S/ ' . number_format((float)$v['total'], 2)
+                               . ' (' . $v['conteo'] . ' pagos)';
+                    ?>
+                        <option value="<?= htmlspecialchars($v['codigo']) ?>"
+                                data-monto="<?= (float)$v['total'] ?>">
+                            <?= $label ?>
+                        </option>
+                    <?php endforeach ?>
+                </select>
+                <span id="sbMonto" style="font-weight:700;color:#003da6;min-width:80px;"></span>
+                <button class="caja-btn caja-btn--outline" onclick="agregarVale()" id="sbBtn" disabled>
+                    + Agregar vale
+                </button>
+            </div>
+            <div id="sbMsg" class="caja-alert" style="margin:.4rem 0;" hidden></div>
+        </div>
     </section>
 
     <!-- ── Gastos ─────────────────────────────────────────── -->
@@ -374,9 +402,10 @@ const ES_EDICION = <?= $esEdicion ? 'true' : 'false' ?>;
 const SESION_ID  = <?= $sesionId ?: 'null' ?>;
 const CONCEPTOS    = <?= json_encode($conceptos ?? []) ?>;
 const STAFF        = <?= json_encode($staff ?? []) ?>;
-const TIPOS_EGRESO = <?= json_encode($tiposEgreso ?? []) ?>;
-const MODOS        = <?= json_encode($modos ?? []) ?>;
-const LOCALES      = <?= json_encode($locales ?? []) ?>;
+const TIPOS_EGRESO    = <?= json_encode($tiposEgreso ?? []) ?>;
+const MODOS           = <?= json_encode($modos ?? []) ?>;
+const LOCALES         = <?= json_encode($locales ?? []) ?>;
+const SOLOBANK_VALES  = <?= json_encode($soloBankVales ?? []) ?>;
 </script>
 <script>
 function actualizarContador(el) {

@@ -368,7 +368,11 @@ function renderPagosDigitales(pagos) {
         total += parseFloat(p.monto);
         const badgeCls = p.estado === 'APROBADO' ? 'badge-contratado'
                        : p.estado === 'RECHAZADO' ? 'badge-rechazado' : 'badge-pendiente';
-        const canDelete = p.estado === 'PENDIENTE';
+        const canDelete   = p.estado === 'PENDIENTE';
+        const esSoloBank  = p.modo_desc === 'SoloBank';
+        const deleteCall  = esSoloBank
+            ? `eliminarPagoDigital(${p.id_movimiento}, true)`
+            : `eliminarPagoDigital(${p.id_movimiento})`;
         return `<tr>
             <td><strong>${p.modo_desc}</strong></td>
             <td>${p.numero_operacion || '—'}</td>
@@ -376,7 +380,7 @@ function renderPagosDigitales(pagos) {
             <td class="text-center"><span class="badge ${badgeCls}" style="font-size:0.68rem;">${p.estado}</span></td>
             <td class="text-center">
                 ${canDelete
-                    ? `<button class="caja-gasto__remove" onclick="eliminarPagoDigital(${p.id_movimiento})">✕</button>`
+                    ? `<button class="caja-gasto__remove" onclick="${deleteCall}">✕</button>`
                     : '—'}
             </td>
         </tr>`;
@@ -385,12 +389,13 @@ function renderPagosDigitales(pagos) {
     $('totalDigital').textContent = `S/ ${total.toFixed(2)}`;
 }
 
-async function eliminarPagoDigital(id) {
+async function eliminarPagoDigital(id, esSoloBank = false) {
     const msg = $('digitalesMsg');
+    const url = esSoloBank
+        ? `${BASE}/caja/api/solobank-mov/${id}/quitar`
+        : `${BASE}/caja/api/pago-digital/${id}/eliminar`;
     try {
-        const r   = await fetch(`${BASE}/caja/api/pago-digital/${id}/eliminar`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-        });
+        const r   = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
         const res = await r.json();
         if (res.success) {
             hideAlert(msg);
@@ -400,6 +405,51 @@ async function eliminarPagoDigital(id) {
         }
     } catch {
         showAlert(msg, 'Error de conexión.');
+    }
+}
+
+// ── SoloBank vales ────────────────────────────────────
+
+function sbSelectChanged() {
+    const sel   = $('sbSelect');
+    const btn   = $('sbBtn');
+    const monto = $('sbMonto');
+    if (!sel || !sel.value) {
+        if (btn)   btn.disabled = true;
+        if (monto) monto.textContent = '';
+        return;
+    }
+    const opt = sel.options[sel.selectedIndex];
+    const m   = parseFloat(opt.dataset.monto || 0);
+    if (monto) monto.textContent = `S/ ${m.toFixed(2)}`;
+    if (btn)   btn.disabled = false;
+}
+
+async function agregarVale() {
+    const sel    = $('sbSelect');
+    const msg    = $('sbMsg');
+    const codigo = sel?.value?.trim();
+    if (!codigo || !SESION_ID) return;
+
+    try {
+        const r   = await fetch(`${BASE}/caja/api/sesion/${SESION_ID}/solobank`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ codigo }),
+        });
+        const res = await r.json();
+        if (res.success) {
+            // Quitar vale del select
+            sel.remove(sel.selectedIndex);
+            sel.value = '';
+            sbSelectChanged();
+            if (msg) { msg.hidden = false; msg.className = 'caja-alert caja-alert--success'; msg.textContent = 'Vale SoloBank agregado.'; }
+            await cargarPagosDigitales();
+        } else {
+            if (msg) { msg.hidden = false; msg.className = 'caja-alert caja-alert--error'; msg.textContent = res.message || 'Error al agregar vale.'; }
+        }
+    } catch {
+        if (msg) { msg.hidden = false; msg.className = 'caja-alert caja-alert--error'; msg.textContent = 'Error de conexión.'; }
     }
 }
 
