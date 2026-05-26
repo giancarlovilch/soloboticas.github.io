@@ -208,6 +208,7 @@ $router->get('/api/solobank/vales/disponibles',            [SoloBankController::
 $router->post('/caja/api/sesion/{id}/solobank',            [SoloBankController::class, 'usarVale']);
 $router->post('/caja/api/solobank-mov/{id}/quitar',        [SoloBankController::class, 'quitarVale']);
 $router->get('/admin/solobank-vales',                      [SoloBankController::class, 'vistaAdmin']);
+$router->post('/admin/solobank-vales/{id}/toggle',         [SoloBankController::class, 'toggleEstado']);
 
 /**
  * EJECUCIÓN: El dispatch DEBE ir siempre AL FINAL[cite: 3, 8]

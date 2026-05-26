@@ -101,18 +101,48 @@ class SoloBankRepository
         ")->execute(['mid' => $movimientoId]);
     }
 
-    public function getAll(): array
+    public function toggleEstado(int $id): ?array
     {
-        return $this->db->query("
+        $stmt = $this->db->prepare(
+            "SELECT id, estado FROM solobank_vales WHERE id = :id"
+        );
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch();
+        if (!$row) return null;
+
+        if ($row['estado'] === 'DISPONIBLE') {
+            $this->db->prepare(
+                "UPDATE solobank_vales SET estado = 'USADO' WHERE id = :id"
+            )->execute(['id' => $id]);
+            return ['nuevo_estado' => 'USADO'];
+        } else {
+            // Liberar — limpiar vínculo con sesión
+            $this->db->prepare(
+                "UPDATE solobank_vales
+                    SET estado = 'DISPONIBLE', sesion_id = NULL, movimiento_id = NULL
+                  WHERE id = :id"
+            )->execute(['id' => $id]);
+            return ['nuevo_estado' => 'DISPONIBLE'];
+        }
+    }
+
+    public function getAll(?string $fecha = null): array
+    {
+        $where = $fecha ? "WHERE sv.fecha = :fecha" : "";
+        $params = $fecha ? ['fecha' => $fecha] : [];
+        $stmt = $this->db->prepare("
             SELECT sv.*,
                    c.descripcion AS caja_local_desc,
                    l.descripcion AS local_desc
             FROM solobank_vales sv
-            LEFT JOIN sesion_caja sc ON sc.id_sesion  = sv.sesion_id
-            LEFT JOIN caja        c  ON c.id_caja     = sc.caja_id
-            LEFT JOIN local       l  ON l.id_local    = c.local_id
+            LEFT JOIN sesion_caja sc ON sc.id_sesion = sv.sesion_id
+            LEFT JOIN caja        c  ON c.id_caja    = sc.caja_id
+            LEFT JOIN local       l  ON l.id_local   = c.local_id
+            $where
             ORDER BY sv.fecha DESC, sv.recibido_en DESC
-            LIMIT 200
-        ")->fetchAll();
+            LIMIT 500
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll();
     }
 }

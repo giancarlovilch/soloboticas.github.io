@@ -122,13 +122,23 @@ class SoloBankController extends Controller
         }
     }
 
+    // ── POST /admin/solobank-vales/{id}/toggle ────────────────────────────────
+    public function toggleEstado(int $id): void
+    {
+        $this->requireAuth();
+        $result = $this->repo->toggleEstado($id);
+        if (!$result) { $this->error('Vale no encontrado', 404); return; }
+        $this->success('Estado actualizado', $result);
+    }
+
     // ── GET /admin/solobank-vales  (dashboard admin) ──────────────────────────
     public function vistaAdmin(): void
     {
         $this->requireAuth();
-        $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
-        $userName = $_SESSION['user_name'] ?? 'Usuario';
-        $vales    = $this->repo->getAll();
+        $basePath  = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $userName  = $_SESSION['user_name'] ?? 'Usuario';
+        $filtroFecha = $_GET['fecha'] ?? '';
+        $vales     = $this->repo->getAll($filtroFecha ?: null);
         require_once __DIR__ . '/../../views/admin/solobank-vales.php';
     }
 }
