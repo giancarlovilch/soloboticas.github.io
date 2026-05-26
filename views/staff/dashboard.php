@@ -47,19 +47,6 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
 
 <main class="staff-main">
 
-    <!-- ── Pagos PLIN ────────────────────────────────────── -->
-    <section class="staff-card" style="text-align:center;background:linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%);border:1.5px solid #c4b5fd;">
-        <h2 class="staff-section-title" style="color:#6d28d9;">Cobros PLIN</h2>
-        <p style="font-size:0.82rem;color:#7c3aed;margin-bottom:1rem;">
-            Reclama los pagos QR recibidos y asígnalos a tu caja.
-        </p>
-        <a href="<?= $basePath ?>/plin"
-           class="staff-btn-marcar"
-           style="display:inline-block;text-decoration:none;padding:.75rem 2rem;background:#6d28d9;border-color:#6d28d9;">
-            Ir a PLIN →
-        </a>
-    </section>
-
     <!-- ── Reloj ───────────────────────────────────────── -->
     <section class="staff-card staff-clock-card">
         <div class="staff-clock" id="reloj">00:00:00</div>
@@ -123,6 +110,19 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
                 👤 Mis encuestas →
             </a>
         </div>
+    </section>
+
+    <!-- ── Pagos PLIN ────────────────────────────────────── -->
+    <section class="staff-card" style="text-align:center;background:linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%);border:1.5px solid #c4b5fd;">
+        <h2 class="staff-section-title" style="color:#6d28d9;">Cobros PLIN</h2>
+        <p style="font-size:0.82rem;color:#7c3aed;margin-bottom:1rem;">
+            Reclama los pagos QR recibidos y asígnalos a tu caja.
+        </p>
+        <a href="<?= $basePath ?>/plin"
+           class="staff-btn-marcar"
+           style="display:inline-block;text-decoration:none;padding:.75rem 2rem;background:#6d28d9;border-color:#6d28d9;">
+            Ir a PLIN →
+        </a>
     </section>
 
 </main>
