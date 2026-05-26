@@ -17,7 +17,7 @@ class SoloBankRepository
         $this->db->exec("
             CREATE TABLE IF NOT EXISTS solobank_vales (
                 id             INT AUTO_INCREMENT PRIMARY KEY,
-                codigo         VARCHAR(64)    NOT NULL UNIQUE,
+                codigo         VARCHAR(64)    NOT NULL,
                 caja           VARCHAR(20)    NOT NULL,
                 fecha          DATE           NOT NULL,
                 turno          VARCHAR(10)    NOT NULL DEFAULT 'Tarde',
@@ -27,8 +27,11 @@ class SoloBankRepository
                 sesion_id      INT            NULL,
                 movimiento_id  INT            NULL,
                 recibido_en    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                actualizado_en DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                actualizado_en DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_codigo (codigo),
+                INDEX idx_estado (estado),
+                INDEX idx_fecha  (fecha)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     }
 
