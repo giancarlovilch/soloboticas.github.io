@@ -389,6 +389,29 @@ function renderPagosDigitales(pagos) {
     $('totalDigital').textContent = `S/ ${total.toFixed(2)}`;
 }
 
+async function recargarValesSelect() {
+    const sel = $('sbSelect');
+    if (!sel) return;
+    try {
+        const r    = await fetch(`${BASE}/api/solobank/vales/disponibles`);
+        const res  = await r.json();
+        const vales = res.data?.vales ?? [];
+        // Conservar solo el placeholder y reconstruir opciones
+        sel.innerHTML = '<option value="">— Seleccionar vale —</option>';
+        vales.forEach(v => {
+            const d     = new Date(v.fecha + 'T00:00:00');
+            const label = `${v.caja} · ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${v.turno} · S/ ${parseFloat(v.total).toFixed(2)} (${v.conteo} pagos)`;
+            const opt   = document.createElement('option');
+            opt.value            = v.codigo;
+            opt.dataset.monto    = v.total;
+            opt.textContent      = label;
+            sel.appendChild(opt);
+        });
+        sel.value = '';
+        sbSelectChanged();
+    } catch { /* silencioso */ }
+}
+
 async function eliminarPagoDigital(id, esSoloBank = false) {
     const msg = $('digitalesMsg');
     const url = esSoloBank
@@ -400,6 +423,7 @@ async function eliminarPagoDigital(id, esSoloBank = false) {
         if (res.success) {
             hideAlert(msg);
             await cargarPagosDigitales();
+            if (esSoloBank) await recargarValesSelect();
         } else {
             showAlert(msg, res.message || 'No se pudo eliminar.');
         }
