@@ -22,10 +22,15 @@ class SoloBankController extends Controller
         if (empty($keyEsperada)) {
             $this->error('SOLOBANK_API_KEY no configurada en servidor', 500); exit;
         }
+        // getallheaders() falla en PHP-FPM/CGI; $_SERVER es siempre confiable
         $headers     = function_exists('getallheaders') ? getallheaders() : [];
-        $keyRecibida = $headers['X-SoloBank-Key'] ?? $headers['x-solobank-key'] ?? '';
-        if (!hash_equals($keyEsperada, $keyRecibida)) {
-            $this->error('API Key inválida', 401); exit;
+        $keyRecibida = $headers['X-SoloBank-Key']
+                    ?? $headers['x-solobank-key']
+                    ?? $_SERVER['HTTP_X_SOLOBANK_KEY']
+                    ?? '';
+        if (!hash_equals($keyEsperada, trim($keyRecibida))) {
+            $preview = substr($keyRecibida, 0, 6) ?: '(vacía)';
+            $this->error("API Key inválida — recibida: '{$preview}…'", 401); exit;
         }
     }
 
