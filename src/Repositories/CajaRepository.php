@@ -772,6 +772,13 @@ class CajaRepository
     // ── Eliminar sesión y todos sus hijos ──────────────────
     public function eliminarSesion(int $sesionId): void
     {
+        // Liberar vales SoloBank vinculados antes de borrar los movimientos
+        $this->db->prepare(
+            "UPDATE solobank_vales
+                SET estado = 'DISPONIBLE', sesion_id = NULL, movimiento_id = NULL
+              WHERE sesion_id = :sid"
+        )->execute(['sid' => $sesionId]);
+
         // Orden de borrado respetando FKs
         $tablas = [
             "DELETE FROM rectificacion_cuadre  WHERE sesion_id = :sid",
