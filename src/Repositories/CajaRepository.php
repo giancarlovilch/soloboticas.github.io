@@ -233,7 +233,36 @@ class CajaRepository
                         WHERE pc.id_caja = sc.caja_id
                           AND prev.id_sesion < sc.id_sesion
                         ORDER BY prev.id_sesion DESC LIMIT 1
-                       ) AS sesion_anterior_id
+                       ) AS sesion_anterior_id,
+                       (
+                           COALESCE(dc.total_efectivo_contado, 0) - (
+                               COALESCE(sc.saldo_inicial, 0)
+                               + COALESCE(dc.total_ventas_sistema, 0)
+                               - COALESCE(dc.total_gastos_sistema, 0)
+                               - COALESCE((
+                                   SELECT SUM(ms.monto)
+                                   FROM movimiento_sesion ms
+                                   WHERE ms.sesion_id = sc.id_sesion
+                                     AND ms.tipo_movimiento_id = 1
+                                     AND ms.estado IN ('PENDIENTE','APROBADO')
+                               ), 0)
+                           )
+                       ) AS diferencia,
+                       COALESCE((
+                           SELECT SUM(rc.monto)
+                           FROM rectificacion_cuadre rc
+                           WHERE rc.sesion_id = sc.id_sesion
+                       ), 0) AS sum_rectifs,
+                       COALESCE((
+                           SELECT SUM(CASE WHEN ae.accion = 'AGREGAR' THEN ae.monto ELSE -ae.monto END)
+                           FROM ajuste_esperado ae
+                           WHERE ae.sesion_id = sc.id_sesion
+                       ), 0) AS sum_ajustes,
+                       COALESCE((
+                           SELECT SUM(cv.monto_nuevo - cv.monto_anterior)
+                           FROM correccion_venta cv
+                           WHERE cv.sesion_id = sc.id_sesion
+                       ), 0) AS sum_corr_ventas
                 FROM sesion_caja sc
                 INNER JOIN caja c ON sc.caja_id = c.id_caja
                 INNER JOIN local l ON c.local_id = l.id_local
@@ -358,6 +387,28 @@ class CajaRepository
         return $stmt->rowCount() > 0;
     }
 
+    public function getMovimientoById(int $movId, int $sesionId): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT ms.id_movimiento, ms.sesion_id, ms.estado, ms.monto,
+                    ms.numero_operacion, m.descripcion AS modo_desc
+             FROM movimiento_sesion ms
+             INNER JOIN modo m ON ms.modo_id = m.id_modo
+             WHERE ms.id_movimiento = :mid AND ms.sesion_id = :sid
+               AND ms.tipo_movimiento_id = 1"
+        );
+        $stmt->execute(['mid' => $movId, 'sid' => $sesionId]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public function adminDeleteMovimiento(int $movId): void
+    {
+        $this->db->prepare(
+            "DELETE FROM movimiento_sesion
+             WHERE id_movimiento = :id AND tipo_movimiento_id = 1"
+        )->execute(['id' => $movId]);
+    }
+
     public function confirmarPagoDigital(int $movId, int $revisorId, string $estado): bool
     {
         $stmt = $this->db->prepare(
@@ -431,6 +482,43 @@ class CajaRepository
         );
         $stmt->execute(['sid' => $sesionId]);
         return (float)$stmt->fetchColumn();
+    }
+
+    /** Recalcula diferencia/resultado en detalle_cuadre tras cambios retroactivos
+     *  (asignación o liberación de vales SoloBank en sesiones ya cerradas). */
+    public function recalcularDiferencia(int $sesionId): void
+    {
+        $sesion = $this->getSesionById($sesionId);
+        if (!$sesion) return;
+
+        $dcStmt = $this->db->prepare("SELECT * FROM detalle_cuadre WHERE sesion_id = :sid");
+        $dcStmt->execute(['sid' => $sesionId]);
+        $dc = $dcStmt->fetch();
+        if (!$dc) return;
+
+        $ventas         = (float)($dc['total_ventas_sistema']  ?? 0);
+        $gastos         = (float)($dc['total_gastos_sistema']  ?? 0);
+        $efectivoFisico = (float)($dc['total_efectivo_contado'] ?? 0);
+        $saldoInicial   = (float)($sesion['saldo_inicial']      ?? 0);
+
+        $digitalAprobado = $this->sumDigitalDeclarado($sesionId);
+        $totalEsperado   = round($saldoInicial + $ventas - $gastos - $digitalAprobado, 2);
+        $diferencia      = round($efectivoFisico - $totalEsperado, 2);
+        $resultado       = abs($diferencia) < 0.01 ? 'CONSISTENTE'
+                         : ($diferencia > 0 ? 'SOBRANTE' : 'FALTANTE');
+
+        $this->db->prepare(
+            "UPDATE detalle_cuadre SET
+                total_esperado_sistema = :esp,
+                diferencia             = :dif,
+                resultado_cuadre       = :res
+             WHERE sesion_id = :sid"
+        )->execute([
+            'esp' => $totalEsperado,
+            'dif' => $diferencia,
+            'res' => $resultado,
+            'sid' => $sesionId,
+        ]);
     }
 
     // ── Gastos ─────────────────────────────────────────────

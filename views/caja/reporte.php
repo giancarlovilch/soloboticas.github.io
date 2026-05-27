@@ -249,6 +249,7 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
     </section>
 
     <!-- ── Pagos digitales detallados ────────────────────────── -->
+    <?php $esAdmin = ($userRol ?? $_SESSION['user_rol'] ?? '') === 'ADMIN'; ?>
     <section class="caja-card">
         <h2 class="caja-card__title">Cobros electrónicos del turno (<?= count($digitales ?? []) ?>)</h2>
         <?php if (empty($digitales)): ?>
@@ -262,6 +263,7 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
                     <th>N° Operación</th>
                     <th class="text-right">Monto</th>
                     <th class="text-center">Estado</th>
+                    <?php if ($esAdmin): ?><th class="text-center" style="width:48px"></th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -274,7 +276,7 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
             foreach ($digitales as $dg):
                 $est = $estadoDigital[$dg['estado']] ?? ['label' => $dg['estado'], 'cls' => ''];
             ?>
-                <tr>
+                <tr id="dgrow-<?= $dg['id_movimiento'] ?>">
                     <td style="font-size:0.78rem;color:#64748b;">
                         <?= date('H:i', strtotime($dg['fecha_movimiento'])) ?>
                     </td>
@@ -286,12 +288,50 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
                             <?= $est['label'] ?>
                         </span>
                     </td>
+                    <?php if ($esAdmin): ?>
+                    <td class="text-center">
+                        <button onclick="abrirModalEliminarPago(<?= $dg['id_movimiento'] ?>, '<?= htmlspecialchars(addslashes($dg['modo_desc'])) ?>', '<?= number_format((float)$dg['monto'],2) ?>')"
+                                style="background:none;border:1px solid #fca5a5;color:#ef4444;border-radius:5px;padding:2px 7px;font-size:0.72rem;cursor:pointer;"
+                                title="Eliminar cobro">🗑</button>
+                    </td>
+                    <?php endif; ?>
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
         <?php endif; ?>
     </section>
+
+    <!-- Modal eliminar cobro electrónico (solo ADMIN) -->
+    <?php if ($esAdmin): ?>
+    <div id="modalEliminarPago" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:500;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:14px;padding:1.75rem;width:360px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.22);">
+            <h3 style="font-size:1rem;font-weight:700;color:#1e293b;margin:0 0 .3rem;">Eliminar cobro electrónico</h3>
+            <p id="elimPagoDesc" style="font-size:.82rem;color:#475569;margin:0 0 1rem;line-height:1.5;"></p>
+            <div style="background:#fef3c7;border-radius:8px;padding:.6rem .9rem;margin-bottom:1rem;">
+                <p style="font-size:.76rem;color:#92400e;margin:0;">
+                    ⚠ Esta acción no se puede deshacer. El cuadre se recalculará automáticamente.
+                </p>
+            </div>
+            <label style="font-size:.8rem;font-weight:600;color:#334155;display:block;margin-bottom:.3rem;">
+                Tu contraseña de administrador
+            </label>
+            <input id="elimPagoPass" type="password" placeholder="Contraseña"
+                   style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:7px;padding:.45rem .7rem;font-size:.85rem;margin-bottom:.75rem;">
+            <div id="elimPagoErr" style="font-size:.78rem;color:#991b1b;margin-bottom:.5rem;display:none;"></div>
+            <div style="display:flex;gap:.6rem;justify-content:flex-end;">
+                <button onclick="cerrarModalEliminarPago()"
+                    style="background:#f1f5f9;border:none;border-radius:7px;padding:.5rem 1.1rem;font-size:.82rem;cursor:pointer;color:#475569;">
+                    Cancelar
+                </button>
+                <button id="btnConfirmarElimPago"
+                    style="background:#dc2626;border:none;border-radius:7px;padding:.5rem 1.1rem;font-size:.82rem;font-weight:700;color:#fff;cursor:pointer;">
+                    Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- ── Vales SoloBank ───────────────────────────────────── -->
     <?php
@@ -1042,6 +1082,58 @@ async function asignarVale(sesionId) {
         showAlert(msg, 'Error de conexión.', 'error');
     }
 }
+
+// ── Eliminar cobro electrónico (solo ADMIN) ───────────
+let _elimPagoMovId = null;
+const _SESION_ID   = <?= (int)$sesion['id_sesion'] ?>;
+
+function abrirModalEliminarPago(movId, modo, monto) {
+    _elimPagoMovId = movId;
+    document.getElementById('elimPagoDesc').textContent =
+        `${modo} · S/ ${monto}`;
+    document.getElementById('elimPagoPass').value = '';
+    document.getElementById('elimPagoErr').style.display = 'none';
+    document.getElementById('modalEliminarPago').style.display = 'flex';
+    setTimeout(() => document.getElementById('elimPagoPass').focus(), 80);
+}
+
+function cerrarModalEliminarPago() {
+    document.getElementById('modalEliminarPago').style.display = 'none';
+    _elimPagoMovId = null;
+}
+
+document.getElementById('elimPagoPass')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btnConfirmarElimPago')?.click();
+});
+
+document.getElementById('btnConfirmarElimPago')?.addEventListener('click', async function () {
+    if (!_elimPagoMovId) return;
+    const pass = document.getElementById('elimPagoPass').value;
+    const errEl = document.getElementById('elimPagoErr');
+    if (!pass) { errEl.textContent = 'Ingresa tu contraseña.'; errEl.style.display = 'block'; return; }
+
+    this.disabled = true;
+    try {
+        const r   = await fetch(`${BASE}/caja/api/sesion/${_SESION_ID}/pago-digital/${_elimPagoMovId}/eliminar-admin`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ password: pass }),
+        });
+        const res = await r.json();
+        if (res.success) {
+            document.getElementById(`dgrow-${_elimPagoMovId}`)?.remove();
+            cerrarModalEliminarPago();
+            setTimeout(() => location.reload(), 600);
+        } else {
+            errEl.textContent = res.message || 'Error al eliminar.';
+            errEl.style.display = 'block';
+        }
+    } catch {
+        errEl.textContent = 'Error de conexión.';
+        errEl.style.display = 'block';
+    }
+    this.disabled = false;
+});
 
 // ── Eliminar cuadre ───────────────────────────────────
 function abrirModalEliminar() {

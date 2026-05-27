@@ -24,19 +24,20 @@ $tipoPagoInfo = [
     'OTROS'      => ['label' => 'Otros',       'bg' => '#ede9fe', 'color' => '#5b21b6'],
 ];
 $estadoInfo = [
-    'PAGADO'                  => ['label' => 'Pagado',     'bg' => '#d1fae5', 'color' => '#065f46'],
-    'CONFIRMADO_BENEFICIARIO' => ['label' => 'Confirmado', 'bg' => '#d1fae5', 'color' => '#065f46'],
-    'APROBADO'                => ['label' => 'Aprobado',   'bg' => '#ede9fe', 'color' => '#5b21b6'],
-    'PENDIENTE'               => ['label' => 'Pendiente',  'bg' => '#fef3c7', 'color' => '#92400e'],
-    'OBSERVADO'               => ['label' => 'Observado',  'bg' => '#ffedd5', 'color' => '#9a3412'],
-    'RECHAZADO'               => ['label' => 'Rechazado',  'bg' => '#fee2e2', 'color' => '#991b1b'],
+    'PAGADO'                  => ['label' => 'Pagado',        'bg' => '#d1fae5', 'color' => '#065f46'],
+    'CONFIRMADO_BENEFICIARIO' => ['label' => 'Confirmado',    'bg' => '#d1fae5', 'color' => '#065f46'],
+    'APROBADO'                => ['label' => 'Aprobado',      'bg' => '#ede9fe', 'color' => '#5b21b6'],
+    'PENDIENTE'               => ['label' => 'Pendiente',     'bg' => '#fef3c7', 'color' => '#92400e'],
+    'OBSERVADO'               => ['label' => 'Observado',     'bg' => '#ffedd5', 'color' => '#9a3412'],
+    'RECHAZADO'               => ['label' => 'Rechazado',     'bg' => '#fee2e2', 'color' => '#991b1b'],
+    'AJUSTE_CUADRE'           => ['label' => 'Ajuste cuadre', 'bg' => '#e0f2fe', 'color' => '#0369a1'],
 ];
 
 // KPIs
 $totalPagado     = 0;
 $trabajadoresPagados = [];
 foreach ($ecoPagos as $p) {
-    if (in_array($p['estado'], ['PAGADO','CONFIRMADO_BENEFICIARIO','APROBADO'])) {
+    if (in_array($p['estado'], ['PAGADO','CONFIRMADO_BENEFICIARIO','APROBADO','AJUSTE_CUADRE'])) {
         $totalPagado += (float)$p['monto'];
     }
     $trabajadoresPagados[$p['beneficiario_nombre']] = true;

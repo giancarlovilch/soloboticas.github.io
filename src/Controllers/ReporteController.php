@@ -186,7 +186,20 @@ class ReporteController extends Controller
                     p.nombres      AS cajera_nombre,
                     pv.nombres     AS vendedor_nombre,
                     dc.resultado_cuadre,
-                    dc.diferencia,
+                    (
+                        COALESCE(dc.total_efectivo_contado, 0) - (
+                            COALESCE(sc.saldo_inicial, 0)
+                            + COALESCE(dc.total_ventas_sistema, 0)
+                            - COALESCE(dc.total_gastos_sistema, 0)
+                            - COALESCE((
+                                SELECT SUM(ms.monto)
+                                FROM movimiento_sesion ms
+                                WHERE ms.sesion_id = sc.id_sesion
+                                  AND ms.tipo_movimiento_id = 1
+                                  AND ms.estado IN ('PENDIENTE','APROBADO')
+                            ), 0)
+                        )
+                    ) AS diferencia,
                     dc.total_efectivo_contado  AS lo_que_es,
                     dc.total_ventas_sistema    AS ventas,
                     dc.total_gastos_sistema    AS gastos,

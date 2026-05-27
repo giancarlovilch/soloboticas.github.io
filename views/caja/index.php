@@ -178,6 +178,7 @@ $estadoLabel = [
                         <th class="text-center">Ops. BCP</th>
                         <th>Anterior</th>
                         <th class="text-center">Estado</th>
+                        <th class="text-right">Resultado</th>
                         <th class="text-center">Acción</th>
                     </tr>
                 </thead>
@@ -215,6 +216,27 @@ $estadoLabel = [
                             <?php endif; ?>
                         </td>
                         <td class="text-center"><span class="caja-estado <?= $e['cls'] ?>"><?= $e['label'] ?></span></td>
+                        <td class="text-right" style="white-space:nowrap;">
+                        <?php
+                        $tieneDetalle = in_array($s['estado'], ['CERRADA','APROBADA','OBSERVADA','RECHAZADA'], true)
+                                     && $s['diferencia'] !== null;
+                        if ($tieneDetalle):
+                            $difCorr = (float)$s['diferencia']
+                                     + (float)$s['sum_rectifs']
+                                     + (float)$s['sum_ajustes']
+                                     - (float)$s['sum_corr_ventas'];
+                            if (abs($difCorr) < 0.01):
+                        ?>
+                            <span style="background:#d1fae5;color:#065f46;font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:5px;">Conforme</span>
+                        <?php elseif ($difCorr > 0): ?>
+                            <span style="background:#dbeafe;color:#1e40af;font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:5px;">+<?= number_format($difCorr,2) ?></span>
+                        <?php else: ?>
+                            <span style="background:#fee2e2;color:#991b1b;font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:5px;"><?= number_format($difCorr,2) ?></span>
+                        <?php endif; ?>
+                        <?php else: ?>
+                            <span style="color:#cbd5e1;font-size:.72rem;">—</span>
+                        <?php endif; ?>
+                        </td>
                         <td class="text-center" style="white-space:nowrap;">
                             <?php if ($s['estado'] === 'ABIERTA'): ?>
                                 <a href="<?= $basePath ?>/caja/sesion/<?= $s['id_sesion'] ?>" class="caja-link">Continuar</a>
@@ -229,7 +251,7 @@ $estadoLabel = [
                     </tr>
                 <?php endforeach; ?>
                 <?php if (empty($recientes)): ?>
-                    <tr><td colspan="10" class="caja-table__empty">No hay cuadres en este período.</td></tr>
+                    <tr><td colspan="11" class="caja-table__empty">No hay cuadres en este período.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>

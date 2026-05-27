@@ -122,6 +122,7 @@ $router->get('/caja/api/sesion/{id}/pagos-digitales',    [CajaController::class,
 $router->post('/caja/api/sesion/{id}/pago-digital',      [CajaController::class, 'addPagoDigital']);
 $router->post('/caja/api/pago-digital/{id}/confirmar',   [CajaController::class, 'confirmarPago']);
 $router->post('/caja/api/pago-digital/{id}/eliminar',    [CajaController::class, 'deletePagoDigitalRoute']);
+$router->post('/caja/api/sesion/{id}/pago-digital/{movId}/eliminar-admin', [CajaController::class, 'eliminarPagoAdmin']);
 $router->get('/caja/api/catalogos',                      [CajaController::class, 'apiCatalogos']);
 $router->get('/caja/api/cajas/{id}',                     [CajaController::class, 'apiCajasByLocal']);
 $router->get('/caja/api/saldo/{id}',                     [CajaController::class, 'apiSaldoBase']);

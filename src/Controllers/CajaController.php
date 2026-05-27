@@ -278,6 +278,7 @@ class CajaController extends Controller
         $postulanteId = $this->requireAuth();
         $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
         $userName     = $_SESSION['user_name'] ?? 'Usuario';
+        $userRol      = $_SESSION['user_rol']  ?? 'STAFF';
 
         $sesion = $this->repo->getSesionById($id);
         if (!$sesion || !in_array($sesion['estado'], ['CERRADA','APROBADA','OBSERVADA','RECHAZADA'], true)) {
@@ -336,6 +337,54 @@ class CajaController extends Controller
 
         $this->repo->addRectificacion($id, $postulanteId, $tipoRectId, $monto, $desc);
         $this->success('Ajuste registrado. Base del siguiente turno actualizada.');
+    }
+
+    // ── POST /caja/api/sesion/{id}/pago-digital/{movId}/eliminar-admin ──
+    public function eliminarPagoAdmin(int $sesionId, int $movId): void
+    {
+        $postulanteId = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Solo administradores pueden eliminar cobros', 403);
+            return;
+        }
+
+        $d        = $this->getAllInput();
+        $password = $d['password'] ?? '';
+        if (empty($password)) {
+            $this->validationError('Se requiere tu contraseña para confirmar');
+            return;
+        }
+
+        // Verificar contraseña del admin
+        require_once __DIR__ . '/../Repositories/AuthRepository.php';
+        $authRepo = new AuthRepository();
+        $user     = $authRepo->findByPostulanteId($postulanteId);
+        if (!$user || !password_verify($password, $user['password'])) {
+            $this->error('Contraseña incorrecta', 403);
+            return;
+        }
+
+        // Verificar que el movimiento pertenece a esta sesión
+        $mov = $this->repo->getMovimientoById($movId, $sesionId);
+        if (!$mov) {
+            $this->error('Cobro no encontrado en esta sesión', 404);
+            return;
+        }
+
+        // Eliminar el movimiento sin restricción de estado
+        $this->repo->adminDeleteMovimiento($movId);
+
+        // Si era un vale SoloBank, liberarlo para que vuelva a estar disponible
+        require_once __DIR__ . '/../Repositories/SoloBankRepository.php';
+        (new SoloBankRepository())->liberarVale($movId);
+
+        // Actualizar detalle_cuadre con la nueva diferencia
+        $this->repo->recalcularDiferencia($sesionId);
+
+        $this->success('Cobro eliminado', [
+            'modo'  => $mov['modo_desc'],
+            'monto' => $mov['monto'],
+        ]);
     }
 
     // ── POST /caja/api/rectificacion/{id}/eliminar ─────────

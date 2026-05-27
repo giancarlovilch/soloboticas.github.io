@@ -130,6 +130,40 @@ class AdminController extends Controller
             $stmtPagos->execute($ecoParams);
             $ecoPagos = $stmtPagos->fetchAll();
 
+            // Incluir pagos a personal registrados como corrección en cuadres cerrados
+            $ajWhere  = "ae.tipo = 'PERSONAL' AND ae.accion = 'AGREGAR'
+                         AND DATE(sc.fecha_operacion) BETWEEN :desde AND :hasta";
+            $ajParams = ['desde' => $ecoDesde, 'hasta' => $ecoHasta];
+            if ($ecoPid)  { $ajWhere .= " AND ae.ref_id = :pid";       $ajParams['pid']  = $ecoPid; }
+            if ($ecoTipo) { $ajWhere .= " AND ae.tipo_pago = :tipo";   $ajParams['tipo'] = $ecoTipo; }
+
+            $stmtAj = $db->prepare(
+                "SELECT ae.id_ajuste AS id_pago_personal,
+                        ae.monto,
+                        COALESCE(ae.tipo_pago, 'OTROS') AS tipo_pago,
+                        'AJUSTE_CUADRE'                 AS estado,
+                        sc.fecha_operacion              AS fecha_pago,
+                        ae.descripcion                  AS numero_operacion,
+                        sc.fecha_operacion, sc.turno_id,
+                        l.descripcion  AS local_desc,
+                        pb.nombres     AS beneficiario_nombre,
+                        pe.nombres     AS emisor_nombre
+                 FROM ajuste_esperado ae
+                 INNER JOIN sesion_caja sc ON sc.id_sesion     = ae.sesion_id
+                 INNER JOIN caja ca        ON ca.id_caja       = sc.caja_id
+                 INNER JOIN local l        ON l.id_local       = ca.local_id
+                 INNER JOIN postulante pb  ON pb.id_postulante = ae.ref_id
+                 INNER JOIN postulante pe  ON pe.id_postulante = ae.postulante_id
+                 WHERE {$ajWhere}
+                 ORDER BY sc.fecha_operacion DESC"
+            );
+            $stmtAj->execute($ajParams);
+            $ajPagos = $stmtAj->fetchAll();
+
+            // Unir y ordenar por fecha descendente
+            $ecoPagos = array_merge($ecoPagos, $ajPagos);
+            usort($ecoPagos, fn($a, $b) => strcmp($b['fecha_pago'], $a['fecha_pago']));
+
             $ecoTrabajadores = $db->query(
                 "SELECT p.id_postulante AS id, p.nombres AS nombre
                  FROM postulante p INNER JOIN usuario u ON u.postulante_id = p.id_postulante

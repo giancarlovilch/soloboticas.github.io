@@ -107,6 +107,9 @@ class SoloBankController extends Controller
             return;
         }
 
+        // Actualizar detalle_cuadre para que arqueos refleje el nuevo digital
+        $cajaRepo->recalcularDiferencia($sesionId);
+
         $this->success('Vale SoloBank asignado', [
             'id_movimiento' => $movId,
             'monto'         => $vale['total'],
@@ -133,6 +136,16 @@ class SoloBankController extends Controller
         $this->requireAuth();
         $result = $this->repo->toggleEstado($id);
         if (!$result) { $this->error('Vale no encontrado', 404); return; }
+
+        // Si se liberó un vale que estaba asignado a una sesión,
+        // o si se marcó como usado manualmente (sin sesión, no afecta detalle_cuadre),
+        // recalcular diferencia solo cuando había sesión vinculada.
+        $sesionAfectada = (int)($result['sesion_id'] ?? 0);
+        if ($sesionAfectada > 0) {
+            $cajaRepo = new CajaRepository();
+            $cajaRepo->recalcularDiferencia($sesionAfectada);
+        }
+
         $this->success('Estado actualizado', $result);
     }
 
