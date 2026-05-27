@@ -104,25 +104,36 @@ class SoloBankRepository
     public function toggleEstado(int $id): ?array
     {
         $stmt = $this->db->prepare(
-            "SELECT id, estado FROM solobank_vales WHERE id = :id"
+            "SELECT id, estado, sesion_id, movimiento_id FROM solobank_vales WHERE id = :id"
         );
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
         if (!$row) return null;
 
         if ($row['estado'] === 'DISPONIBLE') {
+            // Marcar como usado manualmente (sin sesión vinculada)
             $this->db->prepare(
                 "UPDATE solobank_vales SET estado = 'USADO' WHERE id = :id"
             )->execute(['id' => $id]);
-            return ['nuevo_estado' => 'USADO'];
+            return ['nuevo_estado' => 'USADO', 'sesion_id' => null];
         } else {
-            // Liberar — limpiar vínculo con sesión
+            // Liberar: si tiene movimiento_sesion vinculado, borrarlo también
+            // para que el cuadre de la cajera no quede con un cobro huérfano
+            if (!empty($row['movimiento_id'])) {
+                $this->db->prepare(
+                    "DELETE FROM movimiento_sesion
+                      WHERE id_movimiento = :mid AND tipo_movimiento_id = 1"
+                )->execute(['mid' => $row['movimiento_id']]);
+            }
             $this->db->prepare(
                 "UPDATE solobank_vales
                     SET estado = 'DISPONIBLE', sesion_id = NULL, movimiento_id = NULL
                   WHERE id = :id"
             )->execute(['id' => $id]);
-            return ['nuevo_estado' => 'DISPONIBLE'];
+            return [
+                'nuevo_estado' => 'DISPONIBLE',
+                'sesion_id'    => $row['sesion_id'],
+            ];
         }
     }
 

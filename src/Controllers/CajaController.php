@@ -293,6 +293,11 @@ class CajaController extends Controller
             $sesion['fecha_operacion']
         );
 
+        // Vales SoloBank disponibles para asignar retroactivamente
+        require_once __DIR__ . '/../Repositories/SoloBankRepository.php';
+        $sbRepo        = new SoloBankRepository();
+        $soloBankVales = $sbRepo->getValesDisponibles();
+
         require_once __DIR__ . '/../../views/caja/reporte.php';
     }
 

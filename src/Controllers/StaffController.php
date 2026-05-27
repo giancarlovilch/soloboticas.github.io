@@ -144,8 +144,8 @@ class StaffController extends Controller
             $hasta            = $_GET['hasta'] ?? date('Y-m-d');
             $filtroTrabajador = isset($_GET['trabajador']) ? (int)$_GET['trabajador'] : 0;
             // Si el formulario fue enviado explícitamente ($filtro presente), respetar el checkbox.
-            // En la carga inicial (sin $filtro) el default es true.
-            $soloSinCalif = isset($_GET['filtro']) ? isset($_GET['sin_calif']) : true;
+            // En la carga inicial (sin $filtro) el default es false: muestra todos.
+            $soloSinCalif = isset($_GET['filtro']) ? isset($_GET['sin_calif']) : false;
 
             $slotsData = $asistRepo->getAllSlots(
                 $desde, $hasta, $filtroTrabajador, $soloSinCalif, $registradorId

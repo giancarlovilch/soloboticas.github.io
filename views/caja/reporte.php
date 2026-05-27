@@ -293,6 +293,96 @@ $clsDif     = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobra
         <?php endif; ?>
     </section>
 
+    <!-- ── Vales SoloBank ───────────────────────────────────── -->
+    <?php
+    $valesSB = array_values(array_filter(
+        $digitales ?? [],
+        fn($d) => strtolower(trim($d['modo_desc'] ?? '')) === 'solobank'
+    ));
+    // Mostrar solo si hay vales asignados O hay vales disponibles para asignar
+    if (!empty($valesSB) || !empty($soloBankVales)):
+    ?>
+    <section class="caja-card">
+        <div class="caja-card__header-row">
+            <div>
+                <h2 class="caja-card__title">Vales SoloBank (<?= count($valesSB) ?>)</h2>
+                <p class="caja-card__desc">
+                    Cierres recibidos desde la app SoloBank.
+                    <?= empty($soloBankVales) ? '' : 'Si la cajera olvidó asignar uno, puedes agregarlo aquí.' ?>
+                </p>
+            </div>
+            <?php if (!empty($soloBankVales)): ?>
+            <button class="caja-btn caja-btn--outline" onclick="toggleSeccion('seccionSB', this)">
+                Asignar vale olvidado
+            </button>
+            <?php endif; ?>
+        </div>
+
+        <?php if (!empty($valesSB)): ?>
+        <table class="caja-table" style="margin-bottom:.5rem;">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th class="text-center">Estado</th>
+                    <th class="text-right">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($valesSB as $v):
+                $estCls = match($v['estado']) {
+                    'APROBADO'  => 'background:#d1fae5;color:#065f46;',
+                    'RECHAZADO' => 'background:#fee2e2;color:#991b1b;',
+                    default     => 'background:#fef3c7;color:#92400e;',
+                };
+            ?>
+                <tr>
+                    <td style="font-size:.82rem;font-weight:600;font-family:monospace;">
+                        <?= htmlspecialchars($v['numero_operacion'] ?? '—') ?>
+                    </td>
+                    <td class="text-center">
+                        <span style="font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:5px;<?= $estCls ?>">
+                            <?= htmlspecialchars($v['estado']) ?>
+                        </span>
+                    </td>
+                    <td class="text-right"><?= $f2($v['monto']) ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php elseif (!empty($soloBankVales)): ?>
+            <p class="caja-empty">Sin vales asignados en este turno.</p>
+        <?php endif; ?>
+
+        <?php if (!empty($soloBankVales)): ?>
+        <div id="seccionSB" hidden>
+            <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:.75rem 1rem;margin-bottom:.75rem;">
+                <p style="font-size:.78rem;color:#92400e;margin:0;">
+                    ⚠ Al asignar un vale retroactivamente el saldo esperado del arqueo se actualizará.
+                    Solo hazlo si el vale corresponde realmente a este turno.
+                </p>
+            </div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                <select id="sbValeCodigo" class="caja-input" style="flex:1;min-width:200px;">
+                    <option value="">— Selecciona un vale disponible —</option>
+                    <?php foreach ($soloBankVales as $sv): ?>
+                    <option value="<?= htmlspecialchars($sv['codigo']) ?>">
+                        <?= htmlspecialchars($sv['codigo']) ?>
+                        · <?= htmlspecialchars($sv['caja']) ?>
+                        · <?= date('d/m', strtotime($sv['fecha'])) ?>
+                        · S/ <?= number_format((float)$sv['total'], 2) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+                <button class="caja-btn caja-btn--secondary" onclick="asignarVale(<?= $sesion['id_sesion'] ?>)">
+                    Asignar
+                </button>
+            </div>
+            <div id="sbMsg" class="caja-alert" hidden style="margin-top:.5rem;"></div>
+        </div>
+        <?php endif; ?>
+    </section>
+    <?php endif; // fin: mostrar sección SoloBank ?>
+
     <!-- ── Rectificaciones ────────────────────────────────── -->
     <section class="caja-card">
         <div class="caja-card__header-row">
@@ -926,6 +1016,31 @@ async function submitCorreccionVenta(sesionId) {
         if (res.success) { showAlert(msg, '✓ ' + res.message, 'ok'); setTimeout(() => location.reload(), 900); }
         else showAlert(msg, res.message, 'error');
     } catch { showAlert(msg, 'Error de conexión.', 'error'); }
+}
+
+// ── Asignar vale SoloBank olvidado ────────────────────
+async function asignarVale(sesionId) {
+    const codigo = document.getElementById('sbValeCodigo')?.value?.trim();
+    const msg    = document.getElementById('sbMsg');
+    if (!codigo) { showAlert(msg, 'Selecciona un vale de la lista.', 'error'); return; }
+
+    try {
+        const r   = await fetch(`${BASE}/caja/api/sesion/${sesionId}/solobank`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ codigo }),
+        });
+        const res = await r.json();
+        if (res.success) {
+            const monto = parseFloat(res.data?.monto ?? 0).toFixed(2);
+            showAlert(msg, `✓ Vale asignado correctamente · S/ ${monto}`, 'ok');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            showAlert(msg, res.message || 'Error al asignar el vale.', 'error');
+        }
+    } catch {
+        showAlert(msg, 'Error de conexión.', 'error');
+    }
 }
 
 // ── Eliminar cuadre ───────────────────────────────────

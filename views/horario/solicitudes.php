@@ -118,7 +118,7 @@ $turnosLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
     <form method="GET" style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
         <label style="font-size:0.82rem;font-weight:600;color:#475569;">Ver turnos del día:</label>
         <input type="date" name="fecha" value="<?= htmlspecialchars($fecha) ?>"
-               class="hor-btn hor-btn--outline" style="padding:.4rem .75rem;font-size:0.85rem;cursor:pointer;">
+               class="hor-btn hor-btn--outline" style="padding:.4rem .75rem;font-size:0.85rem;cursor:pointer;color:#1e293b;">
         <button type="submit" class="hor-btn hor-btn--primary">Buscar</button>
     </form>
 
