@@ -131,7 +131,7 @@ class AdminController extends Controller
             $ecoPagos = $stmtPagos->fetchAll();
 
             // Incluir pagos a personal registrados como corrección en cuadres cerrados
-            $ajWhere  = "ae.tipo = 'PERSONAL' AND ae.accion = 'AGREGAR'
+            $ajWhere  = "ae.tipo = 'PERSONAL'
                          AND DATE(sc.fecha_operacion) BETWEEN :desde AND :hasta";
             $ajParams = ['desde' => $ecoDesde, 'hasta' => $ecoHasta];
             if ($ecoPid)  { $ajWhere .= " AND ae.ref_id = :pid";       $ajParams['pid']  = $ecoPid; }

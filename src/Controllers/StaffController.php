@@ -254,9 +254,8 @@ class StaffController extends Controller
              INNER JOIN caja ca        ON ca.id_caja     = sc.caja_id
              INNER JOIN local l        ON l.id_local     = ca.local_id
              INNER JOIN postulante p   ON p.id_postulante = ae.postulante_id
-             WHERE ae.tipo      = 'PERSONAL'
-               AND ae.tipo_pago = 'DESCUENTO'
-               AND ae.ref_id    = :pid
+             WHERE ae.tipo   = 'PERSONAL'
+               AND ae.ref_id = :pid
                AND DATE(ae.fecha) BETWEEN :desde AND :hasta
              ORDER BY ae.fecha DESC"
         );

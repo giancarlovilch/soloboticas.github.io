@@ -285,9 +285,9 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
                 <div style="font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#be185d;margin-bottom:.3rem;">Pagos recibidos</div>
                 <div style="font-size:1.15rem;font-weight:800;color:#9d174d;font-variant-numeric:tabular-nums;"><?= $f2($totalPagadoReal) ?></div>
                 <?php if ($netDescuentos > 0.01): ?>
-                <div style="font-size:.7rem;font-weight:700;color:#991b1b;margin-top:.2rem;">− <?= $f2($netDescuentos) ?> descuento</div>
+                <div style="font-size:.7rem;font-weight:700;color:#991b1b;margin-top:.2rem;"><?= $f2($netDescuentos) ?> de descuento</div>
                 <?php elseif ($netDescuentos < -0.01): ?>
-                <div style="font-size:.7rem;font-weight:700;color:#065f46;margin-top:.2rem;">+ <?= $f2(abs($netDescuentos)) ?> devuelto</div>
+                <div style="font-size:.7rem;font-weight:700;color:#065f46;margin-top:.2rem;"><?= $f2(abs($netDescuentos)) ?> devuelto</div>
                 <?php endif; ?>
             </div>
             <div style="padding:1rem;">
@@ -374,8 +374,24 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
             </thead>
             <tbody>
             <?php foreach ($descuentosAdj as $d):
-                $esAplicado = $d['accion'] === 'AGREGAR';
-                $dow = $diasLabel[(int)date('w', strtotime($d['fecha']))];
+                $accion   = $d['accion'];
+                $tipoPago = $d['tipo_pago'] ?? '';
+                $dow      = $diasLabel[(int)date('w', strtotime($d['fecha']))];
+
+                // Semántica por combinación accion + tipo_pago:
+                // AGREGAR+DESCUENTO → descuento directo (badge rojo, sin signo)
+                // QUITAR+cualquiera → pago revertido / devolución (badge naranja, con −)
+                // AGREGAR+otros    → pago registrado desde cuadre (badge azul, sin signo)
+                if ($accion === 'QUITAR') {
+                    $badge = '<span class="eco-badge" style="background:#ffedd5;color:#9a3412;">Pago revertido</span>';
+                    $signo = '−'; $colorMonto = '#991b1b';
+                } elseif ($tipoPago === 'DESCUENTO') {
+                    $badge = '<span class="eco-badge" style="background:#fee2e2;color:#991b1b;">Descuento aplicado</span>';
+                    $signo = ''; $colorMonto = '#991b1b';
+                } else {
+                    $badge = '<span class="eco-badge" style="background:#e0f2fe;color:#0369a1;">Pago registrado</span>';
+                    $signo = ''; $colorMonto = '#0369a1';
+                }
             ?>
             <tr>
                 <td style="white-space:nowrap;">
@@ -386,17 +402,11 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
                     <span style="font-size:.8rem;">Cuadre #<?= $d['id_sesion'] ?></span>
                     <span class="eco-sub"><?= htmlspecialchars($d['local_desc']) ?></span>
                 </td>
-                <td>
-                    <?php if ($esAplicado): ?>
-                        <span class="eco-badge" style="background:#fee2e2;color:#991b1b;">Descuento aplicado</span>
-                    <?php else: ?>
-                        <span class="eco-badge" style="background:#d1fae5;color:#065f46;">Descuento liberado</span>
-                    <?php endif; ?>
-                </td>
+                <td><?= $badge ?></td>
                 <td style="font-size:.78rem;color:#475569;"><?= htmlspecialchars($d['descripcion'] ?? '') ?></td>
                 <td class="text-right">
-                    <span class="eco-monto" style="color:<?= $esAplicado ? '#991b1b' : '#065f46' ?>">
-                        <?= $esAplicado ? '−' : '+' ?> <?= $f2($d['monto']) ?>
+                    <span class="eco-monto" style="color:<?= $colorMonto ?>">
+                        <?= $signo ? $signo . ' ' : '' ?><?= $f2($d['monto']) ?>
                     </span>
                 </td>
             </tr>
