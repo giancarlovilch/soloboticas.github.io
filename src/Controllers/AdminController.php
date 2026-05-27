@@ -142,6 +142,7 @@ class AdminController extends Controller
                         ae.monto,
                         COALESCE(ae.tipo_pago, 'OTROS') AS tipo_pago,
                         'AJUSTE_CUADRE'                 AS estado,
+                        ae.accion,
                         sc.fecha_operacion              AS fecha_pago,
                         ae.descripcion                  AS numero_operacion,
                         sc.fecha_operacion, sc.turno_id,

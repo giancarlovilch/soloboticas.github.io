@@ -37,8 +37,11 @@ $estadoInfo = [
 $totalPagado     = 0;
 $trabajadoresPagados = [];
 foreach ($ecoPagos as $p) {
-    if (in_array($p['estado'], ['PAGADO','CONFIRMADO_BENEFICIARIO','APROBADO','AJUSTE_CUADRE'])) {
+    if (in_array($p['estado'], ['PAGADO','CONFIRMADO_BENEFICIARIO','APROBADO'])) {
         $totalPagado += (float)$p['monto'];
+    } elseif ($p['estado'] === 'AJUSTE_CUADRE') {
+        $esReversion = ($p['accion'] ?? '') === 'QUITAR';
+        $totalPagado += $esReversion ? -(float)$p['monto'] : (float)$p['monto'];
     }
     $trabajadoresPagados[$p['beneficiario_nombre']] = true;
 }
@@ -177,7 +180,10 @@ $totalAdelantos = count(array_filter($ecoPagos, fn($p) => $p['tipo_pago'] === 'A
                 </td>
                 <td style="font-size:.78rem;color:#475569;"><?= htmlspecialchars($p['emisor_nombre']) ?></td>
                 <td class="text-right">
-                    <span class="eco-monto">S/ <?= number_format((float)$p['monto'], 2, '.', ',') ?></span>
+                    <?php $esReversion = ($p['estado'] === 'AJUSTE_CUADRE' && ($p['accion'] ?? '') === 'QUITAR'); ?>
+                    <span class="eco-monto" style="<?= $esReversion ? 'color:#991b1b;' : '' ?>">
+                        <?= $esReversion ? '− ' : '' ?>S/ <?= number_format((float)$p['monto'], 2, '.', ',') ?>
+                    </span>
                 </td>
             </tr>
             <?php endforeach; ?>
