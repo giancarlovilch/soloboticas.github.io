@@ -262,7 +262,11 @@ class CajaRepository
                            SELECT SUM(cv.monto_nuevo - cv.monto_anterior)
                            FROM correccion_venta cv
                            WHERE cv.sesion_id = sc.id_sesion
-                       ), 0) AS sum_corr_ventas
+                       ), 0) AS sum_corr_ventas,
+                       ic.id_incidencia   AS inc_id,
+                       ic.tipo            AS inc_tipo,
+                       ic.estado          AS inc_estado,
+                       ic.monto_pendiente AS inc_pendiente
                 FROM sesion_caja sc
                 INNER JOIN caja c ON sc.caja_id = c.id_caja
                 INNER JOIN local l ON c.local_id = l.id_local
@@ -272,6 +276,7 @@ class CajaRepository
                     AND sp.rol_participacion = 'VENDEDORA'
                 LEFT JOIN postulante pv ON sp.postulante_id = pv.id_postulante
                 LEFT JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
+                LEFT JOIN incidencia_contable ic ON ic.sesion_origen_id = sc.id_sesion
                 WHERE {$where}
                 ORDER BY sc.fecha_operacion DESC, sc.fecha_apertura DESC";
 
@@ -869,6 +874,13 @@ class CajaRepository
 
         // Orden de borrado respetando FKs
         $tablas = [
+            "DELETE FROM deposito_kgyr         WHERE sesion_id = :sid",
+            "DELETE FROM auditoria_cuadre      WHERE sesion_id = :sid",
+            "DELETE FROM transferencia_caja    WHERE sesion_origen_id  = :sid",
+            "DELETE FROM transferencia_caja    WHERE sesion_destino_id = :sid",
+            "DELETE FROM incidencia            WHERE sesion_id = :sid",
+            "DELETE FROM vale_regularizacion   WHERE sesion_origen_id  = :sid",
+            "DELETE FROM vale_regularizacion   WHERE sesion_destino_id = :sid",
             "DELETE FROM rectificacion_cuadre  WHERE sesion_id = :sid",
             "DELETE FROM ajuste_esperado       WHERE sesion_id = :sid",
             "DELETE FROM correccion_venta      WHERE sesion_id = :sid",
@@ -880,6 +892,14 @@ class CajaRepository
             "DELETE FROM pago_deposito         WHERE sesion_id = :sid",
             "DELETE FROM reporte_venta         WHERE sesion_id = :sid",
             "DELETE FROM sesion_participante   WHERE sesion_id = :sid",
+            // Incidencias: movimientos → vales → incidencia
+            "DELETE mic FROM movimiento_incidencia_contable mic
+               INNER JOIN incidencia_contable ic ON mic.incidencia_id = ic.id_incidencia
+               WHERE ic.sesion_origen_id = :sid",
+            "DELETE vr FROM vale_regularizacion vr
+               INNER JOIN incidencia_contable ic ON ic.id_incidencia = vr.incidencia_origen_id
+               WHERE ic.sesion_origen_id = :sid",
+            "DELETE FROM incidencia_contable   WHERE sesion_origen_id = :sid",
             "DELETE FROM sesion_caja           WHERE id_sesion = :sid",
         ];
         foreach ($tablas as $sql) {
@@ -912,20 +932,121 @@ class CajaRepository
         }
     }
 
+    // ── Auditoría de cambios post-cierre ──────────────────
+
+    private function audit(int $sesionId, int $postulanteId, string $accion, string $campo, string $anterior, string $nuevo): void
+    {
+        $this->db->prepare(
+            "INSERT INTO auditoria_cuadre
+                (sesion_id, postulante_id, accion, campo_modificado, valor_anterior, valor_nuevo)
+             VALUES (:sid, :pid, :acc, :campo, :ant, :nue)"
+        )->execute([
+            'sid'   => $sesionId,
+            'pid'   => $postulanteId,
+            'acc'   => $accion,
+            'campo' => $campo,
+            'ant'   => $anterior,
+            'nue'   => $nuevo,
+        ]);
+    }
+
+    public function getAuditoria(int $sesionId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT ac.*, p.nombres AS registrado_por
+             FROM auditoria_cuadre ac
+             LEFT JOIN postulante p ON ac.postulante_id = p.id_postulante
+             WHERE ac.sesion_id = :sid
+             ORDER BY ac.fecha ASC"
+        );
+        $stmt->execute(['sid' => $sesionId]);
+        return $stmt->fetchAll();
+    }
+
+    // ── Actualizar conteo de efectivo ─────────────────────
+
+    public function updateConteo(int $sesionId, float $exterior, float $monedas, float $billetesCaja, float $billetesFuerte, float $agenteBcp, int $postulanteId): void
+    {
+        $old = $this->db->prepare("SELECT * FROM detalle_cuadre WHERE sesion_id = :sid");
+        $old->execute(['sid' => $sesionId]);
+        $prev = $old->fetch();
+        if (!$prev) return;
+
+        $mapa = [
+            'monto_caja_exterior'        => $exterior,
+            'monto_monedas'              => $monedas,
+            'monto_billetes_caja'        => $billetesCaja,
+            'monto_billetes_caja_fuerte' => $billetesFuerte,
+            'monto_agente_bcp'           => $agenteBcp,
+        ];
+        foreach ($mapa as $col => $nuevo) {
+            $anterior = round((float)$prev[$col], 2);
+            if (abs($anterior - round($nuevo, 2)) >= 0.01) {
+                $this->audit($sesionId, $postulanteId, 'CONTEO_MODIFICADO', $col,
+                    'S/ ' . number_format($anterior, 2),
+                    'S/ ' . number_format($nuevo, 2));
+            }
+        }
+
+        $nuevoEfectivo = round($exterior + $monedas + $billetesCaja + $billetesFuerte + $agenteBcp, 2);
+        $proxEfectivo  = round($exterior + $monedas + $billetesCaja + $billetesFuerte, 2);
+
+        // Fetch expected to compute diferencia and resultado here (avoids repeating :efe in SQL)
+        $esperado  = round((float)($prev['total_esperado_sistema'] ?? 0), 2);
+        $diferencia = round($nuevoEfectivo - $esperado, 2);
+        $resultado  = abs($diferencia) < 0.01 ? 'CONSISTENTE' : ($diferencia > 0 ? 'SOBRANTE' : 'FALTANTE');
+
+        $this->db->prepare(
+            "UPDATE detalle_cuadre SET
+                monto_caja_exterior        = :ext,
+                monto_monedas              = :mon,
+                monto_billetes_caja        = :bil,
+                monto_billetes_caja_fuerte = :fue,
+                monto_agente_bcp           = :age,
+                total_efectivo_contado     = :efe,
+                saldo_proxima_efectivo     = :prox_ef,
+                saldo_proxima_agente_bcp   = :prox_age,
+                saldo_proximo_dia          = :efe2,
+                diferencia                 = :dif,
+                resultado_cuadre           = :res
+             WHERE sesion_id = :sid"
+        )->execute([
+            'ext'      => $exterior,
+            'mon'      => $monedas,
+            'bil'      => $billetesCaja,
+            'fue'      => $billetesFuerte,
+            'age'      => $agenteBcp,
+            'efe'      => $nuevoEfectivo,
+            'efe2'     => $nuevoEfectivo,
+            'prox_ef'  => $proxEfectivo,
+            'prox_age' => $agenteBcp,
+            'dif'      => $diferencia,
+            'res'      => $resultado,
+            'sid'      => $sesionId,
+        ]);
+
+        $this->propagarBase($sesionId);
+    }
+
+    // ── Rectificaciones ────────────────────────────────────
+
     public function addRectificacion(int $sesionId, int $registraId, int $tipoRectId, float $monto, string $descripcion): void
     {
-        // Obtener signo del tipo para calcular monto firmado
         $signoStmt = $this->db->prepare("SELECT signo FROM tipo_rectificacion WHERE id_tipo_rect = :id");
         $signoStmt->execute(['id' => $tipoRectId]);
         $signo = (int)($signoStmt->fetchColumn() ?? 1);
         $montoFirmado = abs($monto) * $signo;
 
-        // Mapa de compatibilidad con el enum heredado
         $tipoEnum = match($tipoRectId) {
             1 => 'DINERO_ENCONTRADO',
             2 => 'DEVOLUCION_DINERO',
             default => null,
         };
+
+        // Leer saldo antes
+        $antStmt = $this->db->prepare("SELECT saldo_proximo_dia FROM detalle_cuadre WHERE sesion_id = :sid");
+        $antStmt->execute(['sid' => $sesionId]);
+        $saldoAntes = (float)$antStmt->fetchColumn();
 
         $this->db->prepare(
             "INSERT INTO rectificacion_cuadre
@@ -933,13 +1054,20 @@ class CajaRepository
              VALUES (:sid, :reg, :tipo, :trid, :mon, :desc, 'APROBADA')"
         )->execute(['sid' => $sesionId, 'reg' => $registraId, 'tipo' => $tipoEnum, 'trid' => $tipoRectId, 'mon' => $montoFirmado, 'desc' => $descripcion]);
 
-        // Actualizar saldo_proximo_dia de este arqueo
         $this->db->prepare(
             "UPDATE detalle_cuadre
              SET saldo_proximo_dia      = saldo_proximo_dia + :mon,
                  saldo_proxima_efectivo = saldo_proxima_efectivo + :mon2
              WHERE sesion_id = :sid"
         )->execute(['mon' => $montoFirmado, 'mon2' => $montoFirmado, 'sid' => $sesionId]);
+
+        $this->audit(
+            $sesionId, $registraId,
+            'RECTIFICACION_AGREGADA',
+            'saldo_proximo_dia',
+            'S/ ' . number_format($saldoAntes, 2),
+            'S/ ' . number_format($saldoAntes + $montoFirmado, 2) . ' — ' . $descripcion
+        );
 
         $this->propagarBase($sesionId);
     }
@@ -955,28 +1083,42 @@ class CajaRepository
         $rect = $stmt->fetch();
         if (!$rect) return 'Rectificación no encontrada';
 
-        // Revertir el ajuste en saldo_proximo_dia
+        $sesionId     = (int)$rect['sesion_id'];
         $montoInverso = -(float)$rect['monto'];
+
+        // Leer saldo antes
+        $antStmt = $this->db->prepare("SELECT saldo_proximo_dia FROM detalle_cuadre WHERE sesion_id = :sid");
+        $antStmt->execute(['sid' => $sesionId]);
+        $saldoAntes = (float)$antStmt->fetchColumn();
+
         $this->db->prepare(
             "UPDATE detalle_cuadre
              SET saldo_proximo_dia      = saldo_proximo_dia + :mon,
                  saldo_proxima_efectivo = saldo_proxima_efectivo + :mon2
              WHERE sesion_id = :sid"
-        )->execute(['mon' => $montoInverso, 'mon2' => $montoInverso, 'sid' => $rect['sesion_id']]);
+        )->execute(['mon' => $montoInverso, 'mon2' => $montoInverso, 'sid' => $sesionId]);
 
         $this->db->prepare("DELETE FROM rectificacion_cuadre WHERE id_rectificacion = :id")
             ->execute(['id' => $rectId]);
 
-        $this->propagarBase((int)$rect['sesion_id']);
+        $this->audit(
+            $sesionId, $adminId,
+            'RECTIFICACION_ELIMINADA',
+            'saldo_proximo_dia',
+            'S/ ' . number_format($saldoAntes, 2),
+            'S/ ' . number_format($saldoAntes + $montoInverso, 2) . ' — eliminada: ' . $rect['descripcion_contexto']
+        );
+
+        $this->propagarBase($sesionId);
 
         return true;
     }
 
     /**
-     * Propaga saldo_proximo_dia al siguiente turno de la misma caja.
-     * Cubre todos los estados no definitivos (no solo ABIERTA/PENDIENTE_VENTA).
-     * Si la sesión siguiente ya tiene cuadre guardado (CERRADA/EN_REVISION/etc.),
-     * recalcula total_esperado, diferencia y resultado_cuadre para mantener consistencia.
+     * Propaga saldo_proximo_dia en cascada por todos los turnos siguientes de la misma caja.
+     * Para sesiones cerradas: recalcula total_esperado, diferencia y resultado_cuadre.
+     * La cadena se detiene en la primera sesión ABIERTA o PENDIENTE_VENTA (aún sin cuadre),
+     * ya que su saldo_proximo_dia todavía no existe y la siguiente sesión no puede existir aún.
      */
     public function propagarBase(int $sesionId): float
     {
@@ -984,13 +1126,16 @@ class CajaRepository
         $cajaStmt->execute(['sid' => $sesionId]);
         $cajaId = $cajaStmt->fetchColumn();
 
+        // Si la sesión origen no existe o no tiene cuadre, no hay nada que propagar
         $saldoStmt = $this->db->prepare(
             "SELECT saldo_proximo_dia FROM detalle_cuadre WHERE sesion_id = :sid"
         );
         $saldoStmt->execute(['sid' => $sesionId]);
-        $saldo = (float)$saldoStmt->fetchColumn();
+        $raw = $saldoStmt->fetchColumn();
+        if ($raw === false) return 0.0;
+        $saldo = (float)$raw;
 
-        // Sesión inmediatamente posterior de la misma caja (cualquier estado, salvo APROBADA)
+        // Siguiente sesión de la misma caja que no sea APROBADA (inmutable)
         $nextStmt = $this->db->prepare(
             "SELECT id_sesion, estado FROM sesion_caja
              WHERE caja_id   = :cid
@@ -1007,11 +1152,11 @@ class CajaRepository
         $nextId     = (int)$next['id_sesion'];
         $nextEstado = $next['estado'];
 
-        // Actualizar base
+        // Actualizar saldo de apertura de la siguiente sesión
         $this->db->prepare("UPDATE sesion_caja SET saldo_inicial = :sal WHERE id_sesion = :sid")
                  ->execute(['sal' => $saldo, 'sid' => $nextId]);
 
-        // Si ya tiene cuadre guardado, recalcular con la nueva base
+        // Si ya tiene cuadre guardado, recalcular con la nueva base y continuar la cadena
         if (in_array($nextEstado, ['CERRADA', 'EN_REVISION', 'OBSERVADA', 'RECHAZADA'])) {
             $dcStmt = $this->db->prepare("SELECT * FROM detalle_cuadre WHERE sesion_id = :sid");
             $dcStmt->execute(['sid' => $nextId]);
@@ -1051,8 +1196,13 @@ class CajaRepository
                     'dif' => $nuevaDif,
                     'sid' => $nextId,
                 ]);
+
+                // Propagar en cascada: continúa con la sesión siguiente de nextId
+                $this->propagarBase($nextId);
             }
         }
+        // Si nextEstado es ABIERTA o PENDIENTE_VENTA: solo se actualizó saldo_inicial
+        // y la cadena se detiene — esa sesión aún no tiene saldo_proximo_dia real.
 
         return $saldo;
     }
@@ -1096,17 +1246,56 @@ class CajaRepository
             'mon'  => abs($monto),
             'uid'  => $userId,
         ]);
+
+        $this->audit(
+            $sesionId, $userId,
+            'AJUSTE_ESPERADO_AGREGADO',
+            'total_esperado',
+            '—',
+            "{$accion} S/ " . number_format(abs($monto), 2) . " ({$tipo}) — {$desc}"
+        );
+
+        // Auto-registrar en deposito_kgyr cuando es un depósito a KGyR
+        if ($tipo === 'DEPOSITO') {
+            $ajusteId = (int)$this->db->lastInsertId();
+            $banco    = $extra['banco'] ?? 'BCP';
+            $sesion   = $this->getSesionById($sesionId);
+            $fecha    = $sesion ? date('Y-m-d', strtotime($sesion['fecha_operacion'])) : date('Y-m-d');
+            $this->db->prepare("
+                INSERT INTO deposito_kgyr
+                    (banco, monto, referencia, fecha, sesion_id, origen, origen_id, registrado_por_id)
+                VALUES (:banco, :monto, :ref, :fecha, :sid, 'AJUSTE_ESPERADO', :oid, :uid)
+            ")->execute([
+                'banco' => $banco,
+                'monto' => abs($monto),
+                'ref'   => $desc ?: null,
+                'fecha' => $fecha,
+                'sid'   => $sesionId,
+                'oid'   => $ajusteId,
+                'uid'   => $userId,
+            ]);
+        }
     }
 
     public function deleteAjusteEsperado(int $ajusteId, int $adminId, string $password): bool|string
     {
         if (!$this->verificarPasswordAdmin($adminId, $password)) return 'Contraseña incorrecta';
 
-        $stmt = $this->db->prepare("SELECT id_ajuste FROM ajuste_esperado WHERE id_ajuste = :id");
+        $stmt = $this->db->prepare("SELECT * FROM ajuste_esperado WHERE id_ajuste = :id");
         $stmt->execute(['id' => $ajusteId]);
-        if (!$stmt->fetch()) return 'Ajuste no encontrado';
+        $ajuste = $stmt->fetch();
+        if (!$ajuste) return 'Ajuste no encontrado';
 
         $this->db->prepare("DELETE FROM ajuste_esperado WHERE id_ajuste = :id")->execute(['id' => $ajusteId]);
+
+        $this->audit(
+            (int)$ajuste['sesion_id'], $adminId,
+            'AJUSTE_ESPERADO_ELIMINADO',
+            'total_esperado',
+            "{$ajuste['accion']} S/ " . number_format((float)$ajuste['monto'], 2) . " ({$ajuste['tipo']}) — {$ajuste['descripcion']}",
+            '—'
+        );
+
         return true;
     }
 
@@ -1305,7 +1494,6 @@ class CajaRepository
 
     public function addCorreccionVenta(int $sesionId, float $montoNuevo, string $motivo, int $usuarioId): void
     {
-        // monto_anterior = ventas originales + suma de deltas previos
         $baseStmt = $this->db->prepare(
             "SELECT total_ventas_sistema FROM detalle_cuadre WHERE sesion_id = :sid"
         );
@@ -1324,11 +1512,19 @@ class CajaRepository
             "INSERT INTO correccion_venta (sesion_id, monto_anterior, monto_nuevo, motivo, usuario_id)
              VALUES (:sid, :ant, :nuevo, :mot, :uid)"
         )->execute([
-            'sid'  => $sesionId,
-            'ant'  => $montoAnterior,
+            'sid'   => $sesionId,
+            'ant'   => $montoAnterior,
             'nuevo' => round($montoNuevo, 2),
-            'mot'  => $motivo !== '' ? $motivo : null,
-            'uid'  => $usuarioId,
+            'mot'   => $motivo !== '' ? $motivo : null,
+            'uid'   => $usuarioId,
         ]);
+
+        $this->audit(
+            $sesionId, $usuarioId,
+            'CORRECCION_VENTA',
+            'total_ventas_sistema',
+            'S/ ' . number_format($montoAnterior, 2),
+            'S/ ' . number_format(round($montoNuevo, 2), 2) . ($motivo !== '' ? " — {$motivo}" : '')
+        );
     }
 }

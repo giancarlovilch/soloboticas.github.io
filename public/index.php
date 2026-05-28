@@ -40,6 +40,7 @@ require_once __DIR__ . '/../src/Controllers/AdminController.php';
 require_once __DIR__ . '/../src/Controllers/StaffController.php';
 require_once __DIR__ . '/../src/Controllers/CajaController.php';
 require_once __DIR__ . '/../src/Controllers/HorarioController.php';
+require_once __DIR__ . '/../src/Controllers/IncidenciaContableController.php';
 
 /**
  * Lógica para detección de rutas y Base Path
@@ -111,6 +112,7 @@ $router->post('/caja/api/sesion/guardar',      [CajaController::class, 'guardarS
 $router->post('/caja/api/{id}/ventas',         [CajaController::class, 'submitVentas']);
 $router->post('/caja/api/reporte/{id}/rectificar',        [CajaController::class, 'rectificar']);
 $router->post('/caja/api/rectificacion/{id}/eliminar',    [CajaController::class, 'eliminarRectificacion']);
+$router->post('/caja/api/sesion/{id}/conteo',                [CajaController::class, 'apiConteo']);
 $router->post('/caja/api/sesion/{id}/ajuste-esperado',       [CajaController::class, 'addAjusteEsperado']);
 $router->post('/caja/api/ajuste-esperado/{id}/eliminar',     [CajaController::class, 'deleteAjusteEsperado']);
 $router->post('/caja/api/sesion/{id}/comentario',            [CajaController::class, 'guardarComentario']);
@@ -131,6 +133,22 @@ $router->get('/caja/transferir',                              [CajaController::c
 $router->post('/caja/api/transferir/solicitar',               [CajaController::class, 'solicitarTransferencia']);
 $router->post('/caja/api/transferir/{id}/confirmar',          [CajaController::class, 'confirmarTransferenciaAction']);
 $router->post('/caja/api/transferir/{id}/anular',             [CajaController::class, 'anularTransferenciaAction']);
+
+// --- INCIDENCIAS CONTABLES (staff + admin) ---
+// Rutas estáticas ANTES de las dinámicas para evitar que {id} capture 'api'
+$router->get('/incidencias',                           [IncidenciaContableController::class, 'index']);
+$router->get('/incidencias/api/lista',                 [IncidenciaContableController::class, 'apiListar']);
+$router->post('/incidencias/api/{id}/abonar',          [IncidenciaContableController::class, 'apiAbonar']);
+$router->post('/incidencias/api/{id}/cerrar',          [IncidenciaContableController::class, 'apiCerrar']);
+$router->post('/incidencias/api/{id}/reabrir',         [IncidenciaContableController::class, 'apiReabrir']);
+$router->post('/incidencias/api/{id}/descripcion',     [IncidenciaContableController::class, 'apiDescripcion']);
+$router->post('/incidencias/api/{id}/generar-vale',    [IncidenciaContableController::class, 'apiGenerarVale']);
+$router->post('/incidencias/api/{id}/usar-vale',       [IncidenciaContableController::class, 'apiUsarVale']);
+$router->post('/incidencias/api/{id}/anular-vale',     [IncidenciaContableController::class, 'apiAnularVale']);
+$router->post('/incidencias/api/{id}/cobro-electronico',[IncidenciaContableController::class, 'apiAddCobro']);
+$router->get('/incidencias/api/vales-disponibles',     [IncidenciaContableController::class, 'apiValesDisponibles']);
+$router->get('/incidencias/sesion/{id}',               [IncidenciaContableController::class, 'porSesion']);
+$router->get('/incidencias/{id}',                      [IncidenciaContableController::class, 'detalle']);
 
 // --- PORTAL STAFF (colaboradores) ---
 $router->get('/staff',                    [StaffController::class,       'index']);
@@ -188,6 +206,8 @@ $router->post('/admin/postulante/eliminar',[AdminController::class, 'eliminarPos
 // APIS
 $router->get('/admin/api/postulante-detalle', [AdminController::class, 'apiDetallePostulante']);
 $router->post('/admin/postulante/actualizar', [AdminController::class, 'actualizarPostulante']);
+$router->post('/admin/api/deposito-kgyr',                  [AdminController::class, 'apiDepositoCrear']);
+$router->post('/admin/api/deposito-kgyr/{id}/toggle',      [AdminController::class, 'apiDepositoToggle']);
 $router->post('/admin/api/tarifa-base/agregar',      [AdminController::class, 'addTarifaBase']);
 $router->post('/admin/api/tarifa-base/{id}/eliminar',[AdminController::class, 'eliminarTarifaBase']);
 $router->post('/admin/api/bono/agregar',             [AdminController::class, 'addBono']);

@@ -53,6 +53,19 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
         <div class="staff-date"><?= $diaLabel ?></div>
     </section>
 
+    <!-- ── Incidencias Contables ─────────────────── -->
+    <section class="staff-card" style="text-align:center;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);border:1.5px solid #fed7aa;">
+        <h2 class="staff-section-title" style="color:#9a3412;">Incidencias Contables</h2>
+        <p style="font-size:0.82rem;color:#c2410c;margin-bottom:1rem;">
+            Consulta y resuelve discrepancias de caja pendientes.
+        </p>
+        <a href="<?= $basePath ?>/incidencias"
+           class="staff-btn-marcar"
+           style="display:inline-block;text-decoration:none;padding:.75rem 2rem;background:#ea580c;border-color:#ea580c;color:#fff;">
+            Ver incidencias →
+        </a>
+    </section>
+
     <!-- ── Economía ────────────────────────────────── -->
     <section class="staff-card" style="text-align:center;background:linear-gradient(135deg,#fff0f6 0%,#fce7f3 100%);border:1.5px solid #fbcfe8;">
         <h2 class="staff-section-title" style="color:#9d174d;">Mi economía</h2>

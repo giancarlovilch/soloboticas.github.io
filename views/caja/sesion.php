@@ -277,16 +277,50 @@ $act = [
                 <h2 class="caja-card__title">4. Egresos del turno</h2>
                 <p class="caja-card__desc">Registra todos los egresos: pagos a personal, gastos del local y otros conceptos.</p>
             </div>
-            <button type="button" class="caja-btn caja-btn--outline" onclick="agregarGasto()">
-                + Agregar gasto
-            </button>
         </div>
 
-        <div id="gastosContainer" class="caja-gastos-list">
-            <?php foreach ($gastos ?? [] as $g):
+        <!-- Egresos ya guardados (solo lectura) -->
+        <table class="caja-table" id="gastosDisplayTable" style="margin-bottom:.5rem;<?= empty($gastos) ? 'display:none;' : '' ?>">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Detalle</th>
+                    <th class="text-right">Monto</th>
+                    <th class="text-center" style="width:36px;"></th>
+                </tr>
+            </thead>
+            <tbody id="gastosDisplayBody">
+            <?php foreach ($gastos ?? [] as $idx => $g):
+                $tipoPagoLabel = ['ADELANTO'=>'Adelanto','PAGO_TOTAL'=>'Pago total','DESCUENTO'=>'Descuento'];
+                $modo = $g['modo_ref'] ?? '';
+                if ($modo === 'PERSONAL')
+                    $det = htmlspecialchars($g['descripcion']) . ' · ' . ($tipoPagoLabel[$g['tipo_pago']??'']??'');
+                elseif ($modo === 'LOCAL')
+                    $det = htmlspecialchars($g['descripcion']) . ($g['concepto_desc'] ? ' / '.htmlspecialchars($g['concepto_desc']) : '');
+                else
+                    $det = htmlspecialchars($g['descripcion'] ?: $g['comprobante'] ?: '—');
+            ?>
+            <tr data-gasto-idx="<?= $idx ?>">
+                <td><span class="caja-gasto-badge caja-gasto-badge--<?= $g['tipo_css'] ?? 'otro' ?>"><?= htmlspecialchars($g['etiqueta'] ?? '') ?></span></td>
+                <td style="font-size:.83rem;color:#475569;"><?= $det ?></td>
+                <td class="text-right" style="font-weight:700;">S/ <?= number_format((float)$g['monto'],2) ?></td>
+                <td class="text-center">
+                    <button type="button" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:.9rem;padding:.1rem .3rem;border-radius:4px;"
+                            onmouseover="this.style.color='#dc2626'"
+                            onmouseout="this.style.color='#94a3b8'"
+                            onclick="eliminarGastoGuardado(<?= $idx ?>, this)">✕</button>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+
+        <!-- Contenedor oculto para collectGastos() — mantiene los datos del batch -->
+        <div id="gastosContainer" hidden>
+            <?php foreach ($gastos ?? [] as $idx => $g):
                 $modo = $g['modo_ref'] ?? '';
             ?>
-            <div class="caja-gasto-row">
+            <div class="caja-gasto-row" data-saved-idx="<?= $idx ?>">
                 <select class="caja-input caja-gasto__tipo" onchange="tipoChanged(this)">
                     <?php foreach ($tiposEgreso ?? [] as $te): ?>
                         <option value="<?= $te['id_tipo_egreso'] ?>"
@@ -296,16 +330,15 @@ $act = [
                         </option>
                     <?php endforeach; ?>
                 </select>
-
                 <div class="caja-gasto__middle">
                     <?php if ($modo === 'PERSONAL'): ?>
                         <select class="caja-input caja-gasto__staff" style="flex:1">
                             <option value="<?= $g['ref_id'] ?>" selected><?= htmlspecialchars($g['descripcion']) ?></option>
                         </select>
                         <select class="caja-input caja-gasto__tipopago" style="max-width:130px">
-                            <option value="PAGO_TOTAL" <?= ($g['tipo_pago'] ?? 'PAGO_TOTAL') === 'PAGO_TOTAL' ? 'selected' : '' ?>>Pago total</option>
-                            <option value="ADELANTO"   <?= ($g['tipo_pago'] ?? '') === 'ADELANTO'    ? 'selected' : '' ?>>Adelanto</option>
-                            <option value="DESCUENTO"  <?= ($g['tipo_pago'] ?? '') === 'DESCUENTO'   ? 'selected' : '' ?>>Descuento</option>
+                            <option value="PAGO_TOTAL" <?= ($g['tipo_pago']??'PAGO_TOTAL')==='PAGO_TOTAL'?'selected':'' ?>>Pago total</option>
+                            <option value="ADELANTO"   <?= ($g['tipo_pago']??'')==='ADELANTO'  ?'selected':'' ?>>Adelanto</option>
+                            <option value="DESCUENTO"  <?= ($g['tipo_pago']??'')==='DESCUENTO' ?'selected':'' ?>>Descuento</option>
                         </select>
                     <?php elseif ($modo === 'LOCAL'): ?>
                         <select class="caja-input caja-gasto__local" style="max-width:120px">
@@ -313,37 +346,64 @@ $act = [
                         </select>
                         <select class="caja-input caja-gasto__concepto" style="flex:1">
                             <?php if (!empty($g['concepto_id'])): ?>
-                                <option value="<?= $g['concepto_id'] ?>" selected><?= htmlspecialchars($g['concepto_desc'] ?? '') ?></option>
-                            <?php else: ?>
-                                <option value="">— Concepto —</option>
-                            <?php endif; ?>
+                                <option value="<?= $g['concepto_id'] ?>" selected><?= htmlspecialchars($g['concepto_desc']??'') ?></option>
+                            <?php else: ?><option value="">— Concepto —</option><?php endif; ?>
                         </select>
                         <input type="text" class="caja-input caja-gasto__comp" style="max-width:110px"
-                               placeholder="N° comprobante" value="<?= htmlspecialchars($g['comprobante'] ?? '') ?>">
+                               placeholder="N° comprobante" value="<?= htmlspecialchars($g['comprobante']??'') ?>">
                     <?php elseif ($modo === 'DEPOSITO'): ?>
                         <input type="text" class="caja-input caja-gasto__comp" style="flex:1"
-                               placeholder="N° comprobante" value="<?= htmlspecialchars($g['comprobante'] ?? '') ?>">
+                               placeholder="N° comprobante" value="<?= htmlspecialchars($g['comprobante']??'') ?>">
                     <?php elseif ($modo === 'LIBRE'): ?>
                         <input type="text" class="caja-input caja-gasto__desc" style="flex:1"
-                               value="<?= htmlspecialchars($g['descripcion'] ?? '') ?>" placeholder="Descripción del pago">
+                               value="<?= htmlspecialchars($g['descripcion']??'') ?>" placeholder="Descripción del pago">
                     <?php elseif ($modo === 'FACTURA'): ?>
                         <select class="caja-input caja-gasto__tipodoc" style="max-width:140px">
-                            <option value="BOLETA"         <?= ($g['tipo_documento'] ?? '') === 'BOLETA'         ? 'selected' : '' ?>>Boleta</option>
-                            <option value="FACTURA"        <?= ($g['tipo_documento'] ?? '') === 'FACTURA'        ? 'selected' : '' ?>>Factura</option>
-                            <option value="NOTA_DE_VENTA"  <?= ($g['tipo_documento'] ?? '') === 'NOTA_DE_VENTA'  ? 'selected' : '' ?>>Nota de venta</option>
+                            <option value="BOLETA"        <?= ($g['tipo_documento']??'')==='BOLETA'        ?'selected':'' ?>>Boleta</option>
+                            <option value="FACTURA"       <?= ($g['tipo_documento']??'')==='FACTURA'       ?'selected':'' ?>>Factura</option>
+                            <option value="NOTA_DE_VENTA" <?= ($g['tipo_documento']??'')==='NOTA_DE_VENTA' ?'selected':'' ?>>Nota de venta</option>
                         </select>
                         <input type="text" class="caja-input caja-gasto__comp" style="flex:1"
-                               placeholder="N° comprobante" value="<?= htmlspecialchars($g['comprobante'] ?? '') ?>">
+                               placeholder="N° comprobante" value="<?= htmlspecialchars($g['comprobante']??'') ?>">
                     <?php endif; ?>
                 </div>
-
                 <div class="caja-input-money caja-gasto__monto">
                     <span>S/</span>
-                    <input type="number" class="caja-input caja-input--money" value="<?= $g['monto'] ?>" min="0" step="0.01" oninput="recalcularGastos()">
+                    <input type="number" class="caja-input caja-input--money" value="<?= $g['monto'] ?>" min="0" step="0.01">
                 </div>
-                <button type="button" class="caja-gasto__remove" onclick="this.closest('.caja-gasto-row').remove(); recalcularGastos()">✕</button>
+                <button type="button" class="caja-gasto__remove">✕</button>
             </div>
             <?php endforeach; ?>
+        </div>
+
+        <!-- Formulario para agregar nuevo egreso -->
+        <div id="gastoFormWrap" style="background:#f8fafc;border:1.5px solid #e2e8f0;
+             border-radius:10px;padding:.85rem 1rem;margin-bottom:.5rem;">
+            <p style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+                      color:#64748b;margin:0 0 .65rem;">Nuevo egreso</p>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-start;">
+                <select id="gastoTipoNew" class="caja-input" style="max-width:170px;" onchange="gastoTipoChanged()">
+                    <?php foreach ($tiposEgreso ?? [] as $te): ?>
+                    <option value="<?= $te['id_tipo_egreso'] ?>" data-modo="<?= $te['modo_ref'] ?>"
+                            <?= $te['modo_ref'] === 'PERSONAL' ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($te['etiqueta']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+                <div id="gastoMiddleNew" style="display:flex;gap:.5rem;flex:1;flex-wrap:wrap;">
+                    <!-- dinámico según tipo -->
+                </div>
+                <div class="caja-input-money" style="max-width:130px;">
+                    <span>S/</span>
+                    <input type="number" id="gastoMontoNew" class="caja-input caja-input--money"
+                           min="0.01" step="0.01" placeholder="0.00"
+                           oninput="if(this.value<0)this.value=''">
+                </div>
+                <button type="button" class="caja-btn caja-btn--outline" onclick="confirmarGasto()">
+                    Agregar ✓
+                </button>
+            </div>
+            <div id="gastoNewMsg" style="display:none;font-size:.78rem;margin-top:.4rem;color:#dc2626;"></div>
         </div>
 
         <div class="caja-subtotal">

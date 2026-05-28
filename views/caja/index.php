@@ -169,31 +169,36 @@ $estadoLabel = [
             <table class="caja-table">
                 <thead>
                     <tr>
-                        <th>#ID</th>
-                        <th>Fecha · Hora</th>
-                        <th>Caja / Local</th>
-                        <th>Turno</th>
+                        <th style="width:40px;">#ID</th>
+                        <th style="width:72px;">Fecha<br><span style="font-weight:400;opacity:.7;">Hora</span></th>
+                        <th style="width:90px;">Caja<br><span style="font-weight:400;opacity:.7;">Local</span></th>
+                        <th style="width:54px;">Turno</th>
                         <th>Cajera</th>
                         <th>Vendedor/a</th>
-                        <th class="text-center">Ops. BCP</th>
-                        <th>Anterior</th>
-                        <th class="text-center">Estado</th>
-                        <th class="text-right">Resultado</th>
-                        <th class="text-center">Acción</th>
+                        <th class="text-center" style="width:52px;">Ops.<br><span style="font-weight:400;opacity:.7;">BCP</span></th>
+                        <th style="width:52px;">Ant.</th>
+                        <th class="text-center" style="width:100px;">Estado</th>
+                        <th class="text-right" style="width:80px;">Resultado</th>
+                        <th class="text-center" style="width:60px;">Acción</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($recientes as $s):
                     $e    = $estadoLabel[$s['estado']] ?? ['label' => $s['estado'], 'cls' => ''];
                     $hora = $s['fecha_apertura'] ? date('H:i', strtotime($s['fecha_apertura'])) : '—';
+                    $tieneDetalle = in_array($s['estado'], ['CERRADA','APROBADA','OBSERVADA','RECHAZADA'], true)
+                                 && $s['diferencia'] !== null;
+                    $difCorr = $tieneDetalle
+                        ? (float)$s['diferencia'] + (float)$s['sum_rectifs'] + (float)$s['sum_ajustes'] - (float)$s['sum_corr_ventas']
+                        : null;
                 ?>
                     <tr>
                         <td><code style="font-size:0.75rem;color:#475569;">#<?= $s['id_sesion'] ?></code></td>
-                        <td>
+                        <td style="white-space:normal;font-size:.8rem;">
                             <?= date('d/m/Y', strtotime($s['fecha_operacion'])) ?>
                             <span style="color:#94a3b8;font-size:0.72rem;display:block;"><?= $hora ?></span>
                         </td>
-                        <td>
+                        <td style="white-space:normal;font-size:.8rem;">
                             <?= htmlspecialchars($s['caja_desc']) ?>
                             <span style="color:#94a3b8;font-size:0.72rem;display:block;"><?= htmlspecialchars($s['local_desc']) ?></span>
                         </td>
@@ -215,16 +220,33 @@ $estadoLabel = [
                                 <span style="color:#cbd5e1;font-size:0.72rem;">—</span>
                             <?php endif; ?>
                         </td>
-                        <td class="text-center"><span class="caja-estado <?= $e['cls'] ?>"><?= $e['label'] ?></span></td>
+                        <td class="text-center">
+                            <?php if ($tieneDetalle): ?>
+                                <?php
+                                if (!empty($s['inc_id'])):
+                                    $incHref = $basePath.'/incidencias/'.(int)$s['inc_id'];
+                                    if ($s['inc_estado'] === 'CERRADO'):
+                                        $ibg = '#d1fae5'; $icol = '#065f46'; $itxt = '✓ Arqueo cerrado';
+                                    elseif ($s['inc_tipo'] === 'SOBRANTE' || (float)$s['inc_pendiente'] <= 10):
+                                        $ibg = '#dbeafe'; $icol = '#1e40af'; $itxt = '◎ Por cerrar!';
+                                    else:
+                                        $ibg = '#fee2e2'; $icol = '#991b1b'; $itxt = '! Revisar caso';
+                                    endif;
+                                else:
+                                    $incHref = $basePath.'/incidencias/sesion/'.(int)$s['id_sesion'];
+                                    $ibg = '#d1fae5'; $icol = '#065f46'; $itxt = '✓ Arqueo cerrado';
+                                endif;
+                                ?>
+                                <a href="<?= htmlspecialchars($incHref) ?>"
+                                   style="display:inline-block;font-size:0.7rem;font-weight:700;padding:3px 8px;border-radius:4px;text-decoration:none;background:<?= $ibg ?>;color:<?= $icol ?>;">
+                                    <?= $itxt ?>
+                                </a>
+                            <?php else: ?>
+                                <span class="caja-estado <?= $e['cls'] ?>"><?= $e['label'] ?></span>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-right" style="white-space:nowrap;">
-                        <?php
-                        $tieneDetalle = in_array($s['estado'], ['CERRADA','APROBADA','OBSERVADA','RECHAZADA'], true)
-                                     && $s['diferencia'] !== null;
-                        if ($tieneDetalle):
-                            $difCorr = (float)$s['diferencia']
-                                     + (float)$s['sum_rectifs']
-                                     + (float)$s['sum_ajustes']
-                                     - (float)$s['sum_corr_ventas'];
+                        <?php if ($tieneDetalle):
                             if (abs($difCorr) < 0.01):
                         ?>
                             <span style="background:#d1fae5;color:#065f46;font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:5px;">Conforme</span>

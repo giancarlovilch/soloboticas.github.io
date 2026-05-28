@@ -285,6 +285,11 @@ class AdminController extends Controller
             );
         }
 
+        // Datos para la página de bancos
+        if ($page === 'bancos') {
+            require_once __DIR__ . '/../Core/Database.php';
+        }
+
         // Datos para la página de bonos
         $bonosDatos = null;
         if ($page === 'bonos') {
@@ -297,6 +302,47 @@ class AdminController extends Controller
         }
 
         require_once __DIR__ . '/../../views/admin/dashboard.php';
+    }
+
+    /** POST /admin/api/deposito-kgyr */
+    public function apiDepositoCrear(): void
+    {
+        $this->middlewareAdmin();
+        $data  = $this->getAllInput();
+        $banco = $data['banco'] ?? 'BCP';
+        $monto = round((float)($data['monto'] ?? 0), 2);
+        $ref   = trim($data['referencia'] ?? '') ?: null;
+        $fecha = $data['fecha'] ?? date('Y-m-d');
+        $notas = trim($data['notas'] ?? '') ?: null;
+
+        if (!in_array($banco, ['BCP','BBVA'], true)) { $this->error('Banco inválido', 422); return; }
+        if ($monto <= 0) { $this->error('El monto debe ser mayor a 0', 422); return; }
+
+        $uid = (int)$_SESSION['user_id'];
+        $db  = \Database::getConnection();
+        $db->prepare("
+            INSERT INTO deposito_kgyr (banco, monto, referencia, fecha, origen, registrado_por_id, notas)
+            VALUES (:banco, :monto, :ref, :fecha, 'MANUAL', :uid, :notas)
+        ")->execute(['banco'=>$banco,'monto'=>$monto,'ref'=>$ref,'fecha'=>$fecha,'uid'=>$uid,'notas'=>$notas]);
+
+        $this->success('Depósito registrado', ['id' => (int)$db->lastInsertId()]);
+    }
+
+    /** POST /admin/api/deposito-kgyr/{id}/toggle */
+    public function apiDepositoToggle(int $id): void
+    {
+        $this->middlewareAdmin();
+        $db = \Database::getConnection();
+        $stmt = $db->prepare("SELECT confirmado FROM deposito_kgyr WHERE id = :id");
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch();
+        if (!$row) { $this->notFound('Depósito no encontrado'); return; }
+
+        $nuevo = $row['confirmado'] ? 0 : 1;
+        $db->prepare("UPDATE deposito_kgyr SET confirmado = :c WHERE id = :id")
+           ->execute(['c' => $nuevo, 'id' => $id]);
+
+        $this->success($nuevo ? 'Confirmado' : 'Marcado como pendiente', ['confirmado' => $nuevo]);
     }
 
     /** POST /admin/api/tarifa-base/agregar */

@@ -2,15 +2,18 @@
 
 require_once __DIR__ . '/../Core/Controller.php';
 require_once __DIR__ . '/../Repositories/CajaRepository.php';
+require_once __DIR__ . '/../Repositories/IncidenciaContableRepository.php';
 
 class CajaController extends Controller
 {
     private CajaRepository $repo;
+    private IncidenciaContableRepository $incRepo;
 
     public function __construct()
     {
         if (session_status() === PHP_SESSION_NONE) session_start();
-        $this->repo = new CajaRepository();
+        $this->repo    = new CajaRepository();
+        $this->incRepo = new IncidenciaContableRepository();
     }
 
     private function requireAuth(): int
@@ -269,6 +272,21 @@ class CajaController extends Controller
         $this->repo->insertVenta($id, $postulanteId, $ventas);
         $cuadre = $this->repo->calcularYGuardarCuadre($id, $ventas);
 
+        // Auto-detectar incidencia contable si |diferencia| > 10 soles
+        if (abs($cuadre['diferencia'] ?? 0) > 10) {
+            $tipo           = ($cuadre['diferencia'] < 0) ? 'FALTANTE' : 'SOBRANTE';
+            $montoOriginal  = round(abs($cuadre['diferencia']), 2);
+            $responsableId  = (int)($sesion['postulante_apertura_id'] ?? 0) ?: null;
+            $this->incRepo->crear(
+                $id,
+                $tipo,
+                $montoOriginal,
+                $postulanteId,
+                $responsableId,
+                "Auto-detectado al cierre. Diferencia: S/ {$cuadre['diferencia']}"
+            );
+        }
+
         $this->success('Ventas registradas. Cuadre calculado.', $cuadre);
     }
 
@@ -298,6 +316,12 @@ class CajaController extends Controller
         require_once __DIR__ . '/../Repositories/SoloBankRepository.php';
         $sbRepo        = new SoloBankRepository();
         $soloBankVales = $sbRepo->getValesDisponibles();
+
+        // Incidencia contable de esta sesión (si existe)
+        $incidenciaContable = $this->incRepo->getBySesion($id)[0] ?? null;
+
+        // Historial de cambios post-cierre
+        $auditoria = $this->repo->getAuditoria($id);
 
         require_once __DIR__ . '/../../views/caja/reporte.php';
     }
@@ -623,6 +647,31 @@ class CajaController extends Controller
 
         $this->repo->eliminarSesion($id);
         $this->success('Cuadre eliminado correctamente');
+    }
+
+    // ── POST /caja/api/sesion/{id}/conteo ─────────────────
+    public function apiConteo(int $id): void
+    {
+        $postulanteId = $this->requireAuth();
+        $data = $this->getAllInput();
+
+        $exterior      = round((float)($data['exterior']       ?? 0), 2);
+        $monedas       = round((float)($data['monedas']        ?? 0), 2);
+        $billetesCaja  = round((float)($data['billetes_caja']  ?? 0), 2);
+        $billetesFuerte= round((float)($data['billetes_fuerte']?? 0), 2);
+        $agenteBcp     = round((float)($data['agente_bcp']     ?? 0), 2);
+
+        $sesion = $this->repo->getSesionById($id);
+        if (!$sesion) { $this->error('Sesión no encontrada', 404); return; }
+
+        $this->repo->updateConteo($id, $exterior, $monedas, $billetesCaja, $billetesFuerte, $agenteBcp, $postulanteId);
+
+        $reporte = $this->repo->getReporte($id);
+        $this->success('Conteo actualizado', [
+            'total_efectivo_contado' => $reporte['detalle']['total_efectivo_contado'] ?? 0,
+            'diferencia'             => $reporte['detalle']['diferencia']             ?? 0,
+            'resultado_cuadre'       => $reporte['detalle']['resultado_cuadre']       ?? '',
+        ]);
     }
 
     // ── Helper: transacción ────────────────────────────────

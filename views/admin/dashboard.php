@@ -104,6 +104,13 @@ $navActive = [
                     </a>
                 </li>
 
+                <li class="list__item">
+                    <a href="<?= $basePath ?>/incidencias" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Incidencias Cont.</span>
+                    </a>
+                </li>
+
                 <li class="list__item <?= $navActive['asistencias'] ? 'list__item--active' : '' ?>">
                     <a href="?page=asistencias" class="list__button">
                         <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
@@ -146,6 +153,13 @@ $navActive = [
                     </a>
                 </li>
 
+                <li class="list__item <?= ($page==='bancos') ? 'list__item--active' : '' ?>">
+                    <a href="?page=bancos" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Bancos KGyR</span>
+                    </a>
+                </li>
+
                 <p class="nav__section">Sistema</p>
 
                 <li class="list__item">
@@ -182,6 +196,9 @@ $navActive = [
                         break;
                     case 'bonos':
                         require_once __DIR__ . '/bonos_lista.php';
+                        break;
+                    case 'bancos':
+                        require_once __DIR__ . '/bancos.php';
                         break;
                     case 'update':
                         if (isset($p) && !empty($p)) {

@@ -127,34 +127,125 @@ async function crearSesion() {
     }
 }
 
-// ── Agregar fila de gasto ─────────────────────────────
+// ── Eliminar gasto guardado (borra display + hidden batch row) ──
+function eliminarGastoGuardado(idx, btn) {
+    btn.closest('tr').remove();
+    const hidden = document.querySelector(`#gastosContainer .caja-gasto-row[data-saved-idx="${idx}"]`);
+    if (hidden) hidden.remove();
+    recalcularGastos();
+    const tbody = document.getElementById('gastosDisplayBody');
+    const table = document.getElementById('gastosDisplayTable');
+    if (table && tbody && tbody.rows.length === 0) table.style.display = 'none';
+}
+
+// ── Foco al campo monto del formulario ───────────────
 function agregarGasto() {
-    const container = $('gastosContainer');
-    const div = document.createElement('div');
-    div.className = 'caja-gasto-row';
+    gastoTipoChanged();
+    document.getElementById('gastoMontoNew').value = '';
+    document.getElementById('gastoNewMsg').style.display = 'none';
+    document.getElementById('gastoMontoNew').focus();
+}
 
-    const tipoOpts = (TIPOS_EGRESO || []).map((t, i) =>
-        `<option value="${t.id_tipo_egreso}" data-modo="${t.modo_ref}"${i === 0 ? ' selected' : ''}>${t.etiqueta}</option>`
-    ).join('');
+// ── Actualizar campos dinámicos del form ─────────────
+function gastoTipoChanged() {
+    const sel    = document.getElementById('gastoTipoNew');
+    const modo   = sel.options[sel.selectedIndex]?.dataset?.modo || '';
+    const middle = document.getElementById('gastoMiddleNew');
+    middle.innerHTML = buildMiddle(modo);
+}
 
-    const defaultModo = TIPOS_EGRESO[0]?.modo_ref || 'PERSONAL';
+// ── Confirmar y agregar como solo lectura ─────────────
+function confirmarGasto() {
+    const sel    = document.getElementById('gastoTipoNew');
+    const monto  = parseFloat(document.getElementById('gastoMontoNew').value) || 0;
+    const msg    = document.getElementById('gastoNewMsg');
+    const tipoId = parseInt(sel.value) || 0;
+    const modo   = sel.options[sel.selectedIndex]?.dataset?.modo || '';
+    const etiq   = sel.options[sel.selectedIndex]?.text || '';
 
-    div.innerHTML = `
+    if (monto <= 0) { msg.textContent = 'Ingresa un monto válido.'; msg.style.display='block'; return; }
+
+    // Construir fila display
+    let detalle = '';
+    const middle = document.getElementById('gastoMiddleNew');
+
+    const staffSel   = middle.querySelector('.caja-gasto__staff');
+    const tipoPagoSel= middle.querySelector('.caja-gasto__tipopago');
+    const localSel   = middle.querySelector('.caja-gasto__local');
+    const conceptoSel= middle.querySelector('.caja-gasto__concepto');
+    const compInp    = middle.querySelector('.caja-gasto__comp');
+    const descInp    = middle.querySelector('.caja-gasto__desc');
+    const tipoDocSel = middle.querySelector('.caja-gasto__tipodoc');
+
+    if (modo === 'PERSONAL') {
+        if (!staffSel?.value) { msg.textContent = 'Selecciona el personal.'; msg.style.display='block'; return; }
+        detalle = staffSel.options[staffSel.selectedIndex]?.text + ' · ' + (tipoPagoSel?.options[tipoPagoSel.selectedIndex]?.text || '');
+    } else if (modo === 'LOCAL') {
+        if (!localSel?.value) { msg.textContent = 'Selecciona el local.'; msg.style.display='block'; return; }
+        detalle = localSel.options[localSel.selectedIndex]?.text;
+        if (conceptoSel?.value) detalle += ' / ' + conceptoSel.options[conceptoSel.selectedIndex]?.text;
+    } else if (modo === 'FACTURA') {
+        detalle = (tipoDocSel?.options[tipoDocSel.selectedIndex]?.text || '') + (compInp?.value ? ' · ' + compInp.value : '');
+    } else if (modo === 'DEPOSITO') {
+        detalle = compInp?.value || '—';
+    } else {
+        detalle = descInp?.value || '—';
+    }
+
+    // Agregar fila visual de solo lectura
+    const tbody = document.getElementById('gastosDisplayBody');
+    const table = document.getElementById('gastosDisplayTable');
+    const newIdx = 'new_' + Date.now();
+    const tr = document.createElement('tr');
+    tr.dataset.gastoIdx = newIdx;
+    tr.innerHTML = `
+        <td><span class="caja-gasto-badge caja-gasto-badge--otro">${etiq}</span></td>
+        <td style="font-size:.83rem;color:#475569;">${detalle}</td>
+        <td class="text-right" style="font-weight:700;">S/ ${monto.toFixed(2)}</td>
+        <td class="text-center">
+            <button type="button" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:.9rem;padding:.1rem .3rem;border-radius:4px;"
+                    onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#94a3b8'"
+                    onclick="eliminarGastoNuevo('${newIdx}', this)">✕</button>
+        </td>`;
+    tbody.appendChild(tr);
+    if (table) table.style.display = '';
+
+    // Agregar fila oculta para collectGastos()
+    const hiddenRow = document.createElement('div');
+    hiddenRow.className = 'caja-gasto-row';
+    hiddenRow.dataset.newIdx = newIdx;
+    hiddenRow.innerHTML = `
         <select class="caja-input caja-gasto__tipo" onchange="tipoChanged(this)">
-            ${tipoOpts}
+            ${sel.innerHTML}
         </select>
-        <div class="caja-gasto__middle">
-            ${buildMiddle(defaultModo)}
-        </div>
+        <div class="caja-gasto__middle">${middle.innerHTML}</div>
         <div class="caja-input-money caja-gasto__monto">
             <span>S/</span>
-            <input type="number" class="caja-input caja-input--money" min="0" step="0.01" placeholder="0.00" oninput="recalcularGastos()">
+            <input type="number" class="caja-input caja-input--money" value="${monto}" min="0" step="0.01">
         </div>
-        <button type="button" class="caja-gasto__remove" onclick="this.closest('.caja-gasto-row').remove(); recalcularGastos()">✕</button>
-    `;
+        <button type="button" class="caja-gasto__remove">✕</button>`;
+    // Sync tipo seleccionado
+    hiddenRow.querySelector('.caja-gasto__tipo').value = sel.value;
+    document.getElementById('gastosContainer').appendChild(hiddenRow);
 
-    container.appendChild(div);
+    recalcularGastos();
+
+    // Reset form
+    document.getElementById('gastoMontoNew').value = '';
+    middle.innerHTML = buildMiddle(modo);
+    msg.style.display = 'none';
 }
+
+function eliminarGastoNuevo(idx, btn) {
+    btn.closest('tr').remove();
+    const hidden = document.querySelector(`#gastosContainer .caja-gasto-row[data-new-idx="${idx}"]`);
+    if (hidden) hidden.remove();
+    recalcularGastos();
+    const tbody = document.getElementById('gastosDisplayBody');
+    const table = document.getElementById('gastosDisplayTable');
+    if (table && tbody && tbody.rows.length === 0) table.style.display = 'none';
+}
+
 
 function buildStaffSelect() {
     const opts = (STAFF || []).map(s => `<option value="${s.id}">${s.nombre_completo}</option>`).join('');
@@ -481,5 +572,6 @@ async function agregarVale() {
 document.addEventListener('DOMContentLoaded', () => {
     recalcular();
     recalcularGastos();
+    if (document.getElementById('gastoTipoNew')) gastoTipoChanged();
     if (ES_EDICION && SESION_ID) cargarPagosDigitales();
 });
