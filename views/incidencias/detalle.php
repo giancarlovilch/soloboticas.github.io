@@ -70,6 +70,12 @@ $sumAjustesEsp = 0;
 foreach ($ajustesEsperado ?? [] as $aj)
     $sumAjustesEsp += $aj['accion'] === 'AGREGAR' ? -(float)$aj['monto'] : (float)$aj['monto'];
 
+// Ajustes visibles: excluye los generados automáticamente por vales de regularización
+$ajustesDisplay = array_values(array_filter(
+    $ajustesEsperado ?? [],
+    fn($aj) => !str_starts_with($aj['descripcion'] ?? '', 'Vale regularización')
+));
+
 $loQueSeDice = round($saldoIni + $totalVentas - $totalGastos - $digitalDecl + $sumAjustesEsp, 2);
 $difActual   = round($loQueEs - $loQueSeDice, 2);
 
@@ -539,9 +545,9 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     <p class="card-title">Ajustes al esperado</p>
                 </div>
                 <div class="card-body">
-                    <?php if (!empty($ajustesEsperado)): ?>
+                    <?php if (!empty($ajustesDisplay)): ?>
                     <ul class="item-list" style="margin-bottom:.85rem;">
-                        <?php foreach ($ajustesEsperado as $aj): ?>
+                        <?php foreach ($ajustesDisplay as $aj): ?>
                         <li>
                             <span class="item-desc">
                                 <span class="badge" style="background:#f1f5f9;color:#475569;font-size:.65rem;margin-right:.3rem;"><?= $aj['accion'] ?></span>
@@ -1235,12 +1241,12 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                         </div>
 
                         <!-- Ajustes al esperado -->
-                        <?php if (!empty($ajustesEsperado)): ?>
+                        <?php if (!empty($ajustesDisplay)): ?>
                         <div style="border-top:1px dashed #f1f5f9;padding:.18rem 0 0;">
                             <p style="font-size:.68rem;font-weight:700;color:#64748b;margin:.1rem 0 .2rem;">
                                 Ajustes aplicados al cuadre:
                             </p>
-                            <?php foreach ($ajustesEsperado as $aj):
+                            <?php foreach ($ajustesDisplay as $aj):
                                 // AGREGAR: el dinero salió de caja y no estaba registrado → reduce el esperado
                                 // QUITAR:  se espera más efectivo del calculado → aumenta el esperado
                                 $esAgr  = $aj['accion'] === 'AGREGAR';

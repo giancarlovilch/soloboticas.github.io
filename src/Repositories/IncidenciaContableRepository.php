@@ -360,9 +360,23 @@ class IncidenciaContableRepository
 
     public function anularVale(int $valeId, int $usuarioId): void
     {
+        $stmt = $this->db->prepare("SELECT codigo, sesion_origen_id FROM vale_regularizacion WHERE id = :id AND estado = 'DISPONIBLE'");
+        $stmt->execute(['id' => $valeId]);
+        $vale = $stmt->fetch();
+        if (!$vale) return;
+
         $this->db->prepare("
-            UPDATE vale_regularizacion SET estado = 'ANULADO' WHERE id = :id AND estado = 'DISPONIBLE'
+            UPDATE vale_regularizacion SET estado = 'ANULADO' WHERE id = :id
         ")->execute(['id' => $valeId]);
+
+        // Eliminar el ajuste QUITAR que se creó al generar el vale
+        $this->db->prepare("
+            DELETE FROM ajuste_esperado
+             WHERE sesion_id = :sid
+               AND tipo = 'COBRO'
+               AND accion = 'QUITAR'
+               AND descripcion LIKE :desc
+        ")->execute(['sid' => (int)$vale['sesion_origen_id'], 'desc' => "Vale regularización {$vale['codigo']}%"]);
     }
 
     public function editarVale(int $valeId, float $monto, string $descripcion): void
