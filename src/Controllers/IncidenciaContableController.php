@@ -260,10 +260,6 @@ class IncidenciaContableController extends Controller
         $inc = $this->repo->getById($id);
         if (!$inc) { $this->notFound('Incidencia no encontrada'); return; }
         if ($inc['estado'] === 'CERRADO') { $this->error('La incidencia ya está cerrada', 409); return; }
-        if ($monto > (float)$inc['monto_pendiente'] + 0.01) {
-            $this->error('El monto no puede superar el pendiente (S/ ' . number_format($inc['monto_pendiente'], 2) . ')', 422);
-            return;
-        }
 
         try {
             $codigo = $this->repo->generarVale($id, $monto, $desc, $postulanteId);
