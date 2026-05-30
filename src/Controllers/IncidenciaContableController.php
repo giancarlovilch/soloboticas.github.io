@@ -294,6 +294,39 @@ class IncidenciaContableController extends Controller
         }
     }
 
+    // ── POST /incidencias/api/{id}/revertir-vale ─────────
+
+    public function apiRevertirVale(int $id): void
+    {
+        $this->requireAdmin();
+        $data   = $this->getAllInput();
+        $valeId = (int)($data['vale_id'] ?? 0);
+        if (!$valeId) { $this->error('Vale no especificado', 422); return; }
+        try {
+            $this->repo->revertirVale($valeId);
+            $this->success('Vale revertido');
+        } catch (\RuntimeException $e) {
+            $this->error($e->getMessage(), 409);
+        }
+    }
+
+    // ── POST /incidencias/api/{id}/editar-vale ────────────
+
+    public function apiEditarVale(int $id): void
+    {
+        $this->requireAdmin();
+        $data   = $this->getAllInput();
+        $valeId = (int)($data['vale_id'] ?? 0);
+        $monto  = round((float)($data['monto'] ?? 0), 2);
+        $desc   = trim($data['descripcion'] ?? '');
+
+        if (!$valeId) { $this->error('Vale no especificado', 422); return; }
+        if ($monto <= 0) { $this->error('El monto debe ser mayor a 0', 422); return; }
+
+        $this->repo->editarVale($valeId, $monto, $desc);
+        $this->success('Vale actualizado');
+    }
+
     // ── POST /incidencias/api/{id}/anular-vale ────────────
 
     public function apiAnularVale(int $id): void

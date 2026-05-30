@@ -224,7 +224,6 @@ class IncidenciaContableRepository
                SET estado = 'ABIERTO', fecha_cierre = NULL
              WHERE id_incidencia = :id
         ")->execute(['id' => $incidenciaId]);
-        $this->recalcularPendiente($incidenciaId);
     }
 
     public function actualizarDescripcion(int $incidenciaId, string $descripcion): void
@@ -243,6 +242,8 @@ class IncidenciaContableRepository
 
         $codigo = 'VR-' . date('ymd') . '-' . strtoupper(substr(uniqid(), -5));
 
+        $sesionOrigenId = (int)$inc['sesion_origen_id'];
+
         $this->db->prepare("
             INSERT INTO vale_regularizacion
                 (codigo, incidencia_origen_id, sesion_origen_id, monto, descripcion, generado_por_id)
@@ -250,11 +251,22 @@ class IncidenciaContableRepository
         ")->execute([
             'cod'  => $codigo,
             'inc'  => $incidenciaId,
-            'sid'  => $inc['sesion_origen_id'],
+            'sid'  => $sesionOrigenId,
             'mon'  => round($monto, 2),
             'desc' => $descripcion ?: null,
             'reg'  => $generadoPorId,
         ]);
+
+        // Ajuste COBRO+QUITAR en la sesión origen: el sobrante queda explicado
+        require_once __DIR__ . '/CajaRepository.php';
+        (new \CajaRepository())->addAjusteEsperado(
+            $sesionOrigenId,
+            'COBRO',
+            'QUITAR',
+            "Vale regularización {$codigo} — salida sesión #{$sesionOrigenId}",
+            round($monto, 2),
+            $generadoPorId
+        );
 
         return $codigo;
     }
@@ -351,5 +363,66 @@ class IncidenciaContableRepository
         $this->db->prepare("
             UPDATE vale_regularizacion SET estado = 'ANULADO' WHERE id = :id AND estado = 'DISPONIBLE'
         ")->execute(['id' => $valeId]);
+    }
+
+    public function editarVale(int $valeId, float $monto, string $descripcion): void
+    {
+        $this->db->prepare("
+            UPDATE vale_regularizacion
+               SET monto = :monto, descripcion = :desc
+             WHERE id = :id AND estado = 'DISPONIBLE'
+        ")->execute(['monto' => round($monto, 2), 'desc' => $descripcion ?: null, 'id' => $valeId]);
+    }
+
+    public function revertirVale(int $valeId): void
+    {
+        $stmt = $this->db->prepare("SELECT * FROM vale_regularizacion WHERE id = :id AND estado = 'USADO'");
+        $stmt->execute(['id' => $valeId]);
+        $vale = $stmt->fetch();
+        if (!$vale) throw new \RuntimeException('Vale no encontrado o no está en estado USADO');
+
+        $codigo     = $vale['codigo'];
+        $incOrigen  = (int)$vale['incidencia_origen_id'];
+        $sesionDest = (int)$vale['sesion_destino_id'];
+
+        // 1. Eliminar el ABONO generado en la incidencia origen
+        $this->db->prepare("
+            DELETE FROM movimiento_incidencia_contable
+             WHERE incidencia_id = :inc
+               AND tipo = 'ABONO'
+               AND descripcion LIKE :desc
+        ")->execute(['inc' => $incOrigen, 'desc' => "Regularizado con {$codigo}%"]);
+
+        // 2. Eliminar el ajuste QUITAR de la sesión origen (creado al generar)
+        $this->db->prepare("
+            DELETE FROM ajuste_esperado
+             WHERE sesion_id = :sid
+               AND tipo = 'COBRO'
+               AND accion = 'QUITAR'
+               AND descripcion LIKE :desc
+        ")->execute(['sid' => (int)$vale['sesion_origen_id'], 'desc' => "Vale regularización {$codigo}%"]);
+
+        // 3. Eliminar el ajuste AGREGAR de la sesión destino (creado al aplicar)
+        $this->db->prepare("
+            DELETE FROM ajuste_esperado
+             WHERE sesion_id = :sid
+               AND tipo = 'COBRO'
+               AND accion = 'AGREGAR'
+               AND descripcion LIKE :desc
+        ")->execute(['sid' => $sesionDest, 'desc' => "Vale regularización {$codigo}%"]);
+
+        // 4. Marcar vale como ANULADO y limpiar datos de uso
+        $this->db->prepare("
+            UPDATE vale_regularizacion
+               SET estado = 'ANULADO',
+                   incidencia_destino_id = NULL,
+                   sesion_destino_id     = NULL,
+                   usado_por_id          = NULL,
+                   usado_en              = NULL
+             WHERE id = :id
+        ")->execute(['id' => $valeId]);
+
+        // 5. Recalcular pendiente de la incidencia origen
+        $this->recalcularPendiente($incOrigen);
     }
 }

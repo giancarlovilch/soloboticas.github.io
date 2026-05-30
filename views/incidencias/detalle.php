@@ -235,6 +235,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
         .item-list li .item-rm { background:none;border:none;cursor:pointer;color:#94a3b8;
                                   font-size:.85rem;padding:.1rem .3rem;border-radius:4px; }
         .item-list li .item-rm:hover { color:#dc2626;background:#fee2e2; }
+        .item-list li .item-rm.edit:hover { color:#2563eb;background:#dbeafe; }
 
         /* Section divider */
         .sec-divider { border:none;border-top:1px solid #e2e8f0;margin:1rem 0; }
@@ -810,7 +811,10 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                             </span>
                             <span class="item-amount" style="color:#5b21b6;"><?= $f2($vr['monto']) ?></span>
                             <?php if ($esAdmin && $vr['estado'] === 'DISPONIBLE'): ?>
+                            <button class="item-rm edit" onclick="editarValeInline(<?= $vr['id'] ?>, <?= $vr['monto'] ?>, <?= json_encode($vr['descripcion'] ?? '') ?>, this)" title="Editar" style="margin-right:.2rem;">✎</button>
                             <button class="item-rm" onclick="anularVale(<?= $vr['id'] ?>, this)" title="Anular">✕</button>
+                            <?php elseif ($esAdmin && $vr['estado'] === 'USADO'): ?>
+                            <button class="item-rm" onclick="revertirVale(<?= $vr['id'] ?>, this)" title="Revertir aplicación" style="color:#d97706;">↩</button>
                             <?php endif; ?>
                         </li>
                         <?php endforeach; ?>
@@ -828,6 +832,9 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                                 <span style="color:#94a3b8;font-size:.72rem;margin-left:.3rem;">inc. #<?= $vr['incidencia_origen_id'] ?> · sesión #<?= $vr['sesion_origen_id'] ?></span>
                             </span>
                             <span class="item-amount" style="color:#16a34a;">−<?= $f2($vr['monto']) ?></span>
+                            <?php if ($esAdmin): ?>
+                            <button class="item-rm" onclick="revertirVale(<?= $vr['id'] ?>, this)" title="Revertir aplicación" style="color:#d97706;">↩</button>
+                            <?php endif; ?>
                         </li>
                         <?php endforeach; ?>
                     </ul>
@@ -869,30 +876,35 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     ));
                     ?>
                     <?php if (!empty($valesDisponiblesOtros)): ?>
-                    <p class="form-label" style="margin-bottom:.5rem;">Aplicar vale de otra incidencia</p>
-                    <div class="form-row cols-2">
-                        <div>
-                            <label class="form-label">Vale disponible</label>
-                            <select class="form-input" id="vr_usar_id">
-                                <option value="">— seleccionar —</option>
-                                <?php foreach ($valesDisponiblesOtros as $vd): ?>
-                                <option value="<?= $vd['id'] ?>">
-                                    <?= htmlspecialchars($vd['codigo']) ?>
-                                    — S/ <?= number_format($vd['monto'], 2) ?>
-                                    · Inc.#<?= $vd['incidencia_origen_id'] ?>
-                                    <?= htmlspecialchars($vd['local_desc']) ?>
-                                    <?= date('d/m', strtotime($vd['fecha_operacion'])) ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div style="display:flex;align-items:flex-end;">
-                            <button class="btn btn-success btn-sm" onclick="usarVale()" style="width:100%">Aplicar vale</button>
-                        </div>
-                    </div>
+                    <p class="form-label" style="margin-bottom:.5rem;">Vales disponibles de otras incidencias</p>
+                    <ul class="item-list" style="margin-bottom:.85rem;" id="listaValesOtros">
+                        <?php foreach ($valesDisponiblesOtros as $vd): ?>
+                        <li id="vd-<?= $vd['id'] ?>">
+                            <span class="item-desc">
+                                <span style="font-family:monospace;font-weight:700;color:#1e293b;font-size:.8rem;"><?= htmlspecialchars($vd['codigo']) ?></span>
+                                <span style="color:#94a3b8;font-size:.72rem;margin-left:.3rem;">
+                                    Inc.#<?= $vd['incidencia_origen_id'] ?> · <?= htmlspecialchars($vd['local_desc']) ?> · <?= date('d/m', strtotime($vd['fecha_operacion'])) ?>
+                                </span>
+                                <?php if ($vd['descripcion'] ?? ''): ?>
+                                <span style="color:#64748b;font-size:.72rem;margin-left:.3rem;"><?= htmlspecialchars($vd['descripcion']) ?></span>
+                                <?php endif; ?>
+                            </span>
+                            <span class="item-amount" style="color:#5b21b6;margin-right:.4rem;"><?= $f2($vd['monto']) ?></span>
+                            <?php if (!$esCerrada): ?>
+                            <button class="btn btn-success btn-sm" style="padding:.2rem .55rem;font-size:.75rem;margin-right:.2rem;"
+                                onclick="usarValeId(<?= $vd['id'] ?>, this)">Aplicar</button>
+                            <?php endif; ?>
+                            <?php if ($esAdmin): ?>
+                            <button class="item-rm" onclick="editarValeInline(<?= $vd['id'] ?>, <?= $vd['monto'] ?>, <?= json_encode($vd['descripcion'] ?? '') ?>, this)" title="Editar" style="margin-right:.2rem;">✎</button>
+                            <button class="item-rm" onclick="anularValeOtro(<?= $vd['id'] ?>, this)" title="Anular">✕</button>
+                            <?php endif; ?>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
                     <span id="vrUsarAlert" style="display:none;margin-top:.4rem;" class="alert"></span>
                     <?php else: ?>
                     <p style="font-size:.78rem;color:#94a3b8;">No hay vales de otras incidencias disponibles.</p>
+                    <span id="vrUsarAlert" style="display:none;margin-top:.4rem;" class="alert"></span>
                     <?php endif; ?>
 
                 </div>
@@ -1834,6 +1846,48 @@ async function generarVale() {
     }
 }
 
+async function usarValeId(valeId, btn) {
+    if (!confirm('¿Aplicar este vale? Se registrará un ABONO en la incidencia origen y un ajuste en esta sesión.')) return;
+    try {
+        await apiPost(`${BASE}/incidencias/api/${INC_ID}/usar-vale`, { vale_id: valeId });
+        mostrarAlerta('vrUsarAlert', '✓ Vale aplicado', 'ok');
+        setTimeout(() => location.reload(), 1200);
+    } catch(e) { mostrarAlerta('vrUsarAlert', e.message, 'err'); }
+}
+
+async function anularValeOtro(valeId, btn) {
+    if (!confirm('¿Anular este vale? No se podrá usar.')) return;
+    try {
+        await apiPost(`${BASE}/incidencias/api/${INC_ID}/anular-vale`, { vale_id: valeId });
+        btn.closest('li').remove();
+    } catch(e) { alert(e.message); }
+}
+
+function editarValeInline(valeId, montoActual, descActual, btn) {
+    const li = btn.closest('li');
+    if (li.querySelector('.vr-edit-form')) return;
+    const form = document.createElement('div');
+    form.className = 'vr-edit-form';
+    form.style.cssText = 'display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.4rem;width:100%;';
+    form.innerHTML = `
+        <input type="number" step="0.01" min="0.01" value="${montoActual}" style="width:90px;" class="form-input" placeholder="Monto">
+        <input type="text" value="${descActual || ''}" style="flex:1;min-width:120px;" class="form-input" placeholder="Nota (opcional)">
+        <button class="btn btn-primary btn-sm" style="padding:.2rem .55rem;font-size:.75rem;">Guardar</button>
+        <button class="btn btn-secondary btn-sm" style="padding:.2rem .55rem;font-size:.75rem;">Cancelar</button>
+    `;
+    const [inMonto, inDesc, btnGuardar, btnCancelar] = form.querySelectorAll('input, button');
+    btnCancelar.onclick = () => form.remove();
+    btnGuardar.onclick = async () => {
+        const monto = parseFloat(inMonto.value);
+        if (!monto || monto <= 0) { alert('Monto inválido'); return; }
+        try {
+            await apiPost(`${BASE}/incidencias/api/${INC_ID}/editar-vale`, { vale_id: valeId, monto, descripcion: inDesc.value.trim() });
+            setTimeout(() => location.reload(), 400);
+        } catch(e) { alert(e.message); }
+    };
+    li.appendChild(form);
+}
+
 async function usarVale() {
     const valeId = parseInt(document.getElementById('vr_usar_id')?.value);
     if (!valeId) { mostrarAlerta('vrUsarAlert', 'Selecciona un vale', 'err'); return; }
@@ -1852,6 +1906,14 @@ async function anularVale(valeId, btn) {
     try {
         await apiPost(`${BASE}/incidencias/api/${INC_ID}/anular-vale`, { vale_id: valeId });
         btn.closest('li').remove();
+    } catch(e) { alert(e.message); }
+}
+
+async function revertirVale(valeId, btn) {
+    if (!confirm('¿Revertir este vale?\nSe eliminará el abono de esta incidencia y el ajuste de la sesión destino.')) return;
+    try {
+        await apiPost(`${BASE}/incidencias/api/${INC_ID}/revertir-vale`, { vale_id: valeId });
+        setTimeout(() => location.reload(), 400);
     } catch(e) { alert(e.message); }
 }
 </script>
