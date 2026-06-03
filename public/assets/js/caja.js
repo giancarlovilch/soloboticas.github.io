@@ -226,6 +226,15 @@ function confirmarGasto() {
         <button type="button" class="caja-gasto__remove">✕</button>`;
     // Sync tipo seleccionado
     hiddenRow.querySelector('.caja-gasto__tipo').value = sel.value;
+    // innerHTML no preserva .value de selects/inputs modificados por el usuario → sync manual
+    const hm = hiddenRow.querySelector('.caja-gasto__middle');
+    if (staffSel)    { const el = hm.querySelector('.caja-gasto__staff');    if (el) el.value = staffSel.value; }
+    if (tipoPagoSel) { const el = hm.querySelector('.caja-gasto__tipopago'); if (el) el.value = tipoPagoSel.value; }
+    if (localSel)    { const el = hm.querySelector('.caja-gasto__local');    if (el) el.value = localSel.value; }
+    if (conceptoSel) { const el = hm.querySelector('.caja-gasto__concepto'); if (el) el.value = conceptoSel.value; }
+    if (tipoDocSel)  { const el = hm.querySelector('.caja-gasto__tipodoc');  if (el) el.value = tipoDocSel.value; }
+    if (compInp)     { const el = hm.querySelector('.caja-gasto__comp');     if (el) el.value = compInp.value; }
+    if (descInp)     { const el = hm.querySelector('.caja-gasto__desc');     if (el) el.value = descInp.value; }
     document.getElementById('gastosContainer').appendChild(hiddenRow);
 
     recalcularGastos();
@@ -253,12 +262,13 @@ function buildStaffSelect() {
 }
 
 function buildTipoPagoSelect() {
-    return `<select class="caja-input caja-gasto__tipopago" style="max-width:130px">
-        <option value="PAGO_TOTAL">Pago total</option>
-        <option value="ADELANTO">Adelanto</option>
-        <option value="DESCUENTO">Descuento</option>
+    return `<select class="caja-input caja-gasto__tipopago" style="max-width:165px">
+        <option value="MES_ACTUAL">Pago Mes Actual</option>
+        <option value="MES_PASADO">Pago Mes Pasado</option>
+        <option value="PAGO_EXTRA">Pago Extra</option>
     </select>`;
 }
+
 
 function buildLocalSelect() {
     const opts = (LOCALES || []).map(l => `<option value="${l.id}">${l.descripcion}</option>`).join('');
@@ -314,7 +324,7 @@ function collectGastos() {
             const sel = row.querySelector('.caja-gasto__staff');
             if (!sel?.value) return;
             gasto.ref_id    = parseInt(sel.value);
-            gasto.tipo_pago = row.querySelector('.caja-gasto__tipopago')?.value || 'PAGO_TOTAL';
+            gasto.tipo_pago = row.querySelector('.caja-gasto__tipopago')?.value || 'MES_ACTUAL';
         } else if (modoRef === 'LOCAL') {
             const selLocal    = row.querySelector('.caja-gasto__local');
             const selConcepto = row.querySelector('.caja-gasto__concepto');

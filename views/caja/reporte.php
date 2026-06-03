@@ -263,7 +263,7 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
             <thead><tr><th>Tipo</th><th>Detalle</th><th>Comprobante</th><th class="text-right">Monto</th></tr></thead>
             <tbody>
             <?php
-            $tipoPagoLabel = ['ADELANTO' => 'Adelanto', 'PAGO_TOTAL' => 'Pago total', 'DESCUENTO' => 'Descuento'];
+            $tipoPagoLabel = ['MES_ACTUAL' => 'Pago Mes Actual', 'MES_PASADO' => 'Pago Mes Pasado', 'PAGO_EXTRA' => 'Pago Extra'];
             $tipoDocLabel  = ['BOLETA' => 'Boleta', 'FACTURA' => 'Factura', 'NOTA_DE_VENTA' => 'Nota de venta'];
             foreach ($gastos as $g):
                 $modo = $g['modo_ref'] ?? '';
@@ -484,7 +484,7 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
                     $esAgregar = $aj['accion'] === 'AGREGAR';
                     $t = $aj['tipo'] ?? 'COBRO';
                     if ($t === 'COBRO')        $detAj = htmlspecialchars($aj['modo_desc'] ?? '');
-                    elseif ($t === 'PERSONAL') $detAj = htmlspecialchars($aj['staff_desc'] ?? '') . ($aj['tipo_pago'] ? ' · ' . (['ADELANTO'=>'Adelanto','PAGO_TOTAL'=>'Pago total','DESCUENTO'=>'Descuento'][$aj['tipo_pago']] ?? $aj['tipo_pago']) : '');
+                    elseif ($t === 'PERSONAL') $detAj = htmlspecialchars($aj['staff_desc'] ?? '') . ($aj['tipo_pago'] ? ' · ' . (['MES_ACTUAL'=>'Pago Mes Actual','MES_PASADO'=>'Pago Mes Pasado','PAGO_EXTRA'=>'Pago Extra'][$aj['tipo_pago']] ?? $aj['tipo_pago']) : '');
                     elseif ($t === 'LOCAL')    $detAj = htmlspecialchars($aj['local_desc'] ?? '') . ($aj['concepto_desc'] ? ' · ' . htmlspecialchars($aj['concepto_desc']) : '');
                     elseif ($t === 'COMPRA')   $detAj = ['BOLETA'=>'Boleta','FACTURA'=>'Factura','NOTA_DE_VENTA'=>'Nota de venta'][$aj['tipo_documento'] ?? ''] ?? '';
                     else                       $detAj = htmlspecialchars($aj['descripcion'] ?? '');

@@ -291,7 +291,7 @@ $act = [
             </thead>
             <tbody id="gastosDisplayBody">
             <?php foreach ($gastos ?? [] as $idx => $g):
-                $tipoPagoLabel = ['ADELANTO'=>'Adelanto','PAGO_TOTAL'=>'Pago total','DESCUENTO'=>'Descuento'];
+                $tipoPagoLabel = ['MES_ACTUAL'=>'Pago Mes Actual','MES_PASADO'=>'Pago Mes Pasado','PAGO_EXTRA'=>'Pago Extra'];
                 $modo = $g['modo_ref'] ?? '';
                 if ($modo === 'PERSONAL')
                     $det = htmlspecialchars($g['descripcion']) . ' · ' . ($tipoPagoLabel[$g['tipo_pago']??'']??'');
@@ -335,10 +335,10 @@ $act = [
                         <select class="caja-input caja-gasto__staff" style="flex:1">
                             <option value="<?= $g['ref_id'] ?>" selected><?= htmlspecialchars($g['descripcion']) ?></option>
                         </select>
-                        <select class="caja-input caja-gasto__tipopago" style="max-width:130px">
-                            <option value="PAGO_TOTAL" <?= ($g['tipo_pago']??'PAGO_TOTAL')==='PAGO_TOTAL'?'selected':'' ?>>Pago total</option>
-                            <option value="ADELANTO"   <?= ($g['tipo_pago']??'')==='ADELANTO'  ?'selected':'' ?>>Adelanto</option>
-                            <option value="DESCUENTO"  <?= ($g['tipo_pago']??'')==='DESCUENTO' ?'selected':'' ?>>Descuento</option>
+                        <select class="caja-input caja-gasto__tipopago" style="max-width:165px">
+                            <option value="MES_ACTUAL" <?= ($g['tipo_pago']??'MES_ACTUAL')==='MES_ACTUAL'?'selected':'' ?>>Pago Mes Actual</option>
+                            <option value="MES_PASADO" <?= ($g['tipo_pago']??'')==='MES_PASADO'?'selected':'' ?>>Pago Mes Pasado</option>
+                            <option value="PAGO_EXTRA" <?= ($g['tipo_pago']??'')==='PAGO_EXTRA' ?'selected':'' ?>>Pago Extra</option>
                         </select>
                     <?php elseif ($modo === 'LOCAL'): ?>
                         <select class="caja-input caja-gasto__local" style="max-width:120px">

@@ -379,6 +379,32 @@ class IncidenciaContableRepository
         ")->execute(['sid' => (int)$vale['sesion_origen_id'], 'desc' => "Vale regularización {$vale['codigo']}%"]);
     }
 
+    public function eliminarMovimiento(int $movId): void
+    {
+        $stmt = $this->db->prepare("SELECT incidencia_id FROM movimiento_incidencia_contable WHERE id_movimiento = :id AND tipo IN ('ABONO','CONDONACION')");
+        $stmt->execute(['id' => $movId]);
+        $row = $stmt->fetch();
+        if (!$row) throw new \RuntimeException('Movimiento no encontrado o no es editable');
+
+        $this->db->prepare("DELETE FROM movimiento_incidencia_contable WHERE id_movimiento = :id")->execute(['id' => $movId]);
+        $this->recalcularPendiente((int)$row['incidencia_id']);
+    }
+
+    public function editarMovimiento(int $movId, float $monto, string $descripcion): void
+    {
+        $stmt = $this->db->prepare("SELECT incidencia_id FROM movimiento_incidencia_contable WHERE id_movimiento = :id AND tipo IN ('ABONO','CONDONACION')");
+        $stmt->execute(['id' => $movId]);
+        $row = $stmt->fetch();
+        if (!$row) throw new \RuntimeException('Movimiento no encontrado o no es editable');
+
+        $this->db->prepare("
+            UPDATE movimiento_incidencia_contable
+               SET monto = :monto, descripcion = :desc
+             WHERE id_movimiento = :id
+        ")->execute(['monto' => round($monto, 2), 'desc' => $descripcion ?: null, 'id' => $movId]);
+        $this->recalcularPendiente((int)$row['incidencia_id']);
+    }
+
     public function editarVale(int $valeId, float $monto, string $descripcion): void
     {
         $this->db->prepare("

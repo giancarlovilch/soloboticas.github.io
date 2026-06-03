@@ -294,6 +294,45 @@ class IncidenciaContableController extends Controller
         }
     }
 
+    // ── POST /incidencias/api/{id}/eliminar-movimiento ───
+
+    public function apiEliminarMovimiento(int $id): void
+    {
+        $this->requireAdmin();
+        $data  = $this->getAllInput();
+        $movId = (int)($data['mov_id'] ?? 0);
+        if (!$movId) { $this->error('Movimiento no especificado', 422); return; }
+        try {
+            $this->repo->eliminarMovimiento($movId);
+            $actualizada = $this->repo->getById($id);
+            $this->success('Movimiento eliminado', [
+                'monto_pendiente' => $actualizada['monto_pendiente'],
+                'estado'          => $actualizada['estado'],
+            ]);
+        } catch (\RuntimeException $e) {
+            $this->error($e->getMessage(), 422);
+        }
+    }
+
+    // ── POST /incidencias/api/{id}/editar-movimiento ──────
+
+    public function apiEditarMovimiento(int $id): void
+    {
+        $this->requireAdmin();
+        $data  = $this->getAllInput();
+        $movId = (int)($data['mov_id'] ?? 0);
+        $monto = round((float)($data['monto'] ?? 0), 2);
+        $desc  = trim($data['descripcion'] ?? '');
+        if (!$movId) { $this->error('Movimiento no especificado', 422); return; }
+        if ($monto <= 0) { $this->error('El monto debe ser mayor a 0', 422); return; }
+        try {
+            $this->repo->editarMovimiento($movId, $monto, $desc);
+            $this->success('Movimiento actualizado');
+        } catch (\RuntimeException $e) {
+            $this->error($e->getMessage(), 422);
+        }
+    }
+
     // ── POST /incidencias/api/{id}/revertir-vale ─────────
 
     public function apiRevertirVale(int $id): void

@@ -555,7 +555,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                                 switch ($aj['tipo']) {
                                     case 'PERSONAL':
                                         $ajLabel = 'Personal · ' . ($aj['staff_desc'] ?? '—');
-                                        if ($aj['tipo_pago'] ?? '') $ajLabel .= ' (' . $aj['tipo_pago'] . ')';
+                                        if ($aj['tipo_pago'] ?? '') $ajLabel .= ' (' . (['MES_ACTUAL'=>'Pago Mes Actual','MES_PASADO'=>'Pago Mes Pasado','PAGO_EXTRA'=>'Pago Extra'][$aj['tipo_pago']] ?? $aj['tipo_pago']) . ')';
                                         if ($aj['descripcion'] ?? '') $ajLabel .= ' — ' . $aj['descripcion'];
                                         break;
                                     case 'LOCAL':
@@ -650,9 +650,9 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                             <div>
                                 <label class="form-label">Tipo de pago</label>
                                 <select class="form-input" id="aj_tipopago">
-                                    <option value="PAGO_TOTAL">Pago total</option>
-                                    <option value="ADELANTO">Adelanto</option>
-                                    <option value="DESCUENTO">Descuento</option>
+                                    <option value="MES_ACTUAL">Pago Mes Actual</option>
+                                    <option value="MES_PASADO">Pago Mes Pasado</option>
+                                    <option value="PAGO_EXTRA">Pago Extra</option>
                                 </select>
                             </div>
                         </div>
@@ -1255,7 +1255,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                                 switch ($aj['tipo']) {
                                     case 'PERSONAL':
                                         $ajLab = 'Pago a ' . ($aj['staff_desc'] ?? 'personal');
-                                        if ($aj['tipo_pago'] ?? '') $ajLab .= ' (' . $aj['tipo_pago'] . ')';
+                                        if ($aj['tipo_pago'] ?? '') $ajLab .= ' (' . (['MES_ACTUAL'=>'Pago Mes Actual','MES_PASADO'=>'Pago Mes Pasado','PAGO_EXTRA'=>'Pago Extra'][$aj['tipo_pago']] ?? $aj['tipo_pago']) . ')';
                                         break;
                                     case 'LOCAL':
                                         $ajLab = 'Gasto local · ' . ($aj['local_desc'] ?? '?');
@@ -1345,9 +1345,9 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                         <?php foreach ($movimientos as $mov):
                             $mi    = $movTipoInfo[$mov['tipo']] ?? ['label'=>$mov['tipo'],'dot'=>'#94a3b8','bg'=>'#f1f5f9','color'=>'#475569','signo'=>''];
                         ?>
-                        <div class="mov-item">
+                        <div class="mov-item" id="mov-<?= $mov['id_movimiento'] ?>">
                             <span class="mov-dot" style="background:<?= $mi['dot'] ?>;"></span>
-                            <div class="mov-body">
+                            <div class="mov-body" style="flex:1;">
                                 <span class="badge" style="background:<?= $mi['bg'] ?>;color:<?= $mi['color'] ?>"><?= $mi['label'] ?></span>
                                 <?php if ($mov['descripcion']): ?>
                                 <span style="margin-left:.3rem;font-size:.78rem;color:#475569;">
@@ -1359,8 +1359,18 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                                     · <?= date('d/m/Y H:i', strtotime($mov['fecha'])) ?>
                                 </div>
                             </div>
-                            <div class="mov-monto" style="color:<?= $mi['color'] ?>">
-                                <?= $mi['signo'] ?><?= $f2($mov['monto']) ?>
+                            <div style="display:flex;align-items:center;gap:.2rem;">
+                                <div class="mov-monto" style="color:<?= $mi['color'] ?>">
+                                    <?= $mi['signo'] ?><?= $f2($mov['monto']) ?>
+                                </div>
+                                <?php if ($esAdmin && in_array($mov['tipo'], ['ABONO','CONDONACION'])): ?>
+                                <button class="item-rm edit" style="font-size:.8rem;padding:.1rem .25rem;"
+                                    onclick="editarMovInline(<?= $mov['id_movimiento'] ?>, <?= $mov['monto'] ?>, <?= json_encode($mov['descripcion'] ?? '') ?>, this)"
+                                    title="Editar">✎</button>
+                                <button class="item-rm" style="font-size:.8rem;padding:.1rem .25rem;"
+                                    onclick="eliminarMov(<?= $mov['id_movimiento'] ?>, this)"
+                                    title="Eliminar">✕</button>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <?php endforeach; ?>
@@ -1913,6 +1923,39 @@ async function anularVale(valeId, btn) {
         await apiPost(`${BASE}/incidencias/api/${INC_ID}/anular-vale`, { vale_id: valeId });
         btn.closest('li').remove();
     } catch(e) { alert(e.message); }
+}
+
+async function eliminarMov(movId, btn) {
+    if (!confirm('¿Eliminar este movimiento? Se recalculará el pendiente.')) return;
+    try {
+        await apiPost(`${BASE}/incidencias/api/${INC_ID}/eliminar-movimiento`, { mov_id: movId });
+        setTimeout(() => location.reload(), 400);
+    } catch(e) { alert(e.message); }
+}
+
+function editarMovInline(movId, montoActual, descActual, btn) {
+    const item = document.getElementById(`mov-${movId}`);
+    if (item.querySelector('.mov-edit-form')) return;
+    const form = document.createElement('div');
+    form.className = 'mov-edit-form';
+    form.style.cssText = 'display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.4rem;width:100%;grid-column:1/-1;';
+    form.innerHTML = `
+        <input type="number" step="0.01" min="0.01" value="${montoActual}" style="width:85px;" class="form-input" placeholder="Monto">
+        <input type="text" value="${descActual || ''}" style="flex:1;min-width:120px;" class="form-input" placeholder="Nota (opcional)">
+        <button class="btn btn-primary btn-sm" style="padding:.2rem .55rem;font-size:.75rem;">Guardar</button>
+        <button class="btn btn-secondary btn-sm" style="padding:.2rem .55rem;font-size:.75rem;">Cancelar</button>
+    `;
+    const [inMonto, inDesc, btnGuardar, btnCancelar] = form.querySelectorAll('input, button');
+    btnCancelar.onclick = () => form.remove();
+    btnGuardar.onclick = async () => {
+        const monto = parseFloat(inMonto.value);
+        if (!monto || monto <= 0) { alert('Monto inválido'); return; }
+        try {
+            await apiPost(`${BASE}/incidencias/api/${INC_ID}/editar-movimiento`, { mov_id: movId, monto, descripcion: inDesc.value.trim() });
+            setTimeout(() => location.reload(), 400);
+        } catch(e) { alert(e.message); }
+    };
+    item.appendChild(form);
 }
 
 async function revertirVale(valeId, btn) {

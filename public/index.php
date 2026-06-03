@@ -147,6 +147,8 @@ $router->post('/incidencias/api/{id}/usar-vale',       [IncidenciaContableContro
 $router->post('/incidencias/api/{id}/anular-vale',     [IncidenciaContableController::class, 'apiAnularVale']);
 $router->post('/incidencias/api/{id}/editar-vale',     [IncidenciaContableController::class, 'apiEditarVale']);
 $router->post('/incidencias/api/{id}/revertir-vale',   [IncidenciaContableController::class, 'apiRevertirVale']);
+$router->post('/incidencias/api/{id}/eliminar-movimiento', [IncidenciaContableController::class, 'apiEliminarMovimiento']);
+$router->post('/incidencias/api/{id}/editar-movimiento',   [IncidenciaContableController::class, 'apiEditarMovimiento']);
 $router->post('/incidencias/api/{id}/cobro-electronico',[IncidenciaContableController::class, 'apiAddCobro']);
 $router->get('/incidencias/api/vales-disponibles',     [IncidenciaContableController::class, 'apiValesDisponibles']);
 $router->get('/incidencias/sesion/{id}',               [IncidenciaContableController::class, 'porSesion']);
