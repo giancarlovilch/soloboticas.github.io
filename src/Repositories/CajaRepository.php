@@ -22,7 +22,8 @@ class CajaRepository
     public function getCajasByLocal(int $localId): array
     {
         $stmt = $this->db->prepare(
-            "SELECT id_caja AS id, descripcion FROM caja WHERE local_id = :lid AND activo = 1 ORDER BY descripcion"
+            "SELECT id_caja AS id, descripcion, requiere_vendedora
+             FROM caja WHERE local_id = :lid AND activo = 1 ORDER BY descripcion"
         );
         $stmt->execute(['lid' => $localId]);
         return $stmt->fetchAll();
@@ -865,6 +866,40 @@ class CajaRepository
     // ── Eliminar sesión y todos sus hijos ──────────────────
     public function eliminarSesion(int $sesionId): void
     {
+        // Obtener cajera, vendedora, fecha y turno antes de borrar
+        $stmtInfo = $this->db->prepare(
+            "SELECT sc.postulante_apertura_id AS cajera_id,
+                    sc.fecha_operacion, sc.turno_id,
+                    sp.postulante_id AS vendedora_id
+             FROM sesion_caja sc
+             LEFT JOIN sesion_participante sp
+                    ON sp.sesion_id = sc.id_sesion AND sp.rol_participacion = 'VENDEDORA'
+             WHERE sc.id_sesion = :sid LIMIT 1"
+        );
+        $stmtInfo->execute(['sid' => $sesionId]);
+        $info = $stmtInfo->fetch();
+
+        // Eliminar encuestas (asistencia) registradas mutuamente para esta sesión:
+        //   vendedora registrada por cajera, y cajera registrada por vendedora
+        if ($info && $info['cajera_id'] && $info['vendedora_id']) {
+            $cid   = (int)$info['cajera_id'];
+            $vid   = (int)$info['vendedora_id'];
+            $fecha = $info['fecha_operacion'];
+            $tid   = (int)$info['turno_id'];
+
+            $cond = "(postulante_id = :vid  AND registrado_por_id = :cid  AND fecha = :fecha  AND turno_id = :tid)
+                  OR (postulante_id = :cid2 AND registrado_por_id = :vid2 AND fecha = :fecha2 AND turno_id = :tid2)";
+            $p    = ['vid'=>$vid,'cid'=>$cid,'fecha'=>$fecha,'tid'=>$tid,
+                     'cid2'=>$cid,'vid2'=>$vid,'fecha2'=>$fecha,'tid2'=>$tid];
+
+            $this->db->prepare(
+                "DELETE ac FROM asistencia_checklist ac
+                 INNER JOIN asistencia a ON ac.asistencia_id = a.id_asistencia
+                 WHERE {$cond}"
+            )->execute($p);
+            $this->db->prepare("DELETE FROM asistencia WHERE {$cond}")->execute($p);
+        }
+
         // Liberar vales SoloBank vinculados antes de borrar los movimientos
         $this->db->prepare(
             "UPDATE solobank_vales
@@ -890,8 +925,9 @@ class CajaRepository
             "DELETE FROM pago_local            WHERE sesion_id = :sid",
             "DELETE FROM pago_factura          WHERE sesion_id = :sid",
             "DELETE FROM pago_deposito         WHERE sesion_id = :sid",
-            "DELETE FROM reporte_venta         WHERE sesion_id = :sid",
-            "DELETE FROM sesion_participante   WHERE sesion_id = :sid",
+            "DELETE FROM reporte_venta          WHERE sesion_id = :sid",
+            "DELETE FROM horario_rendimiento    WHERE sesion_caja_id = :sid",
+            "DELETE FROM sesion_participante    WHERE sesion_id = :sid",
             // Incidencias: movimientos → vales → incidencia
             "DELETE mic FROM movimiento_incidencia_contable mic
                INNER JOIN incidencia_contable ic ON mic.incidencia_id = ic.id_incidencia
@@ -905,6 +941,123 @@ class CajaRepository
         foreach ($tablas as $sql) {
             $this->db->prepare($sql)->execute(['sid' => $sesionId]);
         }
+    }
+
+    // ── Rendimiento ────────────────────────────────────────
+
+    /**
+     * Registra operaciones BCP de la cajera al cerrar el arqueo.
+     * Falla silenciosamente si no hay horario_slot coincidente.
+     */
+    public function registrarRendimientoCajera(int $sesionId): void
+    {
+        try {
+            // Datos de la sesión
+            $stmt = $this->db->prepare(
+                "SELECT sc.postulante_apertura_id, sc.turno_id, sc.fecha_operacion,
+                        ca.local_id, dc.num_operaciones_bcp
+                 FROM sesion_caja sc
+                 INNER JOIN caja ca ON ca.id_caja = sc.caja_id
+                 LEFT  JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
+                 WHERE sc.id_sesion = :sid LIMIT 1"
+            );
+            $stmt->execute(['sid' => $sesionId]);
+            $s = $stmt->fetch();
+            if (!$s) return;
+
+            // Buscar el slot de la cajera en esa fecha+turno+local
+            $stmtSlot = $this->db->prepare(
+                "SELECT hs.id_slot FROM horario_slot hs
+                 INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+                 WHERE hs.postulante_id = :pid
+                   AND hs.fecha_dia     = :fecha
+                   AND hs.turno_id      = :tid
+                   AND hs.local_id      = :lid
+                   AND rh.codigo        = 'CAJERA'
+                 LIMIT 1"
+            );
+            $stmtSlot->execute([
+                'pid'   => $s['postulante_apertura_id'],
+                'fecha' => $s['fecha_operacion'],
+                'tid'   => $s['turno_id'],
+                'lid'   => $s['local_id'],
+            ]);
+            $slotId = $stmtSlot->fetchColumn();
+            if (!$slotId) return;
+
+            $this->db->prepare(
+                "INSERT INTO horario_rendimiento
+                    (horario_slot_id, postulante_id, sesion_caja_id, fecha, local_id, turno_id, rol_codigo, operaciones_bcp)
+                 VALUES (:slot, :pid, :sid, :fecha, :lid, :tid, 'CAJERA', :ops)
+                 ON DUPLICATE KEY UPDATE operaciones_bcp = VALUES(operaciones_bcp), sesion_caja_id = VALUES(sesion_caja_id)"
+            )->execute([
+                'slot'  => $slotId,
+                'pid'   => $s['postulante_apertura_id'],
+                'sid'   => $sesionId,
+                'fecha' => $s['fecha_operacion'],
+                'lid'   => $s['local_id'],
+                'tid'   => $s['turno_id'],
+                'ops'   => $s['num_operaciones_bcp'] ?? 0,
+            ]);
+        } catch (\Throwable) { /* no bloquear el flujo de caja */ }
+    }
+
+    /**
+     * Registra las ventas de la vendedora al enviar el monto de ventas.
+     * Falla silenciosamente si no hay horario_slot coincidente.
+     */
+    public function registrarRendimientoVendedora(int $sesionId, float $monto): void
+    {
+        try {
+            // Datos de la sesión + vendedora desde sesion_participante
+            $stmt = $this->db->prepare(
+                "SELECT sc.turno_id, sc.fecha_operacion, ca.local_id,
+                        sp.postulante_id AS vendedora_id
+                 FROM sesion_caja sc
+                 INNER JOIN caja ca ON ca.id_caja = sc.caja_id
+                 INNER JOIN sesion_participante sp
+                        ON sp.sesion_id = sc.id_sesion AND sp.rol_participacion = 'VENDEDORA'
+                 WHERE sc.id_sesion = :sid LIMIT 1"
+            );
+            $stmt->execute(['sid' => $sesionId]);
+            $s = $stmt->fetch();
+            if (!$s) return;
+
+            // Buscar el slot de la vendedora
+            $stmtSlot = $this->db->prepare(
+                "SELECT hs.id_slot FROM horario_slot hs
+                 INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+                 WHERE hs.postulante_id = :pid
+                   AND hs.fecha_dia     = :fecha
+                   AND hs.turno_id      = :tid
+                   AND hs.local_id      = :lid
+                   AND rh.codigo        = 'VENDEDORA'
+                 LIMIT 1"
+            );
+            $stmtSlot->execute([
+                'pid'   => $s['vendedora_id'],
+                'fecha' => $s['fecha_operacion'],
+                'tid'   => $s['turno_id'],
+                'lid'   => $s['local_id'],
+            ]);
+            $slotId = $stmtSlot->fetchColumn();
+            if (!$slotId) return;
+
+            $this->db->prepare(
+                "INSERT INTO horario_rendimiento
+                    (horario_slot_id, postulante_id, sesion_caja_id, fecha, local_id, turno_id, rol_codigo, ventas_monto)
+                 VALUES (:slot, :pid, :sid, :fecha, :lid, :tid, 'VENDEDORA', :monto)
+                 ON DUPLICATE KEY UPDATE ventas_monto = VALUES(ventas_monto), sesion_caja_id = VALUES(sesion_caja_id)"
+            )->execute([
+                'slot'  => $slotId,
+                'pid'   => $s['vendedora_id'],
+                'sid'   => $sesionId,
+                'fecha' => $s['fecha_operacion'],
+                'lid'   => $s['local_id'],
+                'tid'   => $s['turno_id'],
+                'monto' => $monto,
+            ]);
+        } catch (\Throwable) { /* no bloquear el flujo de ventas */ }
     }
 
     public function verificarPasswordAdmin(int $postulanteId, string $password): bool

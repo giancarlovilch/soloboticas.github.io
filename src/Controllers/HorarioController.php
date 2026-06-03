@@ -180,16 +180,17 @@ class HorarioController extends Controller
     // ── GET /horario/historial ─────────────────────────────
     public function historial(): void
     {
-        $postulanteId = $this->requireAuth();
-        $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
-        $userName     = $_SESSION['user_name'] ?? 'Usuario';
-        $esAdmin      = $this->isAdmin();
+        $postulanteId  = $this->requireAuth();
+        $basePath      = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $userName      = $_SESSION['user_name'] ?? 'Usuario';
+        $esAdmin       = $this->isAdmin();
 
-        $semanas     = $this->repo->getSemanasHistorial(20);
-        $semanaId    = isset($_GET['semana']) ? (int)$_GET['semana'] : ($semanas[0]['id_semana'] ?? null);
-        $semana      = $semanaId ? $this->repo->getSemanaById($semanaId) : null;
-        $slotsConfig = $this->repo->getSlotsConfig();
-        $roles       = $this->repo->getRoles();
+        $semanas       = $this->repo->getSemanasHistorial(20);
+        $semanaId      = isset($_GET['semana']) ? (int)$_GET['semana'] : ($semanas[0]['id_semana'] ?? null);
+        $semana        = $semanaId ? $this->repo->getSemanaById($semanaId) : null;
+        $semanaProxima = $this->repo->getSemanaProxima();
+        $slotsConfig   = $this->repo->getSlotsConfig();
+        $roles         = $this->repo->getRoles();
 
         require_once __DIR__ . '/../../views/horario/historial.php';
     }
@@ -212,12 +213,68 @@ class HorarioController extends Controller
         $this->success('Semana cerrada');
     }
 
+    // ── GET /horario/asistencia ───────────────────────────
+    public function asistencia(): void
+    {
+        $postulanteId  = $this->requireAuth();
+        $basePath      = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $userName      = $_SESSION['user_name'] ?? 'Usuario';
+        $esAdmin       = $this->isAdmin();
+
+        // Por defecto: métricas del trabajador logueado
+        $filtroPersona = isset($_GET['persona']) ? (int)$_GET['persona'] : $postulanteId;
+        $filtroLocal   = isset($_GET['local'])   ? (int)$_GET['local']   : 0;
+
+        // Filtro por mes (por defecto el mes actual)
+        $filtroMes = $_GET['mes'] ?? date('Y-m');
+        if (!preg_match('/^\d{4}-\d{2}$/', $filtroMes)) $filtroMes = date('Y-m');
+        [$anio, $nmes] = explode('-', $filtroMes);
+        $fechaDesde = "{$anio}-{$nmes}-01";
+        $fechaHasta = date('Y-m-d', strtotime("last day of {$fechaDesde}"));
+        // No mostrar días futuros
+        if ($fechaHasta > date('Y-m-d')) $fechaHasta = date('Y-m-d');
+
+        $registros    = $this->repo->getReporteAsistencia($filtroPersona ?: null, $filtroLocal ?: null, $fechaDesde, $fechaHasta);
+        $trabajadores = $this->repo->getTrabajadores();
+        $estadisticas = $this->repo->getEstadisticasMes($filtroPersona ?: $postulanteId, $fechaDesde, $fechaHasta);
+
+        require_once __DIR__ . '/../../views/horario/asistencia.php';
+    }
+
+    // ── GET /horario/log ──────────────────────────────────
+    public function log(): void
+    {
+        $postulanteId = $this->requireAuth();
+        $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $userName     = $_SESSION['user_name'] ?? 'Usuario';
+        $esAdmin      = $this->isAdmin();
+
+        $filtroPersona = isset($_GET['persona']) ? (int)$_GET['persona'] : 0;
+        $filtroLocal   = isset($_GET['local'])   ? (int)$_GET['local']   : 0;
+
+        $logs         = $this->repo->getLogCoberturas($filtroPersona ?: null, $filtroLocal ?: null);
+        $trabajadores = $this->repo->getTrabajadores();
+        $esAdmin      = $this->isAdmin();
+
+        require_once __DIR__ . '/../../views/horario/log.php';
+    }
+
     // ── GET /horario/api/semana/{id} ───────────────────────
     public function getSlots(int $semanaId): void
     {
         $this->requireAuth();
         $slots = $this->repo->getSlotsBySemana($semanaId);
         $this->success('OK', $slots);
+    }
+
+    // ── GET /horario/api/staff-turno ──────────────────────
+    public function getStaffTurno(): void
+    {
+        $this->requireAuth();
+        $localId = isset($_GET['local']) ? (int)$_GET['local'] : 0;
+        $turnoId = isset($_GET['turno']) ? (int)$_GET['turno'] : 0;
+        if (!$localId || !$turnoId) $this->error('local y turno requeridos', 400);
+        $this->success('OK', $this->repo->getStaffPorTurnoHoy($localId, $turnoId));
     }
 
     // ── GET /horario/api/trabajadores ─────────────────────
@@ -242,6 +299,18 @@ class HorarioController extends Controller
         else $this->error($result, 401);
     }
 
+    // ── POST /horario/api/solicitud/{id}/anular ───────────
+    public function anularSolicitud(int $id): void
+    {
+        $postulanteId = $this->requireAuth();
+        if (!$this->isAdmin()) $this->error('Solo administradores pueden anular solicitudes', 403);
+        $password = trim($this->getAllInput()['password'] ?? '');
+        if (empty($password)) $this->error('La contraseña es requerida', 400);
+        $result = $this->repo->anularSolicitud($id, $postulanteId, $password);
+        if ($result === 'ok') $this->success('Solicitud anulada y eliminada correctamente.');
+        else $this->error($result, 401);
+    }
+
     // ── POST /horario/api/solicitud/{id}/revertir-propia ──
     public function revertirCoberturaPropia(int $id): void
     {
@@ -261,8 +330,35 @@ class HorarioController extends Controller
         if (empty($password)) $this->error('La contraseña es requerida', 400);
 
         $result = $this->repo->revertirCobertura($id, $postulanteId, $password);
-        if ($result === 'ok') $this->success('Cobertura revertida. Slot restaurado al trabajador original.');
+        if ($result === 'ok') $this->success('Revertido correctamente. Slots restaurados.');
         else $this->error($result, 401);
+    }
+
+    // ── POST /horario/api/slot/intercambiar ───────────────
+    public function intercambiarSlots(): void
+    {
+        $postulanteId = $this->requireAuth();
+        $data         = $this->getAllInput();
+
+        $miSlotId   = (int)($data['mi_slot_id']   ?? 0);
+        $otroSlotId = (int)($data['otro_slot_id'] ?? 0);
+        $password   = trim($data['password']       ?? '');
+
+        if (!$miSlotId || !$otroSlotId || !$password) {
+            $this->error('mi_slot_id, otro_slot_id y contraseña son requeridos', 400);
+        }
+
+        $db   = \Database::getConnection();
+        $stmt = $db->prepare("SELECT password FROM usuario WHERE postulante_id = :pid LIMIT 1");
+        $stmt->execute(['pid' => $postulanteId]);
+        $hash = $stmt->fetchColumn();
+        if (!$hash || !password_verify($password, $hash)) {
+            $this->error('Contraseña incorrecta', 401);
+        }
+
+        $result = $this->repo->intercambiarSlots($miSlotId, $otroSlotId, $postulanteId);
+        if ($result !== 'ok') $this->error($result, 409);
+        $this->success('Intercambio realizado correctamente');
     }
 
     // ── POST /horario/api/slot/asignar ─────────────────────

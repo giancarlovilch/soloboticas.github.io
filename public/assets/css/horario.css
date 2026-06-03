@@ -70,6 +70,8 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
 .hor-semana-estado { padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
 .estado-abierta { background: #d1fae5; color: #065f46; }
 .estado-cerrada { background: #f1f5f9; color: var(--hor-muted); }
+.estado-activo  { background: #e0f7fa; color: #0097A7; }
+.estado-editable{ background: #d1fae5; color: #065f46; }
 .hor-cierre-info { font-size: 0.75rem; color: var(--hor-muted); }
 
 .hor-semana-nav { display: flex; gap: .4rem; flex-wrap: wrap; }
@@ -167,6 +169,11 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
 .hor-asiento--mio      .hor-asiento__nombre { font-weight: 750; color: #dc2626; background: yellow;}
 .hor-asiento--ocupado  .hor-asiento__nombre { font-weight: 500; color: #50617a; }
 .hor-asiento--filtrado .hor-asiento__nombre { font-weight: 750; color: #2563eb; background: yellow;}
+
+/* Botones admin: siempre clicables aunque el padre tenga pointer-events:none */
+.hor-asiento__btn-picker,
+.hor-asiento__btn-liberar,
+.hor-asiento__btn-encuestado { pointer-events: auto !important; }
 
 /* Botón de asignación para admins (aparece en hover del slot libre) */
 .hor-asiento__btn-picker {
@@ -421,6 +428,48 @@ body.es-admin .hor-asiento--ocupado:hover {
     /* Zoom 70% para pantallas muy pequeñas */
     .hor-sala { zoom: 0.70; }
 }
+
+/* ── BOTÓN NAV TEAL (próxima semana / semana actual) ──── */
+.hor-btn-siguiente {
+    display: flex; align-items: center; justify-content: center; gap: .75rem;
+    width: 100%; padding: 1.1rem 2rem; border-radius: 12px;
+    background: linear-gradient(135deg, #0097A7, #00BCD4);
+    color: #fff; font-size: 1.05rem; font-weight: 700;
+    text-decoration: none; border: none; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,151,167,.35);
+    transition: transform .15s, box-shadow .15s;
+}
+.hor-btn-siguiente:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,151,167,.45); }
+.hor-btn-siguiente__sub  { font-size: 0.75rem; opacity: .85; font-weight: 400; margin-top: 2px; }
+
+/* Indicador de página actual (grayed, sin link) */
+.hor-btn-pagina-actual {
+    display: flex; align-items: center; gap: .75rem;
+    padding: 1.1rem 2rem; border-radius: 12px;
+    background: #e2e8f0; color: #94a3b8;
+    font-size: 1.05rem; font-weight: 700; border: none; cursor: default;
+}
+.hor-btn-pagina-actual__sub { font-size: 0.75rem; font-weight: 400; margin-top: 2px; opacity: .7; }
+
+/* ── ENCUESTADO (admin no puede quitar — ya hay asistencia) ── */
+.hor-asiento__btn-encuestado {
+    position: absolute; top: -4px; left: -4px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #f59e0b; color: #fff;
+    font-size: .6rem; line-height: 16px; text-align: center;
+    border: none; cursor: default; padding: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+
+/* ── INTERCAMBIO (cambié de puesto con otra compañera) ── */
+.hor-asiento--intercambio {
+    background: #fef3c7;
+    border-color: #fbbf24;
+    color: #92400e;
+    opacity: 1;
+}
+.hor-asiento--intercambio .hor-asiento__nombre { font-weight: 700; color: #d97706; }
+.hor-asiento--intercambio:hover { transform: none; }
 
 /* ── COBERTURA (mi reemplazo activo en semana vigente) ── */
 .hor-asiento--cobertura {

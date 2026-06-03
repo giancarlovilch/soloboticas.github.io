@@ -70,17 +70,19 @@ if ($semana) {
     </div>
     <div class="hor-header__right">
         <span class="hor-header__user"><?= htmlspecialchars($userName) ?></span>
-        <a href="<?= $basePath ?>/horario/historial" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📂<span class="hor-btn-txt"> Historial</span></a>
-        <a href="<?= $basePath ?>/horario" class="hor-btn-back">←<span class="hor-btn-txt"> Semana actual</span></a>
+        <a href="<?= $basePath ?>/horario/asistencia" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📊<span class="hor-btn-txt"> Métricas</span></a>
+        <a href="<?= $basePath ?>/horario/log" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📋<span class="hor-btn-txt"> Logs</span></a>
+        <a href="<?= $basePath ?>/<?= $esAdmin ? 'admin/dashboard' : 'staff' ?>" class="hor-btn-back">←<span class="hor-btn-txt"> Volver</span></a>
     </div>
 </header>
 
 <main class="hor-main">
 
-    <!-- ── Navegación: volver a semana actual ──────────────── -->
-    <div>
+    <!-- ── Navegación ─────────────────────────────────────── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+
         <a href="<?= $basePath ?>/horario"
-           style="display:flex;align-items:center;justify-content:center;gap:.6rem;padding:.9rem 1.25rem;border-radius:10px;background:#f8fafc;border:1.5px solid #e2e8f0;text-decoration:none;color:#64748b;font-weight:600;font-size:0.85rem;transition:all .15s;"
+           style="display:flex;align-items:center;gap:.6rem;padding:.9rem 1.25rem;border-radius:10px;background:#f8fafc;border:1.5px solid #e2e8f0;text-decoration:none;color:#64748b;font-weight:600;font-size:0.85rem;transition:all .15s;"
            onmouseover="this.style.borderColor='#94a3b8'" onmouseout="this.style.borderColor='#e2e8f0'">
             <span style="font-size:1.1rem;">◀</span>
             <div>
@@ -88,6 +90,15 @@ if ($semana) {
                 <div style="font-size:0.72rem;font-weight:400;opacity:.7;margin-top:1px;">Solo lectura</div>
             </div>
         </a>
+
+        <div class="hor-btn-pagina-actual" style="justify-content:flex-end;">
+            <div style="flex:1;text-align:right;">
+                <div>Próxima semana</div>
+                <div class="hor-btn-pagina-actual__sub">Página actual</div>
+            </div>
+            <span style="font-size:1.3rem;">▶</span>
+        </div>
+
     </div>
 
     <?php if (!$semana): ?>
@@ -115,28 +126,13 @@ if ($semana) {
                 <?= date('d', strtotime($semana['fecha_inicio'])) ?> –
                 <?= date('d \d\e F Y', strtotime($semana['fecha_fin'])) ?>
             </h1>
-            <span class="hor-semana-estado <?= $semana['estado'] === 'ABIERTA' ? 'estado-abierta' : 'estado-cerrada' ?>">
-                <?= $semana['estado'] === 'ABIERTA' ? '🟢 Abierta' : '🔒 Cerrada' ?>
-            </span>
+            <span class="hor-semana-estado estado-editable">✏️ Editable</span>
             <?php if ($editable && !$esAdmin): ?>
                 <span class="hor-cierre-info">
                     Cierra el domingo <?= date('d/m', strtotime($semana['fecha_fin'])) ?> a medianoche
                 </span>
             <?php endif; ?>
         </div>
-
-        <!-- Navegación entre semanas -->
-        <?php if (count($semanas) > 1): ?>
-        <div class="hor-semana-nav">
-            <?php foreach ($semanas as $s): ?>
-                <a href="?semana=<?= $s['id_semana'] ?>"
-                   class="hor-semana-pill <?= $s['id_semana'] == $semana['id_semana'] ? 'active' : '' ?>">
-                    <?= date('d/m', strtotime($s['fecha_inicio'])) ?> –
-                    <?= date('d/m', strtotime($s['fecha_fin'])) ?>
-                </a>
-            <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
 
         <!-- Filtro por trabajador -->
         <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">

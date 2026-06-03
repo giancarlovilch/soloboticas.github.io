@@ -72,13 +72,33 @@ class CajaController extends Controller
         $postulanteId = $this->requireAuth();
         $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
         $userName     = $_SESSION['user_name'] ?? 'Usuario';
+        $esAdminCaja  = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
 
-        $locales      = $this->repo->getLocales();
+        $localesTodos = $this->repo->getLocales();
         $turnos       = $this->repo->getTurnos();
         $conceptos    = $this->repo->getConceptosGasto();
         $staff        = $this->repo->getStaffActivo();
         $tiposEgreso  = $this->repo->getTiposEgreso();
         $modos        = $this->repo->getModosPago();
+
+        // Filtrar locales y turnos según horario de hoy (solo si no es admin)
+        require_once __DIR__ . '/../Repositories/HorarioRepository.php';
+        $horarioRepo    = new HorarioRepository();
+        $horarioCajera  = $esAdminCaja ? [] : $horarioRepo->getHorarioCajeraHoy($postulanteId);
+
+        // Mapa: local_id => [turno_id, ...] para JS
+        $horarioCajeraMap = [];
+        foreach ($horarioCajera as $h) {
+            $horarioCajeraMap[$h['local_id']][] = (int)$h['turno_id'];
+        }
+
+        // Locales disponibles: admin ve todos, cajera solo los suyos
+        if ($esAdminCaja) {
+            $locales = $localesTodos;
+        } else {
+            $localIds = array_unique(array_column($horarioCajera, 'local_id'));
+            $locales  = array_values(array_filter($localesTodos, fn($l) => in_array($l['id'], $localIds)));
+        }
 
         require_once __DIR__ . '/../../views/caja/sesion.php';
     }
@@ -159,8 +179,69 @@ class CajaController extends Controller
             );
         }
 
+        // Verificar si la caja requiere vendedora
+        $stmtCaja = $db->prepare("SELECT requiere_vendedora FROM caja WHERE id_caja = :cid LIMIT 1");
+        $stmtCaja->execute(['cid' => (int)$data['caja_id']]);
+        $requiereVendedora = (bool)($stmtCaja->fetchColumn() ?? 1);
+
+        // Validar que quien abre la sesión es CAJERA en horario de hoy (solo si no es admin)
+        $isAdminCrear = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
+        if (!$isAdminCrear) {
+            $chkCajera = $db->prepare(
+                "SELECT hs.id_slot
+                 FROM horario_slot hs
+                 INNER JOIN caja c ON c.local_id = hs.local_id AND c.id_caja = :caja_id
+                 INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+                 WHERE hs.turno_id      = :tid
+                   AND hs.fecha_dia     = CURDATE()
+                   AND hs.postulante_id = :pid
+                   AND rh.codigo        = 'CAJERA'
+                 LIMIT 1"
+            );
+            $chkCajera->execute([
+                'caja_id' => (int)$data['caja_id'],
+                'tid'     => (int)$data['turno_id'],
+                'pid'     => $postulanteId,
+            ]);
+            if (!$chkCajera->fetch()) {
+                $this->error(
+                    'No estás asignada en el horario como cajera para este local y turno hoy. '
+                    . 'Corrija el horario en /horario antes de abrir la sesión.',
+                    409
+                );
+            }
+        }
+
+        // Validar vendedora (solo si la caja lo requiere)
+        $vendedorId = isset($data['vendedor_id']) ? (int)$data['vendedor_id'] : 0;
+        if ($requiereVendedora && $vendedorId) {
+            $chkHorario = $db->prepare(
+                "SELECT hs.id_slot
+                 FROM horario_slot hs
+                 INNER JOIN caja c ON c.local_id = hs.local_id AND c.id_caja = :caja_id
+                 INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+                 WHERE hs.turno_id      = :tid
+                   AND hs.fecha_dia     = CURDATE()
+                   AND hs.postulante_id = :vid
+                   AND rh.codigo        = 'VENDEDORA'
+                 LIMIT 1"
+            );
+            $chkHorario->execute([
+                'caja_id' => (int)$data['caja_id'],
+                'tid'     => (int)$data['turno_id'],
+                'vid'     => $vendedorId,
+            ]);
+            if (!$chkHorario->fetch()) {
+                $this->error(
+                    'Esta persona no está asignada en el horario para este local y turno hoy. '
+                    . 'Corrija el horario primero en /horario.',
+                    409
+                );
+            }
+        }
+
         $data['postulante_id'] = $postulanteId;
-        $data['vendedor_id']   = isset($data['vendedor_id']) ? (int)$data['vendedor_id'] : 0;
+        $data['vendedor_id']   = $vendedorId;
         $id = $this->repo->crearSesion($data);
         $this->success('Sesión creada', ['id_sesion' => $id]);
     }
@@ -230,9 +311,10 @@ class CajaController extends Controller
                 }
             }
 
-            // 3. Si es cierre, bloquear la sesión
+            // 3. Si es cierre, bloquear la sesión y registrar rendimiento de cajera
             if (!empty($data['cerrar'])) {
                 $this->repo->cerrarSesion($sesionId, $postulanteId);
+                $this->repo->registrarRendimientoCajera($sesionId);
             }
         });
 
@@ -245,12 +327,60 @@ class CajaController extends Controller
         $postulanteId = $this->requireAuth();
         $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
         $userName     = $_SESSION['user_name'] ?? 'Usuario';
+        $isAdmin      = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
 
         $sesion = $this->repo->getSesionById($id);
         if (!$sesion || $sesion['estado'] !== 'PENDIENTE_VENTA') {
             header('Location: ' . APP_BASE_PATH . '/caja');
             exit;
         }
+
+        $db = \Database::getConnection();
+
+        // Obtener vendedora desde sesion_participante
+        $stmtVend = $db->prepare(
+            "SELECT sp.postulante_id, p.nombres AS vendedora_nombre
+             FROM sesion_participante sp
+             INNER JOIN postulante p ON p.id_postulante = sp.postulante_id
+             WHERE sp.sesion_id = :sid AND sp.rol_participacion = 'VENDEDORA'
+             LIMIT 1"
+        );
+        $stmtVend->execute(['sid' => $id]);
+        $vendRow = $stmtVend->fetch();
+
+        $vendedorId       = (int)($vendRow['postulante_id']    ?? 0);
+        $vendedora_nombre = $vendRow['vendedora_nombre']        ?? '';
+        $cajera_id        = (int)($sesion['postulante_apertura_id'] ?? 0);
+        $cajera_nombre    = $sesion['cajera_nombre']            ?? '';
+        $turno_id         = (int)($sesion['turno_id']           ?? 0);
+
+        // Control de acceso:
+        // - Si hay vendedora asignada → solo ella o admin
+        // - Si no hay vendedora (ej. SB7) → la cajera que abrió o admin
+        if (!$isAdmin) {
+            if ($vendedorId > 0 && $postulanteId !== $vendedorId) {
+                $nombreVend = $vendedora_nombre ?: 'la vendedora asignada';
+                $basePath   = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+                require_once __DIR__ . '/../../views/caja/ventas_acceso_denegado.php';
+                exit;
+            }
+            if ($vendedorId === 0 && $postulanteId !== $cajera_id) {
+                $nombreVend = 'la cajera del turno';
+                $basePath   = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+                require_once __DIR__ . '/../../views/caja/ventas_acceso_denegado.php';
+                exit;
+            }
+        }
+
+        // Verificar si la cajera ya tiene encuesta de hoy registrada
+        $chkAsist = $db->prepare(
+            "SELECT id_asistencia FROM asistencia
+             WHERE postulante_id = :pid AND fecha = CURDATE() AND turno_id = :tid
+             LIMIT 1"
+        );
+        $chkAsist->execute(['pid' => $cajera_id, 'tid' => $turno_id]);
+        // Sin vendedora no hay quien evalúe a la cajera → sin encuesta
+        $surveyNeeded = $vendedorId > 0 && !$chkAsist->fetchColumn() && !$isAdmin;
 
         require_once __DIR__ . '/../../views/caja/ventas.php';
     }
@@ -270,6 +400,7 @@ class CajaController extends Controller
         }
 
         $this->repo->insertVenta($id, $postulanteId, $ventas);
+        $this->repo->registrarRendimientoVendedora($id, $ventas);
         $cuadre = $this->repo->calcularYGuardarCuadre($id, $ventas);
 
         // Auto-detectar incidencia contable si |diferencia| > 10 soles

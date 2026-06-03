@@ -37,6 +37,10 @@ if ($semana) {
         .hor-asiento { cursor: default !important; pointer-events: none !important; }
         .hor-asiento:hover { transform: none !important; box-shadow: none !important; }
 
+        /* Admin: botones siempre visibles en páginas read-only */
+        .hor-asiento__btn-picker  { opacity: 1 !important; }
+        .hor-asiento__btn-liberar { opacity: 1 !important; }
+
         /* Modo cubrir: desbloquea slots elegibles */
         body.modo-cubrir .hor-asiento--cubrir-eligible {
             cursor: pointer !important;
@@ -57,22 +61,6 @@ if ($semana) {
         }
         body.modo-cubrir #bannerCubrir { display: flex; }
 
-        /* Botón próxima semana */
-        .hor-btn-siguiente {
-            display: flex; align-items: center; justify-content: center; gap: .75rem;
-            width: 100%; padding: 1.1rem 2rem; border-radius: 12px;
-            background: linear-gradient(135deg, #0097A7, #00BCD4);
-            color: #fff; font-size: 1.05rem; font-weight: 700;
-            text-decoration: none; border: none; cursor: pointer;
-            box-shadow: 0 4px 16px rgba(0,151,167,.35);
-            transition: transform .15s, box-shadow .15s;
-        }
-        .hor-btn-siguiente:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 24px rgba(0,151,167,.45);
-        }
-        .hor-btn-siguiente__icon { font-size: 1.4rem; }
-        .hor-btn-siguiente__sub  { font-size: 0.75rem; opacity: .85; font-weight: 400; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -87,8 +75,8 @@ if ($semana) {
     </div>
     <div class="hor-header__right">
         <span class="hor-header__user"><?= htmlspecialchars($userName) ?></span>
-        <a href="<?= $basePath ?>/horario/informacion" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">ℹ️<span class="hor-btn-txt"> Info</span></a>
-        <a href="<?= $basePath ?>/horario/historial" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📂<span class="hor-btn-txt"> Historial</span></a>
+        <a href="<?= $basePath ?>/horario/asistencia" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📊<span class="hor-btn-txt"> Métricas</span></a>
+        <a href="<?= $basePath ?>/horario/log" class="hor-btn hor-btn--outline" style="font-size:0.78rem;">📋<span class="hor-btn-txt"> Logs</span></a>
         <a href="<?= $basePath ?>/<?= $esAdmin ? 'admin/dashboard' : 'staff' ?>" class="hor-btn-back">←<span class="hor-btn-txt"> Volver</span></a>
     </div>
 </header>
@@ -143,7 +131,7 @@ if ($semana) {
                 Semana <?= date('d', strtotime($semana['fecha_inicio'])) ?> –
                 <?= date('d \d\e F Y', strtotime($semana['fecha_fin'])) ?>
             </h1>
-            <span id="badgeEstado" class="hor-semana-estado estado-cerrada">🔒 Solo lectura</span>
+            <span id="badgeEstado" class="hor-semana-estado estado-activo">📅 Activo</span>
         </div>
 
         <!-- Filtro por trabajador -->
@@ -161,15 +149,15 @@ if ($semana) {
                 ✕
             </button>
         </div>
-
-        <div id="horResumen" class="hor-resumen" hidden></div>
     </div>
+
+    <div id="horResumen" class="hor-resumen" hidden></div>
 
     <?php if ($semana): ?>
     <div style="display:flex;justify-content:center;">
         <button id="btnCubrirPuesto" class="hor-btn-cubrir" onclick="toggleModoCubrir()"
                 style="width:min(480px,100%);font-size:1.17rem;padding:.6rem 1.5rem;">
-            🤝 CUBRIR PUESTO
+            ⇄ CUBRIR / CAMBIAR PUESTO
         </button>
     </div>
     <?php endif; ?>
@@ -256,6 +244,10 @@ if ($semana) {
             <span>Cubriendo (tú)</span>
         </div>
         <div class="hor-leyenda__item">
+            <div class="hor-asiento hor-asiento--intercambio hor-asiento--demo"></div>
+            <span>Intercambiado (tú)</span>
+        </div>
+        <div class="hor-leyenda__item">
             <div class="hor-asiento hor-asiento--ocupado hor-asiento--demo"></div>
             <span>Ocupado</span>
         </div>
@@ -268,6 +260,42 @@ if ($semana) {
     <?php endif; ?>
 
 </main>
+
+<?php if ($esAdmin): ?>
+<!-- ── Admin: picker ─────────────────────────────────────── -->
+<div id="adminPickerOverlayA" class="hor-picker-overlay" hidden>
+    <div class="hor-picker">
+        <div class="hor-picker__header">
+            <h3>Asignar trabajador</h3>
+            <button onclick="cerrarPickerAdmin()">✕</button>
+        </div>
+        <select id="adminPickerSelectA" class="hor-picker__select">
+            <option value="">— Seleccionar trabajador —</option>
+        </select>
+        <div class="hor-picker__footer">
+            <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;" onclick="cerrarPickerAdmin()">Cancelar</button>
+            <button class="hor-btn hor-btn--primary" onclick="pickerAsignarAdmin()">Asignar</button>
+        </div>
+    </div>
+</div>
+<!-- ── Admin: liberar ────────────────────────────────────── -->
+<div id="liberarAdminOverlayA" class="hor-picker-overlay" hidden>
+    <div class="hor-picker">
+        <div class="hor-picker__header">
+            <h3>Quitar del turno</h3>
+            <button onclick="cerrarLiberarAdmin()">✕</button>
+        </div>
+        <p id="liberarAdminNombreA" style="font-size:.85rem;color:#475569;margin:.25rem 0 .75rem;"></p>
+        <input id="liberarAdminPwdA" type="password" class="hor-picker__select"
+               placeholder="Tu contraseña de administrador"
+               onkeydown="if(event.key==='Enter') confirmarLiberarAdmin()">
+        <div class="hor-picker__footer">
+            <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;" onclick="cerrarLiberarAdmin()">Cancelar</button>
+            <button class="hor-btn" style="background:#ef4444;color:#fff;border:none;" onclick="confirmarLiberarAdmin()">Quitar</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- ── Modal: cubrir / tomar puesto ─────────────────────── -->
 <div id="cubrirOverlay" class="hor-picker-overlay" hidden>
@@ -295,6 +323,38 @@ if ($semana) {
     </div>
 </div>
 
+<!-- ── Modal: cambiar de puesto (intercambio) ────────────── -->
+<div id="intercambioOverlay" class="hor-picker-overlay" hidden>
+    <div class="hor-picker">
+        <div class="hor-picker__header">
+            <h3>⇄ Cambiar de Puesto</h3>
+            <button onclick="cerrarModalIntercambio()">✕</button>
+        </div>
+        <p style="font-size:.82rem;color:#475569;margin:.1rem 0 .4rem;">Intercambiarás tu posición con:</p>
+        <div id="intercambioNombreOtra"
+             style="font-size:.95rem;font-weight:700;color:#92400e;
+                    background:#fef3c7;border:1px solid #fbbf24;
+                    border-radius:8px;padding:.55rem .85rem;"></div>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:.5rem;margin:.5rem 0;font-size:.75rem;color:#64748b;">
+            <div id="intercambioMiPuesto" style="background:#f8fafc;border-radius:6px;padding:.4rem .6rem;text-align:center;"></div>
+            <span style="font-size:1.1rem;">⇄</span>
+            <div id="intercambioOtroPuesto" style="background:#f8fafc;border-radius:6px;padding:.4rem .6rem;text-align:center;"></div>
+        </div>
+        <p style="font-size:.77rem;color:#64748b;line-height:1.5;">
+            Tú irás a su posición y ella irá a la tuya. Solo tú podrás revertir el cambio.
+        </p>
+        <input id="intercambioPwd" type="password" class="hor-picker__select"
+               placeholder="Confirma con tu contraseña"
+               onkeydown="if(event.key==='Enter') confirmarIntercambio()">
+        <div class="hor-picker__footer">
+            <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;"
+                    onclick="cerrarModalIntercambio()">Cancelar</button>
+            <button class="hor-btn" style="background:#d97706;color:#fff;border:none;"
+                    onclick="confirmarIntercambio()">Confirmar cambio</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── Modal: revertir cobertura propia ─────────────────── -->
 <div id="revertirOverlay" class="hor-picker-overlay" hidden>
     <div class="hor-picker">
@@ -318,12 +378,14 @@ const BASE      = '<?= $basePath ?>';
 const SEMANA_ID = <?= $semana ? $semana['id_semana'] : 'null' ?>;
 const MI_ID     = <?= $postulanteId ?? (int)($_SESSION['user_id'] ?? 0) ?>;
 const HOY       = '<?= date('Y-m-d') ?>';
+const ES_ADMIN  = <?= $esAdmin ? 'true' : 'false' ?>;
 
-let _slots          = [];
-let _filtroId       = 0;
-let _modoCubrir     = false;
-let _slotParaCubrir  = null;
-let _slotParaRevertir = null;
+let _slots              = [];
+let _filtroId           = 0;
+let _modoCubrir         = false;
+let _slotParaCubrir     = null;
+let _slotParaRevertir   = null;
+let _slotParaIntercambio = null; // { miSlot, otroSlot }
 
 document.addEventListener('DOMContentLoaded', () => {
     if (SEMANA_ID) cargarSlots();
@@ -397,20 +459,23 @@ function renderSlots(slots) {
         const id = `slot-${s.semana_id}-${s.local_id}-${s.turno_id}-${s.dia_semana}-${s.rol_puesto}-${s.slot_num}`;
         const el = document.getElementById(id);
         if (!el) return;
+        el.dataset.slotid = s.id_slot;
 
         if (s.postulante_id) {
-            const pid            = parseInt(s.postulante_id);
-            const esMio          = pid === MI_ID;
-            const solSol         = parseInt(s.solicitud_solicitante_id) || 0;
-            const esCoberturaMia = s.solicitud_tipo === 'COBERTURA' && solSol === MI_ID && esMio;
-            const esMiCambio     = s.solicitud_tipo === 'CAMBIO'    && solSol === MI_ID && esMio;
-            const esFilt         = _filtroId && pid === _filtroId && !esMio;
+            const pid              = parseInt(s.postulante_id);
+            const esMio            = pid === MI_ID;
+            const solSol           = parseInt(s.solicitud_solicitante_id) || 0;
+            const esCoberturaMia   = s.solicitud_tipo === 'COBERTURA'    && solSol === MI_ID && esMio;
+            const esMiCambio       = s.solicitud_tipo === 'CAMBIO'       && solSol === MI_ID && esMio;
+            const esMiIntercambio  = s.solicitud_tipo === 'INTERCAMBIO'  && solSol === MI_ID && esMio;
+            const esFilt           = _filtroId && pid === _filtroId && !esMio;
 
             let cls;
-            if (esCoberturaMia)      cls = 'hor-asiento--cobertura';
-            else if (esMio)          cls = 'hor-asiento--mio';
-            else if (esFilt)         cls = 'hor-asiento--filtrado';
-            else                     cls = 'hor-asiento--ocupado';
+            if (esCoberturaMia)     cls = 'hor-asiento--cobertura';
+            else if (esMiIntercambio) cls = 'hor-asiento--intercambio';
+            else if (esMio)         cls = 'hor-asiento--mio';
+            else if (esFilt)        cls = 'hor-asiento--filtrado';
+            else                    cls = 'hor-asiento--ocupado';
 
             el.className = 'hor-asiento ' + cls;
             el.title     = s.trabajador_nombre || '—';
@@ -418,21 +483,29 @@ function renderSlots(slots) {
 
             const esPasado = s.fecha_dia < HOY;
             if (_modoCubrir && !esPasado) {
-                if (esCoberturaMia) {
-                    // Slot que yo estoy cubriendo → puedo revertir
+                if (esCoberturaMia || esMiCambio || esMiIntercambio) {
+                    // Mis slots con solicitud activa → revertir
                     el.classList.add('hor-asiento--cubrir-eligible');
-                    el.title   = 'Estás cubriendo este turno — clic para revertir';
-                    el.onclick = () => abrirModalRevertir(s);
-                } else if (esMiCambio) {
-                    // Slot libre que yo tomé → puedo liberar
-                    el.classList.add('hor-asiento--cubrir-eligible');
-                    el.title   = 'Tomaste este turno — clic para liberar';
+                    el.title   = esMiIntercambio
+                        ? 'Intercambiaste este puesto — clic para revertir ambos'
+                        : 'Estás cubriendo este turno — clic para revertir';
                     el.onclick = () => abrirModalRevertir(s);
                 } else if (!esMio) {
-                    // Slot de otro o libre-de-otro → puedo cubrir
+                    // Slot de otra persona → detectar si hay conflicto (intercambio) o no (cubrir)
                     el.classList.add('hor-asiento--cubrir-eligible');
-                    el.title   = `Cubrir a ${s.trabajador_nombre || 'este compañero'}`;
-                    el.onclick = () => abrirModalCubrir(s);
+                    const miConflicto = _slots.find(x =>
+                        parseInt(x.postulante_id) === MI_ID &&
+                        x.turno_id == s.turno_id &&
+                        x.dia_semana == s.dia_semana &&
+                        x.id_slot != s.id_slot
+                    );
+                    if (miConflicto) {
+                        el.title   = `Cambiar puesto con ${s.trabajador_nombre || 'esta compañera'}`;
+                        el.onclick = () => abrirModalIntercambio(s, miConflicto);
+                    } else {
+                        el.title   = `Cubrir a ${s.trabajador_nombre || 'esta compañera'}`;
+                        el.onclick = () => abrirModalCubrir(s);
+                    }
                 }
             }
         } else {
@@ -447,12 +520,23 @@ function renderSlots(slots) {
                 libres[s.local_id] = (libres[s.local_id] || 0) + 1;
             }
 
-            // Slots libres también son tomables en modo cubrir (solo hoy/futuro)
+            // Slots libres: tomables en modo cubrir o asignables por admin
             const esPasado = s.fecha_dia < HOY;
             if (_modoCubrir && !esPasado) {
                 el.classList.add('hor-asiento--cubrir-eligible');
                 el.title   = 'Turno libre — clic para tomar';
                 el.onclick = () => abrirModalCubrir(s);
+            }
+            if (ES_ADMIN) agregarBtnPicker(el);
+        }
+
+        // Admin: botón liberar en slots ocupados
+        if (ES_ADMIN && s.postulante_id) {
+            const yaEncuestado = parseInt(s.encuestado) === 1;
+            if (yaEncuestado) {
+                agregarBtnEncuestado(el);
+            } else {
+                agregarBtnLiberar(el, s.trabajador_nombre || '—');
             }
         }
     });
@@ -482,13 +566,13 @@ function toggleModoCubrir() {
     const badge  = document.getElementById('badgeEstado');
     if (btn) {
         btn.classList.toggle('activo', _modoCubrir);
-        btn.textContent = _modoCubrir ? '✕ Salir del modo cubrir' : '🤝 CUBRIR PUESTO';
+        btn.textContent = _modoCubrir ? '✕ Salir del modo cubrir' : '⇄ CUBRIR / CAMBIAR PUESTO';
     }
     if (badge) {
-        badge.textContent = _modoCubrir ? '🔓 Modo cubrir activo' : '🔒 Solo lectura';
+        badge.textContent = _modoCubrir ? '🔓 Modo cubrir activo' : '📅 Activo';
         badge.className   = _modoCubrir
             ? 'hor-semana-estado estado-abierta'
-            : 'hor-semana-estado estado-cerrada';
+            : 'hor-semana-estado estado-activo';
     }
 
     renderSlots(_slots);
@@ -554,11 +638,14 @@ async function confirmarCubrir() {
     }
 }
 
-// ── Modal: revertir (cobertura o turno libre tomado) ──
+// ── Modal: revertir (cobertura, cambio o intercambio) ──
 function abrirModalRevertir(s) {
     _slotParaRevertir = s;
     let msg;
-    if (s.solicitud_tipo === 'COBERTURA') {
+    if (s.solicitud_tipo === 'INTERCAMBIO') {
+        const orig = s.original_nombre || 'tu compañera';
+        msg = `¿Revertir el intercambio? ${orig} volverá a su puesto y tú volverás al tuyo.`;
+    } else if (s.solicitud_tipo === 'COBERTURA') {
         const orig = s.original_nombre || 'tu compañera';
         msg = `¿Quieres dejar de cubrir este turno? ${orig} recuperará su puesto.`;
     } else {
@@ -568,9 +655,170 @@ function abrirModalRevertir(s) {
     document.getElementById('revertirOverlay').hidden = false;
 }
 
+// ── Modal: intercambio de puesto ───────────────────────
+const _ROLES_LABEL = { CAJERA:'Cajera', VENDEDORA:'Vendedora', ALMACENERA:'Almacenera', LIMPIEZA:'Limpieza' };
+const _LOCALES_LABEL = { '2':'SB2', '3':'SB3', '4':'SB4' };
+
+function abrirModalIntercambio(otroSlot, miSlot) {
+    _slotParaIntercambio = { miSlot, otroSlot };
+    document.getElementById('intercambioNombreOtra').textContent = otroSlot.trabajador_nombre || '—';
+
+    const fmtSlot = s => `${_LOCALES_LABEL[s.local_id] || 'Local'} · ${_ROLES_LABEL[s.rol_puesto] || s.rol_puesto}`;
+    document.getElementById('intercambioMiPuesto').textContent   = 'Tú: ' + fmtSlot(miSlot);
+    document.getElementById('intercambioOtroPuesto').textContent = (otroSlot.trabajador_nombre?.split(' ')[0] || 'Ella') + ': ' + fmtSlot(otroSlot);
+
+    document.getElementById('intercambioPwd').value = '';
+    document.getElementById('intercambioOverlay').hidden = false;
+    setTimeout(() => document.getElementById('intercambioPwd').focus(), 60);
+}
+
+function cerrarModalIntercambio() {
+    document.getElementById('intercambioOverlay').hidden = true;
+    _slotParaIntercambio = null;
+}
+
+async function confirmarIntercambio() {
+    const pwd = document.getElementById('intercambioPwd').value.trim();
+    if (!pwd) { mostrarToast('Ingresa tu contraseña', 'info'); return; }
+
+    const { miSlot, otroSlot } = _slotParaIntercambio;
+    cerrarModalIntercambio();
+
+    try {
+        const r   = await fetch(`${BASE}/horario/api/slot/intercambiar`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+                mi_slot_id:   parseInt(miSlot.id_slot),
+                otro_slot_id: parseInt(otroSlot.id_slot),
+                password:     pwd,
+            }),
+        });
+        const res = await r.json();
+        await cargarSlots();
+        if (res.success) mostrarToast('¡Puesto intercambiado correctamente!', 'ok');
+        else             mostrarToast(res.message || 'No se pudo realizar el intercambio.', 'error');
+    } catch {
+        mostrarToast('Error de conexión.', 'error');
+    }
+}
+
 function cerrarModalRevertir() {
     document.getElementById('revertirOverlay').hidden = true;
     _slotParaRevertir = null;
+}
+
+// ── Admin: picker y liberar ────────────────────────────
+let _adminTrabajadores = [];
+let _pickerSlotElA     = null;
+let _liberarSlotElA    = null;
+
+async function cargarTrabajadoresAdmin() {
+    if (!ES_ADMIN || _adminTrabajadores.length) return;
+    try {
+        const r   = await fetch(`${BASE}/horario/api/trabajadores`);
+        const res = await r.json();
+        if (!res.success) return;
+        _adminTrabajadores = res.data || [];
+        const sel = document.getElementById('adminPickerSelectA');
+        if (!sel) return;
+        _adminTrabajadores.forEach(t => {
+            const o = document.createElement('option');
+            o.value = t.id; o.textContent = t.nombre;
+            sel.appendChild(o);
+        });
+    } catch {}
+}
+
+function agregarBtnPicker(el) {
+    if (el.querySelector('.hor-asiento__btn-picker')) return;
+    const btn = document.createElement('button');
+    btn.className   = 'hor-asiento__btn-picker';
+    btn.title       = 'Asignar trabajador';
+    btn.textContent = '👤';
+    btn.addEventListener('click', e => { e.stopPropagation(); abrirPickerAdmin(el); });
+    el.appendChild(btn);
+}
+
+function agregarBtnLiberar(el, nombre) {
+    if (el.querySelector('.hor-asiento__btn-liberar')) return;
+    const btn = document.createElement('button');
+    btn.className   = 'hor-asiento__btn-liberar';
+    btn.title       = `Quitar a ${nombre}`;
+    btn.textContent = '✕';
+    btn.addEventListener('click', e => { e.stopPropagation(); abrirLiberarAdmin(el, nombre); });
+    el.appendChild(btn);
+}
+
+function agregarBtnEncuestado(el) {
+    if (el.querySelector('.hor-asiento__btn-encuestado')) return;
+    const btn = document.createElement('button');
+    btn.className   = 'hor-asiento__btn-encuestado';
+    btn.title       = 'Ya fue encuestado — no se puede quitar';
+    btn.textContent = '📋';
+    el.appendChild(btn);
+}
+
+function abrirPickerAdmin(el) {
+    _pickerSlotElA = el;
+    cargarTrabajadoresAdmin();
+    const sel = document.getElementById('adminPickerSelectA');
+    if (sel) sel.value = '';
+    document.getElementById('adminPickerOverlayA').hidden = false;
+}
+
+function cerrarPickerAdmin() {
+    document.getElementById('adminPickerOverlayA').hidden = true;
+    _pickerSlotElA = null;
+}
+
+async function pickerAsignarAdmin() {
+    const targetId = document.getElementById('adminPickerSelectA').value;
+    if (!targetId) { mostrarToast('Selecciona un trabajador', 'info'); return; }
+    const el = _pickerSlotElA;
+    cerrarPickerAdmin();
+    el.classList.add('hor-asiento--loading');
+    try {
+        const r   = await fetch(`${BASE}/horario/api/slot/asignar`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slot_id: parseInt(el.dataset.slotid), semana_id: SEMANA_ID, target_id: parseInt(targetId) }),
+        });
+        const res = await r.json();
+        await cargarSlots();
+        if (!res.success) mostrarToast(res.message || 'Error al asignar.', 'error');
+    } catch { el.classList.remove('hor-asiento--loading'); mostrarToast('Error de conexión.', 'error'); }
+}
+
+function abrirLiberarAdmin(el, nombre) {
+    _liberarSlotElA = el;
+    document.getElementById('liberarAdminNombreA').textContent = `Quitar a ${nombre} de este turno.`;
+    document.getElementById('liberarAdminPwdA').value = '';
+    document.getElementById('liberarAdminOverlayA').hidden = false;
+    setTimeout(() => document.getElementById('liberarAdminPwdA').focus(), 50);
+}
+
+function cerrarLiberarAdmin() {
+    document.getElementById('liberarAdminOverlayA').hidden = true;
+    _liberarSlotElA = null;
+}
+
+async function confirmarLiberarAdmin() {
+    const pwd   = document.getElementById('liberarAdminPwdA').value.trim();
+    if (!pwd) { mostrarToast('Ingresa tu contraseña', 'info'); return; }
+    const el    = _liberarSlotElA;
+    const slotId = el?.dataset.slotid;
+    if (!slotId) return;
+    cerrarLiberarAdmin();
+    el.classList.add('hor-asiento--loading');
+    try {
+        const r   = await fetch(`${BASE}/horario/api/slot/${slotId}/liberar-admin`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pwd }),
+        });
+        const res = await r.json();
+        await cargarSlots();
+        if (!res.success) mostrarToast(res.message || 'No se pudo quitar al trabajador.', 'error');
+    } catch { el.classList.remove('hor-asiento--loading'); mostrarToast('Error de conexión.', 'error'); }
 }
 
 async function confirmarRevertir() {

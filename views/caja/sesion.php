@@ -9,10 +9,12 @@
 /** @var array $modos */
 /** @var array $detalle */
 /** @var array $gastos */
-$basePath  = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
-$userName  = $userName  ?? $_SESSION['user_name'] ?? 'Usuario';
-$locales   = $locales   ?? [];
-$turnos    = $turnos    ?? [];
+$basePath         = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+$userName         = $userName         ?? $_SESSION['user_name'] ?? 'Usuario';
+$locales          = $locales          ?? [];
+$turnos           = $turnos           ?? [];
+$esAdminCaja      = $esAdminCaja      ?? true;
+$horarioCajeraMap = $horarioCajeraMap ?? [];
 $conceptos = $conceptos ?? [];
 $staff     = $staff     ?? [];
 $detalle   = $detalle   ?? [];
@@ -42,6 +44,22 @@ $act = [
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/normalize.css">
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/caja.css">
     <link rel="icon" type="image/x-icon" href="<?= $basePath ?>/assets/img/logo.ico">
+    <style>
+        /* ── Encuesta de apertura ── */
+        .sv-block { background:#f8fafc;border-radius:10px;padding:.7rem .85rem;margin-bottom:.65rem;border:1px solid #e8edf2; }
+        .sv-block__hd { font-size:.67rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:.55rem; }
+        .sv-rg { display:flex;gap:.3rem;flex-wrap:wrap; }
+        .sv-row2 { display:grid;grid-template-columns:1fr 1fr;gap:.5rem; }
+        .sv-field { margin-bottom:.6rem; }
+        .sv-field__label { font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:.3rem; }
+        .sv-rb { padding:.38rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;background:#fff;color:#475569;transition:all .13s;line-height:1.3; }
+        .sv-rb small { display:block;font-size:.62rem;font-weight:400;color:#94a3b8; }
+        .sv-rb[data-color="blue"].active   { border-color:#3b82f6;background:#dbeafe;color:#1e40af; }
+        .sv-rb[data-color="green"].active  { border-color:#10b981;background:#d1fae5;color:#065f46; }
+        .sv-rb[data-color="amber"].active  { border-color:#f59e0b;background:#fef3c7;color:#92400e; }
+        .sv-rb[data-color="orange"].active { border-color:#f97316;background:#ffedd5;color:#9a3412; }
+        .sv-rb[data-color="red"].active    { border-color:#ef4444;background:#fee2e2;color:#991b1b; }
+    </style>
 </head>
 <body>
 
@@ -67,9 +85,16 @@ $act = [
     <section class="caja-card">
         <h2 class="caja-card__title">1. Datos del turno</h2>
         <div class="caja-form-grid">
+            <?php if (!$esAdminCaja && empty($locales)): ?>
+            <div style="grid-column:1/-1;padding:.75rem 1rem;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;font-size:.82rem;color:#991b1b;font-weight:600;">
+                ⚠️ No tienes ningún turno asignado como cajera en el horario de hoy.
+                <a href="<?= $basePath ?>/horario" style="color:#dc2626;margin-left:.5rem;">→ Ver horario</a>
+            </div>
+            <?php else: ?>
+
             <div class="caja-field">
                 <label>Local <span class="req">*</span></label>
-                <select id="localId" class="caja-input" onchange="cargarCajas(this.value)">
+                <select id="localId" class="caja-input" onchange="cargarCajas(this.value); filtrarTurnos(this.value);">
                     <option value="">— Selecciona local —</option>
                     <?php foreach ($locales as $l): ?>
                         <option value="<?= $l['id'] ?>"><?= htmlspecialchars($l['descripcion']) ?></option>
@@ -84,20 +109,19 @@ $act = [
             </div>
             <div class="caja-field">
                 <label>Turno <span class="req">*</span></label>
-                <select id="turnoId" class="caja-input">
-                    <?php foreach ($turnos as $t): ?>
-                        <option value="<?= $t['id'] ?>"><?= htmlspecialchars($t['descripcion']) ?></option>
-                    <?php endforeach; ?>
+                <select id="turnoId" class="caja-input" onchange="cargarStaffHorario()">
+                    <option value="">— Primero selecciona local —</option>
                 </select>
             </div>
+            <?php endif; ?>
             <div class="caja-field">
-                <label>Vendedor/a del turno <span class="req">*</span></label>
-                <select id="vendedorId" class="caja-input">
-                    <option value="">— Selecciona vendedor/a —</option>
-                    <?php foreach ($staff as $s): ?>
-                        <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['nombre_completo']) ?></option>
-                    <?php endforeach; ?>
+                <label>Personal del turno <span class="req">*</span></label>
+                <select id="vendedorId" class="caja-input" disabled>
+                    <option value="">— Selecciona local y turno primero —</option>
                 </select>
+                <small id="horarioHint" style="font-size:.72rem;color:#94a3b8;margin-top:.25rem;display:block;">
+                    Solo aparece el personal asignado en el horario de hoy para ese local y turno.
+                </small>
             </div>
         </div>
         <div class="caja-base-info" style="font-size:0.82rem;color:#64748b;margin:.5rem 0;">
@@ -106,7 +130,91 @@ $act = [
         <div class="caja-base-info" id="baseInfo" hidden>
             <p>Base del día anterior: <strong id="baseAmount">S/ 0.00</strong></p>
         </div>
-        <button class="caja-btn caja-btn--primary" onclick="crearSesion()" id="btnCrear">
+        <button class="caja-btn caja-btn--primary" onclick="mostrarEncuesta()" id="btnCrear">
+            Continuar →
+        </button>
+    </section>
+
+    <!-- ── Paso 2: Encuesta de apertura para la vendedora ── -->
+    <section class="caja-card" id="surveySection" hidden>
+        <h2 class="caja-card__title">2. Evaluación de apertura — <span id="surveyVendNombre"></span></h2>
+        <p class="caja-card__desc">Completa la ficha de la vendedora antes de abrir el turno.</p>
+
+        <div class="sv-block">
+            <div class="sv-block__hd">⏰ Puntualidad al ingreso</div>
+            <div class="sv-rg">
+                <button type="button" class="sv-rb" data-color="blue"   data-field="llegada_puntualidad" data-val="MUY_TEMPRANO" onclick="pickSurveyRadio(this)">Muy anticipada <small>+10 min antes</small></button>
+                <button type="button" class="sv-rb" data-color="green"  data-field="llegada_puntualidad" data-val="TEMPRANO"     onclick="pickSurveyRadio(this)">Con anticipación <small>menos de 10 min</small></button>
+                <button type="button" class="sv-rb" data-color="orange" data-field="llegada_puntualidad" data-val="TARDE"        onclick="pickSurveyRadio(this)">Retraso leve <small>menos de 10 min</small></button>
+                <button type="button" class="sv-rb" data-color="red"    data-field="llegada_puntualidad" data-val="MUY_TARDE"    onclick="pickSurveyRadio(this)">Retraso considerable <small>+10 min tarde</small></button>
+            </div>
+        </div>
+
+        <div class="sv-block">
+            <div class="sv-block__hd">🏪 Estado del área al ingreso</div>
+            <div class="sv-row2">
+                <div class="sv-field">
+                    <span class="sv-field__label">¿Área ordenada?</span>
+                    <div class="sv-rg">
+                        <button type="button" class="sv-rb" data-color="green" data-field="area_ordenada_ingreso" data-val="1" onclick="pickSurveyRadio(this)">Sí</button>
+                        <button type="button" class="sv-rb" data-color="red"   data-field="area_ordenada_ingreso" data-val="0" onclick="pickSurveyRadio(this)">No</button>
+                    </div>
+                </div>
+                <div class="sv-field">
+                    <span class="sv-field__label">¿Área limpia?</span>
+                    <div class="sv-rg">
+                        <button type="button" class="sv-rb" data-color="green" data-field="area_limpia_ingreso" data-val="1" onclick="pickSurveyRadio(this)">Sí</button>
+                        <button type="button" class="sv-rb" data-color="red"   data-field="area_limpia_ingreso" data-val="0" onclick="pickSurveyRadio(this)">No</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sv-block">
+            <div class="sv-block__hd">👕 Presentación personal</div>
+            <div class="sv-field">
+                <span class="sv-field__label">Higiene personal</span>
+                <div class="sv-rg">
+                    <button type="button" class="sv-rb" data-color="red"   data-field="aseo_personal" data-val="DEFICIENTE" onclick="pickSurveyRadio(this)">Deficiente</button>
+                    <button type="button" class="sv-rb" data-color="amber" data-field="aseo_personal" data-val="ACEPTABLE"  onclick="pickSurveyRadio(this)">Aceptable</button>
+                    <button type="button" class="sv-rb" data-color="green" data-field="aseo_personal" data-val="OPTIMO"     onclick="pickSurveyRadio(this)">Óptimo</button>
+                </div>
+            </div>
+            <div class="sv-field">
+                <span class="sv-field__label">Uniforme e indumentaria</span>
+                <div class="sv-rg">
+                    <button type="button" class="sv-rb" data-color="red"   data-field="vestimenta" data-val="DESCUIDADO"  onclick="pickSurveyRadio(this)">Descuidado</button>
+                    <button type="button" class="sv-rb" data-color="amber" data-field="vestimenta" data-val="PRESENTABLE" onclick="pickSurveyRadio(this)">Presentable</button>
+                    <button type="button" class="sv-rb" data-color="green" data-field="vestimenta" data-val="IMPECABLE"   onclick="pickSurveyRadio(this)">Impecable</button>
+                </div>
+            </div>
+            <div class="sv-row2">
+                <div class="sv-field">
+                    <span class="sv-field__label">Estado de uñas</span>
+                    <div class="sv-rg">
+                        <button type="button" class="sv-rb" data-color="red"   data-field="unas" data-val="DESCUIDADAS" onclick="pickSurveyRadio(this)">Descuidadas</button>
+                        <button type="button" class="sv-rb" data-color="amber" data-field="unas" data-val="ACEPTABLES"  onclick="pickSurveyRadio(this)">Aceptables</button>
+                        <button type="button" class="sv-rb" data-color="green" data-field="unas" data-val="CUIDADAS"    onclick="pickSurveyRadio(this)">Cuidadas</button>
+                    </div>
+                </div>
+                <div class="sv-field">
+                    <span class="sv-field__label">Presentación del cabello</span>
+                    <div class="sv-rg">
+                        <button type="button" class="sv-rb" data-color="red"   data-field="cabello" data-val="SUELTO"   onclick="pickSurveyRadio(this)">Suelto</button>
+                        <button type="button" class="sv-rb" data-color="green" data-field="cabello" data-val="RECOGIDO" onclick="pickSurveyRadio(this)">Recogido</button>
+                        <button type="button" class="sv-rb" data-color="green" data-field="cabello" data-val="MONO"     onclick="pickSurveyRadio(this)">Con moño</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="caja-field" style="max-width:320px;margin-top:.5rem;">
+            <label>Tu contraseña (cajera) <span class="req">*</span></label>
+            <input type="password" id="surveyPassword" class="caja-input" placeholder="Confirma con tu contraseña"
+                   onkeydown="if(event.key==='Enter') abrirTurno()">
+        </div>
+
+        <button class="caja-btn caja-btn--primary" onclick="abrirTurno()" id="btnAbrirTurno" style="margin-top:.75rem;">
             Abrir turno →
         </button>
     </section>
@@ -491,5 +599,51 @@ async function guardarComentario(sesionId) {
 </script>
 <script src="<?= $basePath ?>/assets/js/session-guard.js"></script>
 <script src="<?= $basePath ?>/assets/js/caja.js"></script>
+<script>
+// ── Filtro de turnos según horario (solo cajera no-admin) ──
+const ES_ADMIN_CAJA  = <?= $esAdminCaja ? 'true' : 'false' ?>;
+const HORARIO_MAP    = <?= json_encode($horarioCajeraMap) ?>;
+const TODOS_TURNOS   = <?= json_encode(array_values($turnos)) ?>;
+
+function filtrarTurnos(localId) {
+    const sel = document.getElementById('turnoId');
+    if (!sel) return;
+    sel.innerHTML = '';
+
+    let turnosValidos = TODOS_TURNOS;
+
+    if (!ES_ADMIN_CAJA && localId) {
+        const ids = (HORARIO_MAP[localId] || []).map(Number);
+        turnosValidos = TODOS_TURNOS.filter(t => ids.includes(parseInt(t.id)));
+    }
+
+    if (turnosValidos.length === 0) {
+        sel.innerHTML = '<option value="">Sin turno asignado en este local hoy</option>';
+    } else {
+        sel.innerHTML = '<option value="">— Selecciona turno —</option>';
+        turnosValidos.forEach(t => {
+            const o = document.createElement('option');
+            o.value = t.id; o.textContent = t.descripcion;
+            sel.appendChild(o);
+        });
+    }
+
+    // Resetear horario staff al cambiar local
+    cargarStaffHorario();
+}
+
+// Si solo hay 1 local disponible, preseleccionarlo automáticamente
+document.addEventListener('DOMContentLoaded', () => {
+    const selLocal = document.getElementById('localId');
+    if (selLocal && selLocal.options.length === 2) { // "— elige —" + 1 local
+        selLocal.selectedIndex = 1;
+        cargarCajas(selLocal.value);
+        filtrarTurnos(selLocal.value);
+    }
+    // Inicializar visibilidad vendedora si ya hay caja seleccionada
+    const cajaSelInit = document.getElementById('cajaId');
+    if (cajaSelInit) actualizarCampoVendedora(cajaSelInit);
+});
+</script>
 </body>
 </html>

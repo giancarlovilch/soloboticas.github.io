@@ -86,11 +86,14 @@ $router->get('/api/auth/verify', [AuthController::class, 'verifyToken']);
 
 // --- MÓDULO DE HORARIOS ---
 $router->get('/horario',                        [HorarioController::class, 'index']);
+$router->get('/horario/log',                    [HorarioController::class, 'log']);
+$router->get('/horario/asistencia',             [HorarioController::class, 'asistencia']);
 $router->get('/horario/siguiente',              [HorarioController::class, 'siguiente']);
 $router->get('/horario/historial',              [HorarioController::class, 'historial']);
 $router->get('/horario/solicitudes',            [HorarioController::class, 'solicitudes']);
 $router->post('/horario/api/slot/{id}/liberar-admin',   [HorarioController::class, 'liberarSlotAdmin']);
 $router->post('/horario/api/solicitud/cubrir',                  [HorarioController::class, 'cubrir']);
+$router->post('/horario/api/solicitud/{id}/anular',             [HorarioController::class, 'anularSolicitud']);
 $router->post('/horario/api/solicitud/{id}/revertir-propia',    [HorarioController::class, 'revertirCoberturaPropia']);
 $router->post('/horario/api/solicitud/{id}/revertir',           [HorarioController::class, 'revertirCobertura']);
 $router->get('/horario/informacion',            [HorarioController::class, 'informacion']);
@@ -98,8 +101,10 @@ $router->post('/admin/api/penalidad/{id}',      [HorarioController::class, 'actu
 $router->get('/horario/api/semana/{id}',        [HorarioController::class, 'getSlots']);
 $router->post('/horario/api/semana/crear',      [HorarioController::class, 'crearSemana']);
 $router->post('/horario/api/semana/{id}/cerrar',[HorarioController::class, 'cerrarSemana']);
+$router->post('/horario/api/slot/intercambiar', [HorarioController::class, 'intercambiarSlots']);
 $router->post('/horario/api/slot/asignar',      [HorarioController::class, 'asignarSlot']);
 $router->post('/horario/api/slot/liberar',      [HorarioController::class, 'liberarSlot']);
+$router->get('/horario/api/staff-turno',        [HorarioController::class, 'getStaffTurno']);
 $router->get('/horario/api/trabajadores',       [HorarioController::class, 'getTrabajadores']);
 
 // --- MÓDULO DE CAJA ---
