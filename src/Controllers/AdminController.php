@@ -290,6 +290,21 @@ class AdminController extends Controller
             require_once __DIR__ . '/../Core/Database.php';
         }
 
+        // Datos para la gestión de horarios admin
+        $horarioFecha    = null;
+        $horarioSlots    = [];
+        $horarioHistorial = [];
+        if ($page === 'horario') {
+            require_once __DIR__ . '/../Repositories/HorarioRepository.php';
+            $horarioRepo  = new HorarioRepository();
+            $horarioFecha = $_GET['fecha'] ?? date('Y-m-d');
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $horarioFecha)) {
+                $horarioFecha = date('Y-m-d');
+            }
+            $horarioSlots     = $horarioRepo->getSlotsByFecha($horarioFecha);
+            $horarioHistorial = $horarioRepo->getSolicitudesRecientes(40);
+        }
+
         // Datos para la página de bonos
         $bonosDatos = null;
         if ($page === 'bonos') {

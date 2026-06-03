@@ -44,9 +44,9 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
 
 /* ── MAIN ─────────────────────────────────────────── */
 .hor-main {
-    max-width: 1100px; margin: 1.5rem auto;
+    max-width: 1100px; margin: 0.5rem auto;
     padding: 0 1rem 4rem;
-    display: flex; flex-direction: column; gap: 1.5rem;
+    display: flex; flex-direction: column; 
 }
 
 /* ── BOTONES ─────────────────────────────────────────── */
@@ -62,7 +62,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
 .hor-semana-header {
     display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
     background: var(--hor-card); border: 1px solid var(--hor-border);
-    border-radius: 12px; padding: 1.1rem 1.4rem;
+    border-radius: 12px; padding: 0.5rem 1.4rem;
     box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
 .hor-semana-info { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; flex: 1; }
@@ -91,7 +91,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 .hor-sala__titulo {
-    padding: 1rem 1.4rem;
+    padding: 0.5rem 1.4rem;
     font-size: 1.05rem; font-weight: 700; color: var(--sala-color);
     display: flex; align-items: center; gap: .5rem;
     border-bottom: 1px solid var(--hor-border);
@@ -420,4 +420,48 @@ body.es-admin .hor-asiento--ocupado:hover {
     .hor-grid__row { gap: .15rem; }
     /* Zoom 70% para pantallas muy pequeñas */
     .hor-sala { zoom: 0.70; }
+}
+
+/* ── COBERTURA (mi reemplazo activo en semana vigente) ── */
+.hor-asiento--cobertura {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #991b1b;
+    opacity: 1;
+}
+.hor-asiento--cobertura .hor-asiento__nombre { font-weight: 700; color: #dc2626; }
+.hor-asiento--cobertura:hover { transform: none; }
+
+/* Modo "Cubrir Puesto": slots elegibles se vuelven interactivos */
+body.modo-cubrir .hor-asiento--cubrir-eligible {
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    outline: 2px dashed #dc2626;
+    outline-offset: -3px;
+    transition: transform .12s, box-shadow .12s;
+}
+body.modo-cubrir .hor-asiento--cubrir-eligible:hover {
+    transform: translateY(-2px) scale(1.03) !important;
+    box-shadow: 0 4px 12px rgba(220,38,38,.3) !important;
+}
+
+/* Botón CUBRIR PUESTO */
+.hor-btn-cubrir {
+    display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+    padding: .4rem 1rem; border-radius: 8px;
+    font-size: .78rem; font-weight: 700;
+    background: #dc2626; color: #fff;
+    border: none; cursor: pointer;
+    transition: background .15s, box-shadow .15s;
+    white-space: nowrap;
+}
+.hor-btn-cubrir:hover { background: #b91c1c; }
+.hor-btn-cubrir.activo {
+    background: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220,38,38,.25);
+    animation: cubrir-pulse 1.5s ease-in-out infinite;
+}
+@keyframes cubrir-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(220,38,38,.25); }
+    50%       { box-shadow: 0 0 0 6px rgba(220,38,38,.08); }
 }

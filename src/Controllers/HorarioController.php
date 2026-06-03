@@ -242,6 +242,15 @@ class HorarioController extends Controller
         else $this->error($result, 401);
     }
 
+    // ── POST /horario/api/solicitud/{id}/revertir-propia ──
+    public function revertirCoberturaPropia(int $id): void
+    {
+        $postulanteId = $this->requireAuth();
+        $result = $this->repo->revertirCoberturaPropia($id, $postulanteId);
+        if ($result === 'ok') $this->success('Cobertura revertida. Tu compañera recuperó su turno.');
+        else $this->error($result, 409);
+    }
+
     // ── POST /horario/api/solicitud/{id}/revertir ─────────
     public function revertirCobertura(int $id): void
     {

@@ -77,6 +77,19 @@ if ($semana) {
 
 <main class="hor-main">
 
+    <!-- ── Navegación: volver a semana actual ──────────────── -->
+    <div>
+        <a href="<?= $basePath ?>/horario"
+           style="display:flex;align-items:center;justify-content:center;gap:.6rem;padding:.9rem 1.25rem;border-radius:10px;background:#f8fafc;border:1.5px solid #e2e8f0;text-decoration:none;color:#64748b;font-weight:600;font-size:0.85rem;transition:all .15s;"
+           onmouseover="this.style.borderColor='#94a3b8'" onmouseout="this.style.borderColor='#e2e8f0'">
+            <span style="font-size:1.1rem;">◀</span>
+            <div>
+                <div>Semana actual</div>
+                <div style="font-size:0.72rem;font-weight:400;opacity:.7;margin-top:1px;">Solo lectura</div>
+            </div>
+        </a>
+    </div>
+
     <?php if (!$semana): ?>
     <!-- Sin semana disponible -->
     <div class="hor-empty">

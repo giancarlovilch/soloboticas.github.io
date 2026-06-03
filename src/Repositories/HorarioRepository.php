@@ -364,7 +364,7 @@ class HorarioRepository
 
     // ── SLOTS ─────────────────────────────────────────────
 
-    /** Devuelve todos los slots de la semana con info de quién los ocupa */
+    /** Devuelve todos los slots de la semana con info de quién los ocupa y solicitud activa más reciente */
     public function getSlotsBySemana(int $semanaId): array
     {
         $stmt = $this->db->prepare(
@@ -372,12 +372,24 @@ class HorarioRepository
                     rh.codigo      AS rol_puesto,
                     rh.es_opcional,
                     DAYOFWEEK(hs.fecha_dia) - 1 AS dia_semana_raw,
-                    -- Lunes=1…Domingo=7
                     IF(DAYOFWEEK(hs.fecha_dia)=1, 7, DAYOFWEEK(hs.fecha_dia)-1) AS dia_semana,
-                    p.nombres AS trabajador_nombre
+                    p.nombres                        AS trabajador_nombre,
+                    sc.tipo                          AS solicitud_tipo,
+                    sc.id_solicitud                  AS id_solicitud_activa,
+                    sc.postulante_solicitante_id     AS solicitud_solicitante_id,
+                    sc.postulante_original_id        AS cobertura_original_id,
+                    po.nombres                       AS original_nombre,
+                    IF(sc.tipo = 'COBERTURA', 1, 0) AS es_cobertura
              FROM horario_slot hs
              INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
-             LEFT  JOIN postulante p  ON hs.postulante_id   = p.id_postulante
+             LEFT  JOIN postulante p   ON hs.postulante_id  = p.id_postulante
+             LEFT  JOIN solicitud_cambio sc
+                     ON sc.id_solicitud = (
+                            SELECT MAX(s2.id_solicitud)
+                            FROM solicitud_cambio s2
+                            WHERE s2.slot_id = hs.id_slot AND s2.estado = 'ACTIVA'
+                        )
+             LEFT  JOIN postulante po  ON po.id_postulante = sc.postulante_original_id
              WHERE hs.semana_id = :sid
              ORDER BY hs.local_id, hs.turno_id, hs.fecha_dia, rh.id_rol_horario, hs.slot_num"
         );
@@ -593,13 +605,59 @@ class HorarioRepository
         $slot = $this->getSlotById($slotId);
         if (!$slot) return 'Slot no encontrado';
 
-        $hoy = new DateTime('now', new DateTimeZone('America/Lima'));
+        $hoy      = new DateTime('now', new DateTimeZone('America/Lima'));
         $fechaDia = new DateTime($slot['fecha_dia']);
         if ($fechaDia < $hoy->setTime(0, 0)) {
             return 'No se pueden modificar turnos de días pasados';
         }
 
         $originalId = $slot['postulante_id'] ?: null;
+        if ($originalId && $originalId == $solicitanteId) return 'No puedes cubrir tu propio turno';
+
+        if ($slot['rol_puesto'] === 'LIMPIEZA') {
+            // Limpieza: solo requiere estar en ese local+turno+día en un rol no-limpieza
+            $trabajaLocal = $this->db->prepare(
+                "SELECT COUNT(*) FROM horario_slot hs
+                 INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+                 WHERE hs.semana_id     = :sid
+                   AND hs.postulante_id = :pid
+                   AND hs.local_id      = :lid
+                   AND hs.turno_id      = :tid
+                   AND hs.fecha_dia     = :fdia
+                   AND rh.codigo       != 'LIMPIEZA'"
+            );
+            $trabajaLocal->execute([
+                'sid'  => $slot['semana_id'],
+                'pid'  => $solicitanteId,
+                'lid'  => $slot['local_id'],
+                'tid'  => $slot['turno_id'],
+                'fdia' => $slot['fecha_dia'],
+            ]);
+            if ((int)$trabajaLocal->fetchColumn() === 0) {
+                return 'Solo puedes tomar limpieza en el local y turno donde trabajas ese día';
+            }
+        } else {
+            // Rol normal: máximo 1 slot por turno+día
+            $conflicto = $this->db->prepare(
+                "SELECT id_slot FROM horario_slot
+                 WHERE semana_id     = :sid
+                   AND postulante_id = :pid
+                   AND turno_id      = :tid
+                   AND fecha_dia     = :fdia
+                   AND id_slot      != :sid_actual
+                 LIMIT 1"
+            );
+            $conflicto->execute([
+                'sid'        => $slot['semana_id'],
+                'pid'        => $solicitanteId,
+                'tid'        => $slot['turno_id'],
+                'fdia'       => $slot['fecha_dia'],
+                'sid_actual' => $slotId,
+            ]);
+            if ($conflicto->fetch()) {
+                return 'Ya tienes un turno asignado en ese horario (mismo turno y día)';
+            }
+        }
 
         // Reasignar el slot
         $this->db->prepare(
@@ -608,7 +666,8 @@ class HorarioRepository
              WHERE id_slot = :id"
         )->execute(['pid' => $solicitanteId, 'id' => $slotId]);
 
-        // Registrar solicitud
+        // COBERTURA si había alguien, CAMBIO si el slot estaba libre
+        $tipo = $originalId ? 'COBERTURA' : 'CAMBIO';
         $this->db->prepare(
             "INSERT INTO solicitud_cambio
                 (slot_id, semana_id, tipo, postulante_solicitante_id, postulante_original_id, notas)
@@ -616,11 +675,58 @@ class HorarioRepository
         )->execute([
             'sid'   => $slotId,
             'mid'   => $slot['semana_id'],
-            'tipo'  => $originalId ? 'COBERTURA' : 'CAMBIO',
+            'tipo'  => $tipo,
             'sol'   => $solicitanteId,
             'ori'   => $originalId,
             'notas' => $comentario,
         ]);
+
+        return 'ok';
+    }
+
+    /** El propio solicitante revierte su asignación en modo cubrir (COBERTURA o CAMBIO) */
+    public function revertirCoberturaPropia(int $solicitudId, int $solicitanteId): string
+    {
+        $stmt = $this->db->prepare(
+            "SELECT * FROM solicitud_cambio
+             WHERE id_solicitud              = :id
+               AND tipo                     IN ('COBERTURA', 'CAMBIO')
+               AND estado                   = 'ACTIVA'
+               AND postulante_solicitante_id = :pid"
+        );
+        $stmt->execute(['id' => $solicitudId, 'pid' => $solicitanteId]);
+        $sol = $stmt->fetch();
+        if (!$sol) return 'Solicitud no encontrada o no tienes permiso para revertirla';
+
+        $slot = $this->getSlotById((int)$sol['slot_id']);
+        if (!$slot) return 'Slot no encontrado';
+
+        $hoy      = new DateTime('now', new DateTimeZone('America/Lima'));
+        $fechaDia = new DateTime($slot['fecha_dia']);
+        if ($fechaDia < $hoy->setTime(0, 0)) {
+            return 'No se pueden revertir asignaciones de días pasados';
+        }
+
+        // COBERTURA → restaurar persona original; CAMBIO (slot libre) → dejar vacío
+        if ($sol['postulante_original_id']) {
+            $this->db->prepare(
+                "UPDATE horario_slot
+                 SET postulante_id = :pid, fecha_asignacion = NOW()
+                 WHERE id_slot = :sid"
+            )->execute(['pid' => $sol['postulante_original_id'], 'sid' => $sol['slot_id']]);
+        } else {
+            $this->db->prepare(
+                "UPDATE horario_slot
+                 SET postulante_id = NULL, fecha_asignacion = NULL
+                 WHERE id_slot = :sid"
+            )->execute(['sid' => $sol['slot_id']]);
+        }
+
+        $this->db->prepare(
+            "UPDATE solicitud_cambio
+             SET estado = 'REVERTIDA', revertida_por = :quien, fecha_reversion = NOW()
+             WHERE id_solicitud = :id"
+        )->execute(['quien' => $solicitanteId, 'id' => $solicitudId]);
 
         return 'ok';
     }

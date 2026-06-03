@@ -79,6 +79,13 @@ $navActive = [
                     </a>
                 </li>
 
+                <li class="list__item <?= ($page === 'horario') ? 'list__item--active' : '' ?>">
+                    <a href="?page=horario" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/staff.svg" class="list__img">
+                        <span class="nav__link">Gestión Turnos</span>
+                    </a>
+                </li>
+
                 <p class="nav__section">Reclutamiento</p>
 
                 <li class="list__item <?= $navActive['postulantes'] ? 'list__item--active' : '' ?>">
@@ -199,6 +206,9 @@ $navActive = [
                         break;
                     case 'bancos':
                         require_once __DIR__ . '/bancos.php';
+                        break;
+                    case 'horario':
+                        require_once __DIR__ . '/horario_admin.php';
                         break;
                     case 'update':
                         if (isset($p) && !empty($p)) {
