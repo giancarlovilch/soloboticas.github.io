@@ -288,7 +288,7 @@ class StaffController extends Controller
                      AND (af.turno_id = hs.turno_id OR af.turno_id IS NULL)
                      AND af.estado = 'FALTA'
                )
-             ORDER BY hs.fecha_dia DESC, hs.turno_id ASC"
+             ORDER BY hs.fecha_dia DESC, hs.turno_id DESC"
         );
         $stmtSlots->execute(['pid' => $postulanteId, 'desde' => $desde, 'hasta' => $hasta]);
         $slots = $stmtSlots->fetchAll();
@@ -338,13 +338,53 @@ class StaffController extends Controller
                    AND ca.local_id         = :lid
                    AND sc.turno_id         = :tid
                    AND sc.fecha_operacion  = :fecha
-                   AND sc.estado IN ('CERRADA','APROBADA')
                  LIMIT 1"
             );
             $s->execute(['pid'=>$pid,'rol'=>$rolPart,'lid'=>$localId,'tid'=>$turnoId,'fecha'=>$fecha]);
             $r = $s->fetch();
             return $r ?: null;
         };
+
+        // ── Bono por tiempo de servicio: S/0.20 × meses completos desde fecha_ingreso ──
+        $stmtFI = $db->prepare("SELECT fecha_ingreso FROM postulante WHERE id_postulante = :pid");
+        $stmtFI->execute(['pid' => $postulanteId]);
+        $fechaIngreso = $stmtFI->fetchColumn() ?: null;
+        $bonoServicioMonto = 0.0;
+        $mesesServicio = 0;
+        if ($fechaIngreso) {
+            $dtIngreso = new DateTime($fechaIngreso);
+            $dtRef     = new DateTime($desde); // primer día del mes filtrado
+            if ($dtRef > $dtIngreso) {
+                $diff = $dtIngreso->diff($dtRef);
+                $mesesServicio     = $diff->y * 12 + $diff->m;
+                $bonoServicioMonto = round($mesesServicio * 0.20, 2);
+            }
+        }
+
+        // ── Bono estudios: técnico o universitario, según estado ──
+        $stmtEst = $db->prepare(
+            "SELECT e.tipo_id, e.estado_id,
+                    te.descripcion AS tipo_desc,
+                    es.descripcion AS estado_desc
+             FROM estudio e
+             INNER JOIN tipo_estudio te ON te.id_tipo   = e.tipo_id
+             INNER JOIN estado es       ON es.id_estado = e.estado_id
+             WHERE e.postulante_id = :pid
+               AND e.tipo_id IN (2, 3)
+             ORDER BY e.tipo_id DESC, e.estado_id ASC
+             LIMIT 1"
+        );
+        $stmtEst->execute(['pid' => $postulanteId]);
+        $estudioInfo = $stmtEst->fetch() ?: null;
+
+        $bonoEstudioMonto = 0.0;
+        if ($estudioInfo) {
+            $tipoEst   = (int)$estudioInfo['tipo_id'];
+            $estadoEst = (int)$estudioInfo['estado_id'];
+            $avanzado  = in_array($estadoEst, [1, 3]); // Egreso=1, Titulado=3
+            if ($tipoEst === 3)      $bonoEstudioMonto = $avanzado ? 6.0 : 3.0; // Universitario
+            elseif ($tipoEst === 2)  $bonoEstudioMonto = $avanzado ? 4.0 : 2.0; // Técnico
+        }
 
         // ── 3. Calcular ingresos por slot ─────────────────
         $ingresos      = [];
@@ -372,20 +412,24 @@ class StaffController extends Controller
                 }
             }
 
-            $total          = $base + $bonoV + $bonoO;
+            $bonoE          = $bonoEstudioMonto;
+            $bonoS          = $bonoServicioMonto;
+            $total          = $base + $bonoV + $bonoO + $bonoE + $bonoS;
             $totalIngresos += $total;
-            $totalBonos    += $bonoV + $bonoO;
+            $totalBonos    += $bonoV + $bonoO + $bonoE + $bonoS;
 
             $esCertificado = (bool)($slot['certificado'] ?? false);
             if ($esCertificado) $totalIngCert   += $total;
             else                $totalIngNoCert += $total;
 
             $ingresos[] = array_merge($slot, [
-                'base'         => $base,
-                'bono_v'       => $bonoV,
-                'bono_o'       => $bonoO,
-                'total'        => $total,
-                'certificado'  => $esCertificado,
+                'base'        => $base,
+                'bono_v'      => $bonoV,
+                'bono_o'      => $bonoO,
+                'bono_e'      => $bonoE,
+                'bono_s'      => $bonoS,
+                'total'       => $total,
+                'certificado' => $esCertificado,
             ]);
         }
 

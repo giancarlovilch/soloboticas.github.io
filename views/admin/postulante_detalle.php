@@ -301,6 +301,24 @@ $catalogos = $catalogos ?? [];
                     </div>
 
                     <div class="exp-sidebar__group">
+                        <label class="exp-sidebar__label">FECHA DE INGRESO</label>
+                        <input type="date" name="fecha_ingreso" class="exp-field__input"
+                               value="<?= htmlspecialchars($p['fecha_ingreso'] ?? '') ?>">
+                        <p style="font-size:0.65rem;color:#94a3b8;margin-top:0.3rem;" id="antiguedadSidebar">
+                            <?php
+                            if (!empty($p['fecha_ingreso'])) {
+                                $dt = new DateTime($p['fecha_ingreso']);
+                                $diff = $dt->diff(new DateTime());
+                                $meses = $diff->y * 12 + $diff->m;
+                                echo "Antigüedad: {$meses} meses · Bono S/ " . number_format($meses * 0.20, 2);
+                            } else {
+                                echo 'Sin fecha registrada';
+                            }
+                            ?>
+                        </p>
+                    </div>
+
+                    <div class="exp-sidebar__group">
                         <label class="exp-sidebar__label">ROL DE ACCESO</label>
                         <select name="rol_id" class="exp-sidebar__select">
                             <?php foreach ($catalogos['roles'] ?? [] as $rol): ?>

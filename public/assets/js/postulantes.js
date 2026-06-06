@@ -73,6 +73,7 @@ async function manejarUpdatePostulante(e) {
         activo:        formData.get('activo'),
         rol_id:        formData.get('rol_id'),
         tipo_personal: formData.get('tipo_personal'),
+        fecha_ingreso: formData.get('fecha_ingreso') || null,
         puestos: [],      // <-- NUEVA PROPIEDAD PARA MULTIFUNCIONALIDAD
         experiencias: [],
         estudios: [],

@@ -187,13 +187,20 @@ class AdminController extends Controller
                  INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
                  INNER JOIN local l        ON hs.local_id       = l.id_local
                  INNER JOIN postulante p   ON p.id_postulante   = hs.postulante_id
-                 INNER JOIN asistencia a   ON a.postulante_id   = hs.postulante_id
+                 LEFT JOIN asistencia a    ON a.postulante_id   = hs.postulante_id
                                           AND a.fecha           = hs.fecha_dia
                                           AND (a.turno_id = hs.turno_id OR a.turno_id IS NULL)
                                           AND a.estado != 'FALTA'
-                                          AND (a.llegada_puntualidad IS NOT NULL OR a.salida_puntualidad IS NOT NULL)
                  WHERE {$slotsWhere}
-                 ORDER BY hs.fecha_dia DESC, p.nombres ASC, hs.turno_id ASC"
+                   AND hs.fecha_dia <= CURDATE()
+                   AND NOT EXISTS (
+                       SELECT 1 FROM asistencia af
+                       WHERE af.postulante_id = hs.postulante_id
+                         AND af.fecha         = hs.fecha_dia
+                         AND (af.turno_id = hs.turno_id OR af.turno_id IS NULL)
+                         AND af.estado = 'FALTA'
+                   )
+                 ORDER BY hs.fecha_dia DESC, p.nombres ASC, hs.turno_id DESC"
             );
             $stmtSlots->execute($slotsParams);
             $ecoSlots = $stmtSlots->fetchAll();
@@ -225,32 +232,74 @@ class AdminController extends Controller
                 return (float)($s->fetchColumn() ?: 0);
             };
 
-            $getSesion = function(int $localId, int $turnoId, string $fecha) use ($db): ?array {
+            $getSesionParticipante = function(int $pid, string $rolPart, int $localId, int $turnoId, string $fecha) use ($db): ?array {
                 $s = $db->prepare(
-                    "SELECT sc.id_sesion, dc.num_operaciones_bcp, COALESCE(rv.monto,0) AS ventas
-                     FROM sesion_caja sc
-                     INNER JOIN caja ca ON ca.id_caja = sc.caja_id
+                    "SELECT sc.id_sesion, dc.num_operaciones_bcp,
+                            COALESCE(rv.monto, 0) AS ventas
+                     FROM sesion_participante sp
+                     INNER JOIN sesion_caja sc ON sc.id_sesion   = sp.sesion_id
+                     INNER JOIN caja ca        ON ca.id_caja     = sc.caja_id
                      LEFT JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
                      LEFT JOIN reporte_venta rv  ON rv.sesion_id = sc.id_sesion
-                     WHERE ca.local_id = :lid AND sc.turno_id = :tid
-                       AND sc.fecha_operacion = :fecha AND sc.estado IN ('CERRADA','APROBADA')
-                     ORDER BY sc.id_sesion DESC LIMIT 1"
+                     WHERE sp.postulante_id    = :pid
+                       AND sp.rol_participacion = :rol
+                       AND ca.local_id         = :lid
+                       AND sc.turno_id         = :tid
+                       AND sc.fecha_operacion  = :fecha
+                     LIMIT 1"
                 );
-                $s->execute(['lid'=>$localId,'tid'=>$turnoId,'fecha'=>$fecha]);
+                $s->execute(['pid'=>$pid,'rol'=>$rolPart,'lid'=>$localId,'tid'=>$turnoId,'fecha'=>$fecha]);
                 $r = $s->fetch();
                 return $r ?: null;
             };
 
-            $getVentasVendedora = function(int $pid, int $sesionId) use ($db): float {
-                $s = $db->prepare(
-                    "SELECT COALESCE(rv.monto,0) FROM sesion_participante sp
-                     INNER JOIN reporte_venta rv ON rv.sesion_id = sp.sesion_id
-                     WHERE sp.postulante_id = :pid AND sp.sesion_id = :sid
-                       AND sp.rol_participacion = 'VENDEDORA' LIMIT 1"
-                );
-                $s->execute(['pid'=>$pid,'sid'=>$sesionId]);
-                return (float)($s->fetchColumn() ?: 0);
-            };
+            // ── Bono por tiempo de servicio por trabajador (S/0.20 × meses) ──
+            $servicioBonoMap = [];
+            $workerIds = array_unique(array_column($ecoSlots, 'postulante_id'));
+            if (!empty($workerIds)) {
+                $inListS = implode(',', array_map('intval', $workerIds));
+                $fiRows  = $db->query(
+                    "SELECT id_postulante, fecha_ingreso FROM postulante WHERE id_postulante IN ($inListS)"
+                )->fetchAll();
+                foreach ($fiRows as $fr) {
+                    $fi = $fr['fecha_ingreso'];
+                    if (!$fi) continue;
+                    $dtI = new DateTime($fi);
+                    $dtR = new DateTime($ecoDesde);
+                    if ($dtR > $dtI) {
+                        $diff = $dtI->diff($dtR);
+                        $meses = $diff->y * 12 + $diff->m;
+                        $servicioBonoMap[(int)$fr['id_postulante']] = round($meses * 0.20, 2);
+                    }
+                }
+            }
+
+            // ── Bono estudios por trabajador ──────────────────
+            $estudioBonoMap  = [];
+            $estudioInfoMap  = [];
+            if (!empty($workerIds)) {
+                $inList = implode(',', array_map('intval', $workerIds));
+                $estRows = $db->query(
+                    "SELECT e.postulante_id, e.tipo_id, e.estado_id,
+                            te.descripcion AS tipo_desc, es.descripcion AS estado_desc
+                     FROM estudio e
+                     INNER JOIN tipo_estudio te ON te.id_tipo   = e.tipo_id
+                     INNER JOIN estado es       ON es.id_estado = e.estado_id
+                     WHERE e.postulante_id IN ($inList) AND e.tipo_id IN (2,3)
+                     ORDER BY e.tipo_id DESC, e.estado_id ASC"
+                )->fetchAll();
+                $seen = [];
+                foreach ($estRows as $r) {
+                    $pid = (int)$r['postulante_id'];
+                    if (isset($seen[$pid])) continue;
+                    $seen[$pid] = true;
+                    $avanzado = in_array((int)$r['estado_id'], [1, 3]);
+                    $tipo     = (int)$r['tipo_id'];
+                    $estudioBonoMap[$pid] = $tipo === 3 ? ($avanzado ? 6.0 : 3.0) : ($avanzado ? 4.0 : 2.0);
+                    $estudioInfoMap[$pid] = $r;
+                }
+            }
+            $ecoEstudioInfo = $ecoPid ? ($estudioInfoMap[$ecoPid] ?? null) : null;
 
             $ecoIngresos = [];
             $ecoTotalIngresos = 0.0;
@@ -263,25 +312,66 @@ class AdminController extends Controller
                 $bonoV = 0.0; $bonoO = 0.0;
 
                 if (in_array($rol, ['CAJERA','VENDEDORA'])) {
-                    $sesion = $getSesion($slot['local_id'], $slot['turno_id'], $fecha);
+                    $sesion = $getSesionParticipante($slot['postulante_id'], $rol, $slot['local_id'], $slot['turno_id'], $fecha);
                     if ($sesion) {
                         if ($rol === 'CAJERA') {
-                            $bonoO = $getBono('OPERACIONES_BCP', (float)($sesion['num_operaciones_bcp'] ?? 0), $fecha);
+                            $ops   = (float)($sesion['num_operaciones_bcp'] ?? 0);
+                            $bonoO = $getBono('OPERACIONES_BCP', $ops, $fecha);
                         } else {
-                            $bonoV = $getBono('VENTAS', $getVentasVendedora($slot['postulante_id'], $sesion['id_sesion']), $fecha);
+                            $bonoV = $getBono('VENTAS', (float)($sesion['ventas'] ?? 0), $fecha);
                         }
                     }
                 }
 
-                $total = $base + $bonoV + $bonoO;
+                $bonoE = $estudioBonoMap[$slot['postulante_id']] ?? 0.0;
+                $bonoS = $servicioBonoMap[$slot['postulante_id']] ?? 0.0;
+                $total = $base + $bonoV + $bonoO + $bonoE + $bonoS;
                 $ecoTotalIngresos += $total;
-                $ecoTotalBonos    += $bonoV + $bonoO;
-                $ecoIngresos[] = array_merge($slot, ['base'=>$base,'bono_v'=>$bonoV,'bono_o'=>$bonoO,'total'=>$total]);
+                $ecoTotalBonos    += $bonoV + $bonoO + $bonoE + $bonoS;
+                $ecoIngresos[] = array_merge($slot, ['base'=>$base,'bono_v'=>$bonoV,'bono_o'=>$bonoO,'bono_e'=>$bonoE,'bono_s'=>$bonoS,'total'=>$total]);
             }
 
+            // ── Tarifas y bonos vigentes (sección informativa) ──
+            $hoyStr = date('Y-m-d');
+            $stmtTar = $db->prepare(
+                "SELECT t1.* FROM tarifa_base_rol t1
+                 WHERE t1.fecha_vigencia = (
+                     SELECT MAX(t2.fecha_vigencia) FROM tarifa_base_rol t2
+                     WHERE t2.rol_codigo = t1.rol_codigo AND t2.fecha_vigencia <= :hoy
+                 )
+                 ORDER BY FIELD(t1.rol_codigo,'CAJERA','VENDEDORA','ALMACENERA')"
+            );
+            $stmtTar->execute(['hoy' => $hoyStr]);
+            $ecoTarifasInfo = [];
+            foreach ($stmtTar->fetchAll() as $t) $ecoTarifasInfo[$t['rol_codigo']] = $t;
+
+            $ecoBonosVInfo = []; $ecoBonosOInfo = [];
+            foreach (['VENTAS' => 'ecoBonosVInfo', 'OPERACIONES_BCP' => 'ecoBonosOInfo'] as $tipo => $varName) {
+                $vigMax = $db->prepare("SELECT MAX(fecha_vigencia) FROM configuracion_bono WHERE tipo = :tipo AND fecha_vigencia <= :hoy");
+                $vigMax->execute(['tipo' => $tipo, 'hoy' => $hoyStr]);
+                $fechaVig = $vigMax->fetchColumn();
+                if ($fechaVig) {
+                    $stmtB = $db->prepare("SELECT * FROM configuracion_bono WHERE tipo = :tipo AND fecha_vigencia = :vig ORDER BY desde ASC");
+                    $stmtB->execute(['tipo' => $tipo, 'vig' => $fechaVig]);
+                    $$varName = $stmtB->fetchAll();
+                }
+            }
+
+            $ecoBonoEstudioMonto  = $ecoPid ? ($estudioBonoMap[$ecoPid]  ?? 0.0) : 0.0;
+            $ecoBonoServicioMonto = $ecoPid ? ($servicioBonoMap[$ecoPid] ?? 0.0) : 0.0;
+            $ecoNombreTrabajador = '';
+            if ($ecoPid) {
+                foreach ($ecoTrabajadores as $t) {
+                    if ((int)$t['id'] === $ecoPid) { $ecoNombreTrabajador = $t['nombre']; break; }
+                }
+            }
+            $ecoMesActual = date('Y-m');
+
             $economiaDatos = compact(
-                'ecoPagos','ecoTrabajadores','ecoMes','ecoDesde','ecoHasta','ecoPid','ecoTipo',
-                'ecoIngresos','ecoTotalIngresos','ecoTotalBonos'
+                'ecoPagos','ecoTrabajadores','ecoMes','ecoMesActual','ecoPid','ecoTipo',
+                'ecoIngresos','ecoTotalIngresos','ecoTotalBonos','ecoEstudioInfo',
+                'ecoTarifasInfo','ecoBonosVInfo','ecoBonosOInfo','ecoBonoEstudioMonto',
+                'ecoBonoServicioMonto','ecoNombreTrabajador'
             );
         }
 

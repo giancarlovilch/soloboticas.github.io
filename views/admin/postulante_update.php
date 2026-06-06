@@ -61,6 +61,11 @@ $id_postulante = $_GET['id'] ?? null;
                         <option value="0">Inactivo (Baja de personal)</option>
                     </select>
                 </div>
+                <div class="input-group">
+                    <label>Fecha de ingreso a la empresa</label>
+                    <input type="date" id="fecha_ingreso" name="fecha_ingreso">
+                    <small id="antiguedadLabel" style="color:#be185d;font-size:.72rem;margin-top:3px;display:block;"></small>
+                </div>
             </div>
             <div class="form-footer">
                 <button type="submit" class="btn-save">Guardar Cambios y Procesar</button>

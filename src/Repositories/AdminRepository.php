@@ -153,7 +153,7 @@ class AdminRepository
                         nombres = :nom, apellidos = :ape, genero_id = :gen,
                         fecha_nacimiento = :fnac, email = :email, telefono = :tel,
                         situacion_vivienda_id = :viv, direccion = :dir, distrito = :dis,
-                        tipo_personal = :tipo
+                        tipo_personal = :tipo, fecha_ingreso = :fi
                         WHERE id_postulante = :id";
             // Las columnas INT NULL y DATE NULL rechazan string vacío en strict mode → null
             $intOrNull  = fn($v) => ($v === '' || $v === null) ? null : (int)$v;
@@ -170,6 +170,7 @@ class AdminRepository
                 'dir'   => $data['direccion']              ?? null,
                 'dis'   => $data['distrito']               ?? null,
                 'tipo'  => $data['tipo_personal']          ?? null,
+                'fi'    => $dateOrNull($data['fecha_ingreso'] ?? null),
                 'id'    => $id,
             ]);
 
