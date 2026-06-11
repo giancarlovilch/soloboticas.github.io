@@ -301,6 +301,28 @@ class AdminController extends Controller
             }
             $ecoEstudioInfo = $ecoPid ? ($estudioInfoMap[$ecoPid] ?? null) : null;
 
+            // ── Pago por supervisión: S/ monto_dia × turno trabajado dentro del periodo asignado ──
+            $supervisorPeriodos = [];
+            if (!empty($workerIds)) {
+                $inListSup = implode(',', array_map('intval', $workerIds));
+                $supRows = $db->query(
+                    "SELECT postulante_id, fecha_desde, fecha_hasta, monto_dia
+                     FROM supervisor_periodo WHERE postulante_id IN ($inListSup)"
+                )->fetchAll();
+                foreach ($supRows as $sr) {
+                    $supervisorPeriodos[(int)$sr['postulante_id']][] = $sr;
+                }
+            }
+            $getSupervisorPago = function(int $pid, string $fecha) use ($supervisorPeriodos): float {
+                foreach ($supervisorPeriodos[$pid] ?? [] as $per) {
+                    if ($fecha >= $per['fecha_desde'] && ($per['fecha_hasta'] === null || $fecha <= $per['fecha_hasta'])) {
+                        return (float)$per['monto_dia'];
+                    }
+                }
+                return 0.0;
+            };
+            $ecoSupervisorPeriodos = $ecoPid ? ($supervisorPeriodos[$ecoPid] ?? []) : [];
+
             $ecoIngresos = [];
             $ecoTotalIngresos = 0.0;
             $ecoTotalBonos    = 0.0;
@@ -324,7 +346,7 @@ class AdminController extends Controller
                 }
 
                 $bonoE = $estudioBonoMap[$slot['postulante_id']] ?? 0.0;
-                $bonoS = $servicioBonoMap[$slot['postulante_id']] ?? 0.0;
+                $bonoS = ($servicioBonoMap[$slot['postulante_id']] ?? 0.0) + $getSupervisorPago($slot['postulante_id'], $fecha);
                 $total = $base + $bonoV + $bonoO + $bonoE + $bonoS;
                 $ecoTotalIngresos += $total;
                 $ecoTotalBonos    += $bonoV + $bonoO + $bonoE + $bonoS;
@@ -371,7 +393,7 @@ class AdminController extends Controller
                 'ecoPagos','ecoTrabajadores','ecoMes','ecoMesActual','ecoPid','ecoTipo',
                 'ecoIngresos','ecoTotalIngresos','ecoTotalBonos','ecoEstudioInfo',
                 'ecoTarifasInfo','ecoBonosVInfo','ecoBonosOInfo','ecoBonoEstudioMonto',
-                'ecoBonoServicioMonto','ecoNombreTrabajador'
+                'ecoBonoServicioMonto','ecoNombreTrabajador','ecoSupervisorPeriodos'
             );
         }
 
@@ -404,6 +426,25 @@ class AdminController extends Controller
             $bonosV   = $db->query("SELECT * FROM configuracion_bono WHERE tipo='VENTAS' ORDER BY fecha_vigencia DESC, desde ASC")->fetchAll();
             $bonosOps = $db->query("SELECT * FROM configuracion_bono WHERE tipo='OPERACIONES_BCP' ORDER BY fecha_vigencia DESC, desde ASC")->fetchAll();
             $bonosDatos = compact('tarifas','bonosV','bonosOps');
+        }
+
+        // Datos para la página de supervisores
+        $supervisoresDatos = null;
+        if ($page === 'supervisores') {
+            require_once __DIR__ . '/../Core/Database.php';
+            $db = \Database::getConnection();
+            $supTrabajadores = $db->query(
+                "SELECT p.id_postulante AS id, p.nombres AS nombre
+                 FROM postulante p INNER JOIN usuario u ON u.postulante_id = p.id_postulante
+                 WHERE u.activo = 1 ORDER BY p.nombres"
+            )->fetchAll();
+            $supPeriodos = $db->query(
+                "SELECT sp.*, p.nombres AS trabajador_nombre
+                 FROM supervisor_periodo sp
+                 INNER JOIN postulante p ON p.id_postulante = sp.postulante_id
+                 ORDER BY (sp.fecha_hasta IS NULL) DESC, sp.fecha_desde DESC"
+            )->fetchAll();
+            $supervisoresDatos = compact('supTrabajadores', 'supPeriodos');
         }
 
         require_once __DIR__ . '/../../views/admin/dashboard.php';
@@ -517,6 +558,39 @@ class AdminController extends Controller
         if (!$check->fetch()) { $this->error('No encontrado', 404); return; }
         $db->prepare("DELETE FROM configuracion_bono WHERE id = :id")->execute(['id' => $id]);
         $this->success('Rango eliminado.');
+    }
+
+    /** POST /admin/api/supervisor/agregar */
+    public function addSupervisor(): void
+    {
+        $this->middlewareAdmin();
+        $data  = $this->getAllInput();
+        $pid    = (int)($data['postulante_id'] ?? 0);
+        $desde  = $data['fecha_desde'] ?? '';
+        $hasta  = ($data['fecha_hasta'] !== '' && $data['fecha_hasta'] !== null) ? $data['fecha_hasta'] : null;
+        $monto  = isset($data['monto_dia']) && $data['monto_dia'] !== '' ? (float)$data['monto_dia'] : 5.00;
+        if ($pid <= 0 || !$desde || $monto < 0 || ($hasta !== null && $hasta < $desde)) {
+            $this->error('Datos inválidos', 422); return;
+        }
+        require_once __DIR__ . '/../Core/Database.php';
+        \Database::getConnection()->prepare(
+            "INSERT INTO supervisor_periodo (postulante_id, fecha_desde, fecha_hasta, monto_dia)
+             VALUES (:pid, :desde, :hasta, :monto)"
+        )->execute(['pid' => $pid, 'desde' => $desde, 'hasta' => $hasta, 'monto' => $monto]);
+        $this->success('Periodo de supervisión agregado.');
+    }
+
+    /** POST /admin/api/supervisor/{id}/eliminar */
+    public function eliminarSupervisor(int $id): void
+    {
+        $this->middlewareAdmin();
+        require_once __DIR__ . '/../Core/Database.php';
+        $db = \Database::getConnection();
+        $check = $db->prepare("SELECT id FROM supervisor_periodo WHERE id = :id");
+        $check->execute(['id' => $id]);
+        if (!$check->fetch()) { $this->error('No encontrado', 404); return; }
+        $db->prepare("DELETE FROM supervisor_periodo WHERE id = :id")->execute(['id' => $id]);
+        $this->success('Periodo eliminado.');
     }
 
     /**

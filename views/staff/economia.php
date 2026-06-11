@@ -209,6 +209,22 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
                 <?php else: ?>
                 <p style="font-size:.72rem;color:#64748b;">Fecha de ingreso no registrada — consulta al administrador.</p>
                 <?php endif; ?>
+                <?php
+                $supervisorActivo = null;
+                foreach ($supervisorPeriodos ?? [] as $per) {
+                    if ($per['fecha_desde'] <= $hasta && ($per['fecha_hasta'] === null || $per['fecha_hasta'] >= $desde)) {
+                        $supervisorActivo = $per;
+                        break;
+                    }
+                }
+                ?>
+                <?php if ($supervisorActivo): ?>
+                <p style="font-size:.72rem;color:#065f46;background:#d1fae5;border-radius:6px;padding:.3rem .6rem;margin-top:.4rem;">
+                    ✓ Pago por supervisión · Del <?= date('d/m/Y', strtotime($supervisorActivo['fecha_desde'])) ?>
+                    <?= $supervisorActivo['fecha_hasta'] ? 'al '.date('d/m/Y', strtotime($supervisorActivo['fecha_hasta'])) : '(indefinido)' ?>
+                    · S/ <?= number_format((float)$supervisorActivo['monto_dia'], 2) ?> adicionales por turno trabajado
+                </p>
+                <?php endif; ?>
             </div>
 
             <!-- Bono Estudios -->

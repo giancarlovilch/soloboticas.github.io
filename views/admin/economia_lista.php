@@ -17,10 +17,13 @@ $ecoBonosOInfo       = $ecoBonosOInfo       ?? [];
 $ecoBonoEstudioMonto  = $ecoBonoEstudioMonto  ?? 0.0;
 $ecoBonoServicioMonto = $ecoBonoServicioMonto ?? 0.0;
 $ecoNombreTrabajador  = $ecoNombreTrabajador  ?? '';
+$ecoSupervisorPeriodos = $ecoSupervisorPeriodos ?? [];
 
 $meses      = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 [$anioF, $nmesF] = explode('-', $ecoMes);
 $mesLabel   = $meses[(int)$nmesF - 1] . ' ' . $anioF;
+$ecoDesdeM  = "{$anioF}-{$nmesF}-01";
+$ecoHastaM  = date('Y-m-t', strtotime($ecoDesdeM));
 $diasLabel  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 $turnoLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
 $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
@@ -158,6 +161,22 @@ foreach ($ecoPagos as $p) {
                 </p>
                 <?php elseif ($ecoPid): ?>
                 <p style="font-size:.72rem;color:#64748b;">Fecha de ingreso no registrada para este trabajador.</p>
+                <?php endif; ?>
+                <?php
+                $ecoSupervisorActivo = null;
+                foreach ($ecoSupervisorPeriodos as $per) {
+                    if ($per['fecha_desde'] <= $ecoHastaM && ($per['fecha_hasta'] === null || $per['fecha_hasta'] >= $ecoDesdeM)) {
+                        $ecoSupervisorActivo = $per;
+                        break;
+                    }
+                }
+                ?>
+                <?php if ($ecoPid && $ecoSupervisorActivo): ?>
+                <p style="font-size:.72rem;color:#065f46;background:#d1fae5;border-radius:6px;padding:.3rem .6rem;margin-top:.4rem;">
+                    ✓ Pago por supervisión · <?= htmlspecialchars($ecoNombreTrabajador) ?> · Del <?= date('d/m/Y', strtotime($ecoSupervisorActivo['fecha_desde'])) ?>
+                    <?= $ecoSupervisorActivo['fecha_hasta'] ? 'al '.date('d/m/Y', strtotime($ecoSupervisorActivo['fecha_hasta'])) : '(indefinido)' ?>
+                    · S/ <?= number_format((float)$ecoSupervisorActivo['monto_dia'], 2) ?> adicionales por turno trabajado
+                </p>
                 <?php endif; ?>
             </div>
 

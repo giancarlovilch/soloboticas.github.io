@@ -222,6 +222,8 @@ $router->post('/admin/api/tarifa-base/agregar',      [AdminController::class, 'a
 $router->post('/admin/api/tarifa-base/{id}/eliminar',[AdminController::class, 'eliminarTarifaBase']);
 $router->post('/admin/api/bono/agregar',             [AdminController::class, 'addBono']);
 $router->post('/admin/api/bono/{id}/eliminar',       [AdminController::class, 'eliminarBono']);
+$router->post('/admin/api/supervisor/agregar',       [AdminController::class, 'addSupervisor']);
+$router->post('/admin/api/supervisor/{id}/eliminar', [AdminController::class, 'eliminarSupervisor']);
 // BBVA/PLIN — Vista admin y API recepción (rutas originales intactas para el celular)
 $router->get('/admin/bbva-pagos',      [PagoBBVAController::class, 'vista']);
 $router->post('/api/bbva/pago',        [PagoBBVAController::class, 'registrar']);

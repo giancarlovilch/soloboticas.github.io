@@ -386,6 +386,21 @@ class StaffController extends Controller
             elseif ($tipoEst === 2)  $bonoEstudioMonto = $avanzado ? 4.0 : 2.0; // Técnico
         }
 
+        // ── Pago por supervisión: S/ monto_dia × turno trabajado dentro del periodo asignado ──
+        $stmtSup = $db->prepare(
+            "SELECT fecha_desde, fecha_hasta, monto_dia FROM supervisor_periodo WHERE postulante_id = :pid"
+        );
+        $stmtSup->execute(['pid' => $postulanteId]);
+        $supervisorPeriodos = $stmtSup->fetchAll();
+        $getSupervisorPago = function(string $fecha) use ($supervisorPeriodos): float {
+            foreach ($supervisorPeriodos as $per) {
+                if ($fecha >= $per['fecha_desde'] && ($per['fecha_hasta'] === null || $fecha <= $per['fecha_hasta'])) {
+                    return (float)$per['monto_dia'];
+                }
+            }
+            return 0.0;
+        };
+
         // ── 3. Calcular ingresos por slot ─────────────────
         $ingresos      = [];
         $totalIngresos = 0.0;
@@ -413,7 +428,7 @@ class StaffController extends Controller
             }
 
             $bonoE          = $bonoEstudioMonto;
-            $bonoS          = $bonoServicioMonto;
+            $bonoS          = $bonoServicioMonto + $getSupervisorPago($fecha);
             $total          = $base + $bonoV + $bonoO + $bonoE + $bonoS;
             $totalIngresos += $total;
             $totalBonos    += $bonoV + $bonoO + $bonoE + $bonoS;

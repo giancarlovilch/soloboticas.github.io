@@ -11,6 +11,7 @@ $navActive = [
     'asistencias' => ($page === 'asistencias'),
     'economia'    => ($page === 'economia'),
     'bonos'       => ($page === 'bonos'),
+    'supervisores'=> ($page === 'supervisores'),
 ];
 ?>
 
@@ -139,6 +140,13 @@ $navActive = [
                     </a>
                 </li>
 
+                <li class="list__item <?= $navActive['supervisores'] ? 'list__item--active' : '' ?>">
+                    <a href="?page=supervisores" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Supervisores</span>
+                    </a>
+                </li>
+
                 <li class="list__item">
                     <a href="<?= $basePath ?>/admin/reportes" class="list__button">
                         <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
@@ -203,6 +211,9 @@ $navActive = [
                         break;
                     case 'bonos':
                         require_once __DIR__ . '/bonos_lista.php';
+                        break;
+                    case 'supervisores':
+                        require_once __DIR__ . '/supervisores_lista.php';
                         break;
                     case 'bancos':
                         require_once __DIR__ . '/bancos.php';
