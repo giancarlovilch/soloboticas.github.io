@@ -145,6 +145,9 @@ class CajaController extends Controller
         $dcStmt->execute(['sid' => $id]);
         $detalle = $dcStmt->fetch() ?? [];
 
+        // Transferencias de saldo confirmadas que se aplicarán en el cuadre de cierre
+        $transferenciasPendientes = $this->repo->getTransferenciasPendientesAplicar((int)$sesion['caja_id']);
+
         require_once __DIR__ . '/../../views/caja/sesion.php';
     }
 
@@ -438,10 +441,7 @@ class CajaController extends Controller
         $data = $this->repo->getReporte($id);
         extract($data); // $sesion, $detalle, $venta, $gastos, $rectifs
 
-        $transferencias = $this->repo->getTransferenciasByCaja(
-            (int)$sesion['caja_id'],
-            $sesion['fecha_operacion']
-        );
+        $transferencias = $this->repo->getTransferenciasAplicadas($id);
 
         // Vales SoloBank disponibles para asignar retroactivamente
         require_once __DIR__ . '/../Repositories/SoloBankRepository.php';

@@ -226,6 +226,21 @@ $act = [
             <span>Base: <strong>S/ <?= number_format($sesion['saldo_inicial'], 2) ?></strong></span>
         </div>
     </section>
+
+    <?php foreach ($transferenciasPendientes ?? [] as $tp): ?>
+    <div class="caja-alert caja-alert--info" style="margin-top:.6rem;">
+        <?php if ($tp['lado'] === 'ORIGEN'): ?>
+            Transferencia de <strong>S/ <?= number_format((float)$tp['monto'], 2) ?></strong> enviada a
+            <strong><?= htmlspecialchars($tp['caja_destino_desc']) ?></strong>
+        <?php else: ?>
+            Transferencia de <strong>S/ <?= number_format((float)$tp['monto'], 2) ?></strong> recibida de
+            <strong><?= htmlspecialchars($tp['caja_origen_desc']) ?></strong>
+        <?php endif; ?>
+        (confirmada el <?= date('d/m/Y H:i', strtotime($tp['confirmed_at'])) ?>) — está <strong>por aplicar</strong>:
+        se reflejará en el cuadre de cierre de esta sesión.
+    </div>
+    <?php endforeach; ?>
+
     <input type="hidden" id="sesionId" value="<?= $sesionId ?>">
     <?php endif; ?>
 

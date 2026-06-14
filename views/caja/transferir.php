@@ -3,6 +3,19 @@ $basePath       = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
 $userName       = $_SESSION['user_name'] ?? 'Usuario';
 $pendientes     = array_filter($transferencias, fn($t) => $t['estado'] === 'PENDIENTE');
 $historial      = array_filter($transferencias, fn($t) => $t['estado'] !== 'PENDIENTE');
+
+// Estado visual de aplicación: una transferencia CONFIRMADA no afecta ningún cuadre
+// hasta que se aplica en el cierre de la caja origen y de la caja destino.
+$estadoAplicacion = function (array $t): array {
+    if ($t['estado'] !== 'CONFIRMADA') {
+        return ['label' => $t['estado'], 'tag' => $t['estado'] === 'ANULADA' ? 'anul' : 'pend'];
+    }
+    $aplicadaOrigen  = $t['sesion_aplicada_origen_id']  !== null;
+    $aplicadaDestino = $t['sesion_aplicada_destino_id'] !== null;
+    if ($aplicadaOrigen && $aplicadaDestino) return ['label' => 'APLICADA', 'tag' => 'conf'];
+    if ($aplicadaOrigen || $aplicadaDestino) return ['label' => 'APLICADA PARCIAL', 'tag' => 'pend'];
+    return ['label' => 'POR APLICAR', 'tag' => 'pend'];
+};
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -267,9 +280,10 @@ $historial      = array_filter($transferencias, fn($t) => $t['estado'] !== 'PEND
                     </td>
                     <td><span class="tr-monto" style="color:#1e293b;">S/ <?= number_format($t['monto'], 2) ?></span></td>
                     <td style="font-size:.75rem;color:#475569;"><?= htmlspecialchars($t['numero_comprobante'] ?? '—') ?></td>
+                    <?php $estApl = $estadoAplicacion($t); ?>
                     <td>
-                        <span class="tr-tag tr-tag--<?= $t['estado']==='CONFIRMADA' ? 'conf' : 'anul' ?>">
-                            <?= $t['estado'] ?>
+                        <span class="tr-tag tr-tag--<?= $estApl['tag'] ?>" <?= $estApl['label']==='POR APLICAR' ? 'title="Aún no afecta ningún cuadre. Se aplicará en el siguiente cuadre de cada caja involucrada, sea hoy o mañana."' : '' ?>>
+                            <?= $estApl['label'] ?>
                         </span>
                     </td>
                     <td style="font-size:.75rem;">
@@ -279,7 +293,7 @@ $historial      = array_filter($transferencias, fn($t) => $t['estado'] !== 'PEND
                         <?= date('d/m/Y H:i', strtotime($t['confirmed_at'] ?? $t['anulada_at'] ?? $t['created_at'])) ?>
                     </td>
                     <td>
-                        <?php if ($t['estado'] === 'CONFIRMADA'): ?>
+                        <?php if ($t['estado'] === 'CONFIRMADA' && $t['sesion_aplicada_origen_id'] === null && $t['sesion_aplicada_destino_id'] === null): ?>
                         <button class="caja-btn caja-btn--outline" style="padding:3px 8px;font-size:.68rem;border-color:#fca5a5;color:#dc2626;"
                             onclick="abrirAnular(<?= $t['id'] ?>, '<?= addslashes($t['caja_origen_desc']) ?>', '<?= addslashes($t['caja_destino_desc']) ?>', <?= $t['monto'] ?>, 'CONFIRMADA')">
                             Anular

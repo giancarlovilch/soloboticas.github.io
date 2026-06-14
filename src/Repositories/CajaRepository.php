@@ -760,7 +760,17 @@ class CajaRepository
         // LO QUE SE DICE: base + ventas - gastos - digitales aprobados
         // Los pagos digitales (yape/plin/visa/pos/trans) restan porque no son efectivo físico.
         $digital_aprobado = $this->sumDigitalDeclarado($sesionId);
-        $total_esperado   = round($saldo_inicial + $ventas - $total_gastos - $digital_aprobado, 2);
+
+        // Transferencias de saldo CONFIRMADAS aún no aplicadas a ningún cuadre de esta caja:
+        // el efectivo que sale hacia otra caja resta de "lo que se dice" (caja origen) y el
+        // que entra suma (caja destino). El efectivo físico ya refleja el traslado, así que
+        // esto evita un FALTANTE/SOBRANTE falso por el monto transferido. Cada una se aplica
+        // al primer cuadre que se calcule para esta caja después de confirmarse (hoy o
+        // cualquier día futuro), y queda marcada para no aplicarse dos veces.
+        $transferenciasPendientes = $this->getTransferenciasPendientesAplicar((int)$sesion['caja_id']);
+        $transferenciasNetas = array_sum(array_column($transferenciasPendientes, 'efecto'));
+
+        $total_esperado   = round($saldo_inicial + $ventas - $total_gastos - $digital_aprobado + $transferenciasNetas, 2);
 
         // Diferencia: LO QUE ES − LO QUE SE DICE
         $total_contado = $efectivo_fisico;
@@ -804,6 +814,14 @@ class CajaRepository
             'sid' => $sesionId,
         ]);
 
+        // Marcar las transferencias como aplicadas en este lado, para que no se vuelvan
+        // a contar en el siguiente cuadre de esta caja.
+        foreach ($transferenciasPendientes as $tr) {
+            $columna = $tr['lado'] === 'ORIGEN' ? 'sesion_aplicada_origen_id' : 'sesion_aplicada_destino_id';
+            $this->db->prepare("UPDATE transferencia_saldo SET {$columna} = :sid WHERE id = :tid")
+                     ->execute(['sid' => $sesionId, 'tid' => $tr['id']]);
+        }
+
         return [
             'saldo_inicial'      => $saldo_inicial,
             'total_ventas'       => $ventas,
@@ -811,6 +829,7 @@ class CajaRepository
             'total_esperado'     => $total_esperado,
             'efectivo_fisico'    => $efectivo_fisico,
             'digital_aprobado'   => $digital_aprobado,
+            'transferencias_netas' => $transferenciasNetas,
             'total_contado'      => $total_contado,
             'diferencia'         => $diferencia,
             'resultado'          => $resultado,
@@ -1490,18 +1509,31 @@ class CajaRepository
         )->fetchAll();
     }
 
-    private function getUltimaSesionConDetalle(int $cajaId): ?int
+    // Transferencias CONFIRMADAS aún no aplicadas a ningún cuadre de esta caja en el lado
+    // correspondiente. Cada fila trae 'lado' ('ORIGEN'|'DESTINO') y 'efecto' (monto con
+    // signo: negativo si esta caja es origen, positivo si es destino).
+    public function getTransferenciasPendientesAplicar(int $cajaId): array
     {
         $stmt = $this->db->prepare(
-            "SELECT sc.id_sesion
-             FROM sesion_caja sc
-             INNER JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
-             WHERE sc.caja_id = :cid
-             ORDER BY sc.id_sesion DESC LIMIT 1"
+            "SELECT t.*,
+                    CONCAT(co.descripcion, ' (', lo.descripcion, ')') AS caja_origen_desc,
+                    CONCAT(cd.descripcion, ' (', ld.descripcion, ')') AS caja_destino_desc,
+                    CASE WHEN t.caja_origen_id = :cid1 THEN 'ORIGEN' ELSE 'DESTINO' END AS lado,
+                    CASE WHEN t.caja_origen_id = :cid2 THEN -t.monto ELSE t.monto END AS efecto
+             FROM transferencia_saldo t
+             INNER JOIN caja co ON co.id_caja  = t.caja_origen_id
+             INNER JOIN caja cd ON cd.id_caja  = t.caja_destino_id
+             INNER JOIN local lo ON lo.id_local = co.local_id
+             INNER JOIN local ld ON ld.id_local = cd.local_id
+             WHERE t.estado = 'CONFIRMADA'
+               AND (
+                    (t.caja_origen_id = :cid3 AND t.sesion_aplicada_origen_id IS NULL)
+                 OR (t.caja_destino_id = :cid4 AND t.sesion_aplicada_destino_id IS NULL)
+               )
+             ORDER BY t.confirmed_at ASC"
         );
-        $stmt->execute(['cid' => $cajaId]);
-        $id = $stmt->fetchColumn();
-        return $id ? (int)$id : null;
+        $stmt->execute(['cid1' => $cajaId, 'cid2' => $cajaId, 'cid3' => $cajaId, 'cid4' => $cajaId]);
+        return $stmt->fetchAll();
     }
 
     public function crearTransferencia(int $cajaOrigen, int $cajaDestino, float $monto, ?string $notas, int $solicitanteId): int
@@ -1525,21 +1557,9 @@ class CajaRepository
         $transfer = $t->fetch();
         if (!$transfer) return 'Transferencia no encontrada o ya procesada';
 
-        // Aplicar a detalle_cuadre de la última sesión con detalle de cada caja
-        foreach ([
-            ['cid' => $transfer['caja_origen_id'],  'op' => '-'],
-            ['cid' => $transfer['caja_destino_id'], 'op' => '+'],
-        ] as $side) {
-            $sesionId = $this->getUltimaSesionConDetalle($side['cid']);
-            if ($sesionId) {
-                $op = $side['op'];
-                $this->db->prepare(
-                    "UPDATE detalle_cuadre SET saldo_proximo_dia = COALESCE(saldo_proximo_dia, 0) {$op} :monto
-                     WHERE sesion_id = :id"
-                )->execute(['monto' => $transfer['monto'], 'id' => $sesionId]);
-            }
-        }
-
+        // El efecto sobre el cuadre (lo que se dice) se aplica en calcularYGuardarCuadre()
+        // vía getTransferenciasPendientesAplicar(), al primer cierre de cada caja involucrada
+        // después de confirmarse. No se modifica detalle_cuadre aquí.
         $this->db->prepare(
             "UPDATE transferencia_saldo SET estado = 'CONFIRMADA', confirmador_id = :cid,
              numero_comprobante = :comp, confirmed_at = NOW() WHERE id = :id"
@@ -1560,23 +1580,12 @@ class CajaRepository
         $transfer = $t->fetch();
         if (!$transfer) return 'Transferencia no encontrada o ya anulada';
 
-        // Si estaba CONFIRMADA, revertir el saldo en detalle_cuadre
-        if ($transfer['estado'] === 'CONFIRMADA') {
-            foreach ([
-                ['cid' => $transfer['caja_origen_id'],  'op' => '+'],
-                ['cid' => $transfer['caja_destino_id'], 'op' => '-'],
-            ] as $side) {
-                $sesionId = $this->getUltimaSesionConDetalle($side['cid']);
-                if ($sesionId) {
-                    $op = $side['op'];
-                    $this->db->prepare(
-                        "UPDATE detalle_cuadre SET saldo_proximo_dia = COALESCE(saldo_proximo_dia, 0) {$op} :monto
-                         WHERE sesion_id = :id"
-                    )->execute(['monto' => $transfer['monto'], 'id' => $sesionId]);
-                }
-            }
+        if ($transfer['sesion_aplicada_origen_id'] !== null || $transfer['sesion_aplicada_destino_id'] !== null) {
+            return 'Esta transferencia ya se aplicó en un cuadre y no puede anularse. Registra una transferencia en sentido inverso si fue un error.';
         }
 
+        // Al pasar a ANULADA, getTransferenciasPendientesAplicar() deja de contarla
+        // automáticamente en cualquier cuadre futuro. No se modifica detalle_cuadre aquí.
         $this->db->prepare(
             "UPDATE transferencia_saldo SET estado = 'ANULADA', anulador_id = :aid, anulada_at = NOW()
              WHERE id = :id"
@@ -1606,7 +1615,9 @@ class CajaRepository
         )->fetchAll();
     }
 
-    public function getTransferenciasByCaja(int $cajaId, string $fecha): array
+    // Transferencias CONFIRMADAS cuyo efecto ya quedó incorporado en el cuadre de esta sesión
+    // (lado origen o destino), independientemente de la fecha en que se confirmaron.
+    public function getTransferenciasAplicadas(int $sesionId): array
     {
         $stmt = $this->db->prepare(
             "SELECT t.*,
@@ -1621,12 +1632,10 @@ class CajaRepository
              INNER JOIN local ld ON ld.id_local = cd.local_id
              INNER JOIN postulante ps ON ps.id_postulante = t.solicitante_id
              LEFT JOIN postulante pc  ON pc.id_postulante = t.confirmador_id
-             WHERE (t.caja_origen_id = :cid OR t.caja_destino_id = :cid2)
-               AND t.estado = 'CONFIRMADA'
-               AND DATE(t.confirmed_at) = :fecha
+             WHERE t.sesion_aplicada_origen_id = :sid OR t.sesion_aplicada_destino_id = :sid2
              ORDER BY t.confirmed_at ASC"
         );
-        $stmt->execute(['cid' => $cajaId, 'cid2' => $cajaId, 'fecha' => $fecha]);
+        $stmt->execute(['sid' => $sesionId, 'sid2' => $sesionId]);
         return $stmt->fetchAll();
     }
 

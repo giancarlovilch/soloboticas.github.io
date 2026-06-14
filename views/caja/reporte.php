@@ -30,7 +30,15 @@ foreach ($ajustesEsperado ?? [] as $aj) {
     $sum_ajustes_esp += $aj['accion'] === 'AGREGAR' ? -(float)$aj['monto'] : (float)$aj['monto'];
 }
 
-$loQueSeDice = round($saldo_ini + $total_ventas - $total_gastos - $digital_aprobado + $sum_ajustes_esp, 2);
+// Transferencias de saldo confirmadas: lo que salió hacia otra caja resta de "lo que se
+// dice" y lo que entró desde otra caja suma (el efectivo físico ya refleja el traslado).
+$sum_transferencias = 0.0;
+foreach ($transferencias ?? [] as $tr) {
+    $esEnvioRep = ((int)$tr['caja_origen_id'] === (int)$sesion['caja_id']);
+    $sum_transferencias += $esEnvioRep ? -(float)$tr['monto'] : (float)$tr['monto'];
+}
+
+$loQueSeDice = round($saldo_ini + $total_ventas - $total_gastos - $digital_aprobado + $sum_ajustes_esp + $sum_transferencias, 2);
 $diferencia  = round($loQueEs - $loQueSeDice, 2);
 $resultado   = abs($diferencia) < 0.01 ? 'CONSISTENTE' : ($diferencia > 0 ? 'SOBRANTE' : 'FALTANTE');
 $clsDif      = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobrante' : 'dif-faltante');
@@ -195,6 +203,22 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
                     <span style="color:<?= $colorAj ?>;font-weight:600;"><?= $sum_ajustes_esp >= 0 ? '+' : '−' ?> Ajustes declarados</span>
                     <strong style="color:<?= $colorAj ?>;"><?= $f2(abs($sum_ajustes_esp)) ?></strong>
                 </div>
+                <?php endif; ?>
+                <?php if ($sum_transferencias != 0): ?>
+                <div class="caja-linea <?= $sum_transferencias > 0 ? '' : 'caja-linea--sub' ?>">
+                    <?php $colorTr = $sum_transferencias >= 0 ? '#059669' : '#dc2626'; ?>
+                    <span style="color:<?= $colorTr ?>;font-weight:600;"><?= $sum_transferencias >= 0 ? '+' : '−' ?> Transferencias de saldo</span>
+                    <strong style="color:<?= $colorTr ?>;"><?= $f2(abs($sum_transferencias)) ?></strong>
+                </div>
+                <?php foreach ($transferencias ?? [] as $tr):
+                    $esEnvioTr = ((int)$tr['caja_origen_id'] === (int)$sesion['caja_id']);
+                    $cajaContraparte = $esEnvioTr ? $tr['caja_destino_desc'] : $tr['caja_origen_desc'];
+                ?>
+                <div class="caja-linea caja-linea--sub" style="font-size:.75rem;color:#94a3b8;">
+                    <span><?= $esEnvioTr ? 'Enviada a' : 'Recibida de' ?> <?= htmlspecialchars($cajaContraparte) ?> · <?= date('d/m/Y H:i', strtotime($tr['confirmed_at'])) ?></span>
+                    <span><?= $f2($tr['monto']) ?></span>
+                </div>
+                <?php endforeach; ?>
                 <?php endif; ?>
                 <div class="caja-linea caja-linea--total">
                     <span>= Efectivo esperado</span>

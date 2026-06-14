@@ -539,6 +539,31 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                 </div>
             </div>
 
+            <?php if (!empty($transferenciasPendientes)): ?>
+            <!-- ── Transferencias de saldo por aplicar ───────────── -->
+            <div class="card">
+                <div class="card-head">
+                    <p class="card-title">Transferencias de saldo por aplicar</p>
+                </div>
+                <div class="card-body">
+                    <?php foreach ($transferenciasPendientes as $tp): ?>
+                    <div style="padding:.5rem .85rem;border-radius:8px;font-size:.8rem;background:#f0fdfe;color:#0e7490;border:1px solid #bae6fd;margin-bottom:.4rem;">
+                        <?php if ($tp['lado'] === 'ORIGEN'): ?>
+                            Transferencia de <strong>S/ <?= number_format((float)$tp['monto'], 2) ?></strong> enviada a
+                            <strong><?= htmlspecialchars($tp['caja_destino_desc']) ?></strong>
+                        <?php else: ?>
+                            Transferencia de <strong>S/ <?= number_format((float)$tp['monto'], 2) ?></strong> recibida de
+                            <strong><?= htmlspecialchars($tp['caja_origen_desc']) ?></strong>
+                        <?php endif; ?>
+                        (confirmada el <?= date('d/m/Y H:i', strtotime($tp['confirmed_at'])) ?>) — está
+                        <strong>por aplicar</strong>: se reflejará en el siguiente cuadre de esta caja, sea hoy o
+                        en otro turno.
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- ── 4. Ajustes al esperado ─────────────────────── -->
             <div class="card">
                 <div class="card-head">

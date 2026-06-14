@@ -122,6 +122,9 @@ class IncidenciaContableController extends Controller
 
         extract($reporte);
 
+        // Transferencias de saldo confirmadas pendientes de aplicarse en la caja de esta sesión
+        $transferenciasPendientes = $cajaRepo->getTransferenciasPendientesAplicar((int)$sesion['caja_id']);
+
         require_once __DIR__ . '/../../views/incidencias/detalle.php';
     }
 
