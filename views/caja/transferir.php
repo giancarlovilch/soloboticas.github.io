@@ -1,6 +1,7 @@
 <?php
 $basePath       = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
 $userName       = $_SESSION['user_name'] ?? 'Usuario';
+$isAdmin        = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
 $pendientes     = array_filter($transferencias, fn($t) => $t['estado'] === 'PENDIENTE');
 $historial      = array_filter($transferencias, fn($t) => $t['estado'] !== 'PENDIENTE');
 
@@ -246,10 +247,12 @@ $estadoAplicacion = function (array $t): array {
                             onclick="abrirConfirmar(<?= $t['id'] ?>, '<?= addslashes($t['caja_origen_desc']) ?>', '<?= addslashes($t['caja_destino_desc']) ?>', <?= $t['monto'] ?>)">
                             Confirmar
                         </button>
+                        <?php if ($isAdmin): ?>
                         <button class="caja-btn caja-btn--outline" style="padding:4px 10px;font-size:.72rem;border-color:#fca5a5;color:#dc2626;"
                             onclick="abrirAnular(<?= $t['id'] ?>, '<?= addslashes($t['caja_origen_desc']) ?>', '<?= addslashes($t['caja_destino_desc']) ?>', <?= $t['monto'] ?>, 'PENDIENTE')">
                             Anular
                         </button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -293,7 +296,7 @@ $estadoAplicacion = function (array $t): array {
                         <?= date('d/m/Y H:i', strtotime($t['confirmed_at'] ?? $t['anulada_at'] ?? $t['created_at'])) ?>
                     </td>
                     <td>
-                        <?php if ($t['estado'] === 'CONFIRMADA' && $t['sesion_aplicada_origen_id'] === null && $t['sesion_aplicada_destino_id'] === null): ?>
+                        <?php if ($isAdmin && $t['estado'] === 'CONFIRMADA' && $t['sesion_aplicada_origen_id'] === null && $t['sesion_aplicada_destino_id'] === null): ?>
                         <button class="caja-btn caja-btn--outline" style="padding:3px 8px;font-size:.68rem;border-color:#fca5a5;color:#dc2626;"
                             onclick="abrirAnular(<?= $t['id'] ?>, '<?= addslashes($t['caja_origen_desc']) ?>', '<?= addslashes($t['caja_destino_desc']) ?>', <?= $t['monto'] ?>, 'CONFIRMADA')">
                             Anular

@@ -862,7 +862,12 @@ class CajaController extends Controller
 
     public function anularTransferenciaAction(int $id): void
     {
-        $userId   = $this->requireAuth();
+        $userId = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Solo administradores pueden anular transferencias de saldo', 403);
+            return;
+        }
+
         $password = trim($this->getAllInput()['password'] ?? '');
         if (!$password) $this->error('La contraseña es requerida', 400);
 
