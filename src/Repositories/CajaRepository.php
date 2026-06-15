@@ -236,17 +236,23 @@ class CajaRepository
                         ORDER BY prev.id_sesion DESC LIMIT 1
                        ) AS sesion_anterior_id,
                        (
-                           COALESCE(dc.total_efectivo_contado, 0) - (
-                               COALESCE(sc.saldo_inicial, 0)
-                               + COALESCE(dc.total_ventas_sistema, 0)
-                               - COALESCE(dc.total_gastos_sistema, 0)
-                               - COALESCE((
-                                   SELECT SUM(ms.monto)
-                                   FROM movimiento_sesion ms
-                                   WHERE ms.sesion_id = sc.id_sesion
-                                     AND ms.tipo_movimiento_id = 1
-                                     AND ms.estado IN ('PENDIENTE','APROBADO')
-                               ), 0)
+                           -- Si el cuadre ya se calculó (CERRADA), usar el valor guardado por
+                           -- calcularYGuardarCuadre(), que ya incluye transferencias de saldo
+                           -- aplicadas, ajustes, etc. Solo recalcular en vivo como vista previa
+                           -- para sesiones aún no cuadradas.
+                           COALESCE(dc.diferencia,
+                               COALESCE(dc.total_efectivo_contado, 0) - (
+                                   COALESCE(sc.saldo_inicial, 0)
+                                   + COALESCE(dc.total_ventas_sistema, 0)
+                                   - COALESCE(dc.total_gastos_sistema, 0)
+                                   - COALESCE((
+                                       SELECT SUM(ms.monto)
+                                       FROM movimiento_sesion ms
+                                       WHERE ms.sesion_id = sc.id_sesion
+                                         AND ms.tipo_movimiento_id = 1
+                                         AND ms.estado IN ('PENDIENTE','APROBADO')
+                                   ), 0)
+                               )
                            )
                        ) AS diferencia,
                        COALESCE((
