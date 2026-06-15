@@ -125,6 +125,13 @@ class IncidenciaContableController extends Controller
         // Transferencias de saldo confirmadas pendientes de aplicarse en la caja de esta sesión
         $transferenciasPendientes = $cajaRepo->getTransferenciasPendientesAplicar((int)$sesion['caja_id']);
 
+        // Retiros de efectivo para depósito a KGyR pendientes de aplicarse en la caja de esta sesión
+        $retirosPendientes = $cajaRepo->getRetirosPendientesAplicar((int)$sesion['caja_id']);
+
+        // Transferencias y retiros ya aplicados al cuadre de esta sesión (afectan "lo que se dice")
+        $transferencias   = $cajaRepo->getTransferenciasAplicadas($sesionId);
+        $retirosAplicados = $cajaRepo->getRetirosAplicados($sesionId);
+
         require_once __DIR__ . '/../../views/incidencias/detalle.php';
     }
 
@@ -191,14 +198,16 @@ class IncidenciaContableController extends Controller
             $sumA = 0;
             foreach ($ajustes as $aj)
                 $sumA += $aj['accion'] === 'AGREGAR' ? (float)$aj['monto'] : -(float)$aj['monto'];
-            $difEfectiva = abs(round(
+            $difConSigno = round(
                 ((float)($dc['total_efectivo_contado'] ?? 0) - (float)($dc['total_esperado_sistema'] ?? 0))
                 + $sumR + $sumA - $corrDelta, 2
-            ));
-            if ($difEfectiva > 10) {
+            );
+            // Si la sesión ahora muestra sobrante (> 0), el faltante original quedó resuelto.
+            // Solo bloquear si sigue siendo faltante (< 0) y supera el margen de S/ 10.
+            if ($difConSigno < 0 && abs($difConSigno) > 10) {
                 $this->error(
-                    'No se puede cerrar: diferencia efectiva S/ ' .
-                    number_format($difEfectiva, 2) . '. Debe ser ≤ S/ 10.00.',
+                    'No se puede cerrar: aún hay un faltante efectivo de S/ ' .
+                    number_format(abs($difConSigno), 2) . '. Debe ser ≤ S/ 10.00.',
                     409
                 );
                 return;

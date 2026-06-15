@@ -42,6 +42,34 @@ $stmt = $db->prepare("
 ");
 $stmt->execute($params);
 $depositos = $stmt->fetchAll();
+
+// ── Retiros de caja para depósito a KGyR ───────────────
+$cajasActivas = $db->query(
+    "SELECT c.id_caja, CONCAT(c.descripcion, ' (', l.descripcion, ')') AS desc_completa
+     FROM caja c
+     INNER JOIN local l ON l.id_local = c.local_id
+     WHERE c.activo = 1
+     ORDER BY l.descripcion ASC, c.descripcion ASC"
+)->fetchAll();
+
+$retiros = $db->query(
+    "SELECT rk.*,
+            CONCAT(c.descripcion, ' (', l.descripcion, ')') AS caja_origen_desc,
+            p.nombres AS registrado_por_nombre,
+            pa.nombres AS anulador_nombre,
+            pcd.nombres AS confirmador_directo_nombre,
+            EXISTS(
+                SELECT 1 FROM sesion_caja sc
+                WHERE sc.caja_id = rk.caja_origen_id AND sc.estado IN ('ABIERTA','PENDIENTE_VENTA')
+            ) AS caja_abierta
+     FROM retiro_kgyr rk
+     INNER JOIN caja c ON c.id_caja = rk.caja_origen_id
+     INNER JOIN local l ON l.id_local = c.local_id
+     INNER JOIN postulante p ON p.id_postulante = rk.registrado_por_id
+     LEFT JOIN postulante pa  ON pa.id_postulante  = rk.anulador_id
+     LEFT JOIN postulante pcd ON pcd.id_postulante = rk.confirmado_directo_por_id
+     ORDER BY rk.registrado_en DESC LIMIT 100"
+)->fetchAll();
 ?>
 
 <style>
@@ -206,6 +234,82 @@ $depositos = $stmt->fetchAll();
             <?php endif; ?>
         </div>
     </div>
+
+    <!-- Retiros de caja para depósito a KGyR -->
+    <div class="card" style="margin-top:1.25rem;">
+        <div class="card-head">
+            <p class="card-title">Retiros de caja para depósito a KGyR</p>
+            <button class="btn-sm" style="background:#1e293b;color:#fff;border-color:#1e293b;"
+                    onclick="document.getElementById('modalRetiro').style.display='flex'">
+                + Registrar retiro
+            </button>
+        </div>
+        <div class="card-body" style="padding:0;overflow-x:auto;">
+            <?php if (empty($retiros)): ?>
+            <p style="padding:1.5rem;font-size:.85rem;color:#94a3b8;text-align:center;">Sin retiros registrados.</p>
+            <?php else: ?>
+            <table class="dep-table">
+                <thead>
+                    <tr>
+                        <th>Caja origen</th>
+                        <th>Monto</th>
+                        <th>Banco</th>
+                        <th>Referencia</th>
+                        <th>Registrado por</th>
+                        <th>Estado</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($retiros as $rk): ?>
+                    <tr id="retiro-row-<?= $rk['id'] ?>">
+                        <td style="font-size:.78rem;color:#64748b;"><?= htmlspecialchars($rk['caja_origen_desc']) ?></td>
+                        <td style="font-weight:700;white-space:nowrap;"><?= $f2($rk['monto']) ?></td>
+                        <td>
+                            <span class="badge <?= $rk['banco']==='BCP'?'badge-bcp':'badge-bbva' ?>">
+                                <?= $rk['banco'] ?>
+                            </span>
+                        </td>
+                        <td style="color:#475569;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            <?= htmlspecialchars($rk['referencia'] ?? '—') ?>
+                        </td>
+                        <td style="font-size:.78rem;color:#64748b;white-space:nowrap;">
+                            <?= htmlspecialchars($rk['registrado_por_nombre']) ?><br>
+                            <span style="color:#94a3b8;"><?= date('d/m/Y H:i', strtotime($rk['registrado_en'])) ?></span>
+                        </td>
+                        <td>
+                            <?php if ($rk['estado'] === 'ANULADO'): ?>
+                            <span class="badge" style="background:#f1f5f9;color:#64748b;">ANULADO</span>
+                            <?php elseif ($rk['estado'] === 'APLICADO_DIRECTO'): ?>
+                            <a href="<?= $base ?>/caja/reporte/<?= $rk['sesion_base_ajustada_id'] ?>" target="_blank" class="badge badge-ok" style="text-decoration:none;"
+                               title="Saldo base ajustado el <?= date('d/m/Y H:i', strtotime($rk['confirmado_directo_en'])) ?> por <?= htmlspecialchars($rk['confirmador_directo_nombre'] ?? '—') ?>">
+                                Aplicado directo (cuadre #<?= $rk['sesion_base_ajustada_id'] ?>)
+                            </a>
+                            <?php elseif ($rk['sesion_aplicada_id']): ?>
+                            <a href="<?= $base ?>/caja/reporte/<?= $rk['sesion_aplicada_id'] ?>" target="_blank" class="badge badge-ok" style="text-decoration:none;">
+                                Aplicado a sesión #<?= $rk['sesion_aplicada_id'] ?>
+                            </a>
+                            <?php else: ?>
+                            <span class="badge badge-pend">POR APLICAR</span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="white-space:nowrap;">
+                            <?php if ($rk['estado'] === 'ACTIVO' && !$rk['sesion_aplicada_id']): ?>
+                            <?php if (!$rk['caja_abierta']): ?>
+                            <button class="btn-sm" style="background:#dbeafe;color:#1e40af;border-color:#bfdbfe;"
+                                    onclick="confirmarRetiroDirecto(<?= $rk['id'] ?>, this)" title="La caja está cerrada: ajusta el saldo base ahora sin esperar al próximo cuadre">Confirmar ahora</button>
+                            <?php endif; ?>
+                            <button class="btn-sm" style="background:#fee2e2;color:#991b1b;border-color:#fecaca;"
+                                    onclick="anularRetiroKgyr(<?= $rk['id'] ?>, this)">Anular</button>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
+        </div>
+    </div>
 </div>
 
 <!-- Modal nuevo depósito manual -->
@@ -262,6 +366,68 @@ $depositos = $stmt->fetchAll();
     </div>
 </div>
 
+<!-- Modal nuevo retiro KGyR -->
+<div id="modalRetiro" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);
+     z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:420px;margin:1rem;">
+        <p style="font-size:.95rem;font-weight:800;color:#1e293b;margin:0 0 1rem;">Registrar retiro de caja para KGyR</p>
+        <div style="margin-bottom:.6rem;">
+            <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Caja origen *</label>
+            <select id="rk_caja" style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;">
+                <?php foreach ($cajasActivas as $ca): ?>
+                <option value="<?= $ca['id_caja'] ?>"><?= htmlspecialchars($ca['desc_completa']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.6rem;">
+            <div>
+                <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Monto (S/) *</label>
+                <input type="number" step="0.01" min="0.01" id="rk_monto"
+                       style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;"
+                       placeholder="0.00">
+            </div>
+            <div>
+                <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Banco *</label>
+                <select id="rk_banco" style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;">
+                    <option value="BCP">BCP</option>
+                    <option value="BBVA">BBVA</option>
+                </select>
+            </div>
+        </div>
+        <div style="margin-bottom:.6rem;">
+            <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Referencia</label>
+            <input type="text" id="rk_ref"
+                   style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;"
+                   placeholder="Opcional">
+        </div>
+        <div style="margin-bottom:.6rem;">
+            <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Notas</label>
+            <input type="text" id="rk_notas"
+                   style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;"
+                   placeholder="Opcional">
+        </div>
+        <div style="margin-bottom:.85rem;">
+            <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Tu contraseña *</label>
+            <input type="password" id="rk_password"
+                   style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;"
+                   placeholder="Confirma tu contraseña de admin">
+        </div>
+        <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+            <button onclick="document.getElementById('modalRetiro').style.display='none'"
+                    style="padding:.5rem 1rem;border-radius:7px;border:1.5px solid #e2e8f0;background:#f1f5f9;
+                           color:#475569;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;">
+                Cancelar
+            </button>
+            <button onclick="guardarRetiroKgyr()"
+                    style="padding:.5rem 1rem;border-radius:7px;border:none;background:#1e293b;
+                           color:#fff;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;">
+                Guardar
+            </button>
+        </div>
+        <p id="modalRetiroAlert" style="display:none;margin-top:.5rem;font-size:.78rem;font-weight:600;color:#991b1b;"></p>
+    </div>
+</div>
+
 <script>
 async function confirmarDeposito(id, btn) {
     try {
@@ -296,5 +462,63 @@ async function guardarDepositoManual() {
         alert.textContent = e.message;
         alert.style.display = 'block';
     }
+}
+
+async function guardarRetiroKgyr() {
+    const caja_origen_id = parseInt(document.getElementById('rk_caja').value);
+    const banco   = document.getElementById('rk_banco').value;
+    const monto   = parseFloat(document.getElementById('rk_monto').value) || 0;
+    const ref     = document.getElementById('rk_ref').value.trim();
+    const notas   = document.getElementById('rk_notas').value.trim();
+    const password = document.getElementById('rk_password').value;
+    const alert   = document.getElementById('modalRetiroAlert');
+
+    if (!monto || monto <= 0) { alert.textContent='Ingresa un monto válido'; alert.style.display='block'; return; }
+    if (!password) { alert.textContent='Ingresa tu contraseña'; alert.style.display='block'; return; }
+
+    try {
+        const r    = await fetch(`${BASE}/admin/api/retiro-kgyr`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ caja_origen_id, monto, banco, referencia: ref||null, notas: notas||null, password })
+        });
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.message || 'Error');
+        location.reload();
+    } catch(e) {
+        alert.textContent = e.message;
+        alert.style.display = 'block';
+    }
+}
+
+async function confirmarRetiroDirecto(id, btn) {
+    if (!confirm('Esto ajustará de inmediato el saldo base del próximo cuadre de esta caja, sin esperar a que se vuelva a abrir. ¿Continuar?')) return;
+    const password = prompt('Ingresa tu contraseña de admin para confirmar este retiro ahora:');
+    if (!password) return;
+    try {
+        const r    = await fetch(`${BASE}/admin/api/retiro-kgyr/${id}/confirmar-directo`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ password })
+        });
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.message || 'Error');
+        location.reload();
+    } catch(e) { alert(e.message); }
+}
+
+async function anularRetiroKgyr(id, btn) {
+    const password = prompt('Ingresa tu contraseña de admin para anular este retiro:');
+    if (!password) return;
+    try {
+        const r    = await fetch(`${BASE}/admin/api/retiro-kgyr/${id}/anular`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ password })
+        });
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.message || 'Error');
+        location.reload();
+    } catch(e) { alert(e.message); }
 }
 </script>

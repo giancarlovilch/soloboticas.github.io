@@ -31,6 +31,8 @@ $original   = (float)$incidencia['monto_original'];
 $porcentaje = $original > 0 ? round(100 * (1 - $pendiente / $original)) : 100;
 $cajera     = htmlspecialchars($incidencia['responsable_nombre'] ?? '');
 $vendedora  = htmlspecialchars($incidencia['vendedora_nombre']   ?? '');
+$cajeraId    = (int)($incidencia['responsable_id'] ?? 0);
+$vendedoraId = (int)($incidencia['vendedora_id']   ?? 0);
 
 // Historial más reciente primero
 $movimientos = array_reverse($movimientos ?? []);
@@ -76,7 +78,20 @@ $ajustesDisplay = array_values(array_filter(
     fn($aj) => !str_starts_with($aj['descripcion'] ?? '', 'Vale regularización')
 ));
 
-$loQueSeDice = round($saldoIni + $totalVentas - $totalGastos - $digitalDecl + $sumAjustesEsp, 2);
+// Transferencias de saldo y retiros KGyR ya aplicados al cuadre de esta sesión —
+// mismo cómputo que views/caja/reporte.php para que la diferencia coincida.
+$sumTransferencias = 0.0;
+foreach ($transferencias ?? [] as $tr) {
+    $esEnvio = ((int)$tr['caja_origen_id'] === (int)$sesion['caja_id']);
+    $sumTransferencias += $esEnvio ? -(float)$tr['monto'] : (float)$tr['monto'];
+}
+
+$sumRetiros = 0.0;
+foreach ($retirosAplicados ?? [] as $rt) {
+    $sumRetiros -= (float)$rt['monto'];
+}
+
+$loQueSeDice = round($saldoIni + $totalVentas - $totalGastos - $digitalDecl + $sumAjustesEsp + $sumTransferencias + $sumRetiros, 2);
 $difActual   = round($loQueEs - $loQueSeDice, 2);
 
 // Alias para JS y calculadora
@@ -85,8 +100,12 @@ $sumAjustes = -$sumAjustesEsp; // para display en panel (signo visual)
 // Monto efectivo a resolver (para sugerir en resolución)
 $pendienteEfectivo = abs($difActual);
 
-// Se puede cerrar si: sobrante, pendiente declarado ≤10, o diferencia efectiva ≤10
-$puedeCerrar = $incidencia['tipo'] === 'SOBRANTE' || $pendiente <= 10 || abs($difActual) <= 10;
+// Se puede cerrar si: sobrante, pendiente declarado ≤10, diferencia efectiva ≤10,
+// o la sesión ya muestra sobrante (el faltante original quedó corregido y superado).
+$puedeCerrar = $incidencia['tipo'] === 'SOBRANTE'
+    || $pendiente <= 10
+    || abs($difActual) <= 10
+    || ($incidencia['tipo'] === 'FALTANTE' && $difActual > 0);
 
 $difColor = abs($difActual) <= 0.01 ? '#16a34a' : ($difActual > 0 ? '#1e40af' : '#dc2626');
 $difLabel = abs($difActual) <= 0.01 ? 'CUADRADO' : ($difActual > 0 ? 'SOBRANTE' : 'FALTANTE');
@@ -558,6 +577,27 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                         (confirmada el <?= date('d/m/Y H:i', strtotime($tp['confirmed_at'])) ?>) — está
                         <strong>por aplicar</strong>: se reflejará en el siguiente cuadre de esta caja, sea hoy o
                         en otro turno.
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($retirosPendientes)): ?>
+            <!-- ── Retiros de caja para depósito a KGyR por aplicar ── -->
+            <div class="card">
+                <div class="card-head">
+                    <p class="card-title">Retiros de caja por aplicar</p>
+                </div>
+                <div class="card-body">
+                    <?php foreach ($retirosPendientes as $rp): ?>
+                    <div style="padding:.5rem .85rem;border-radius:8px;font-size:.8rem;background:#f0fdfe;color:#0e7490;border:1px solid #bae6fd;margin-bottom:.4rem;">
+                        Se retiraron <strong>S/ <?= number_format((float)$rp['monto'], 2) ?></strong> de esta caja para
+                        depósito a Grupo KGyR (<?= htmlspecialchars($rp['banco']) ?>), registrado el
+                        <?= date('d/m/Y H:i', strtotime($rp['registrado_en'])) ?> por
+                        <strong><?= htmlspecialchars($rp['registrado_por_nombre']) ?></strong>
+                        — está <strong>por aplicar</strong>: se reflejará en el siguiente cuadre de esta caja, sea hoy
+                        o en otro turno.
                     </div>
                     <?php endforeach; ?>
                 </div>
@@ -1098,8 +1138,8 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                 ?>
                 <div class="card-head">
                     <p class="card-title">Pendiente del caso</p>
-                    <span class="badge" style="background:<?= $ti['bg'] ?>;color:<?= $ti['color'] ?>;font-size:.62rem;">
-                        <?= $ti['label'] ?>
+                    <span class="badge" style="background:<?= $difBg ?>;color:<?= $difColor ?>;font-size:.62rem;">
+                        <?= ucfirst(strtolower($difLabel)) ?>
                     </span>
                 </div>
                 <div class="card-body" style="text-align:center;">
@@ -1309,6 +1349,56 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                         </div>
                         <?php endif; ?>
 
+                        <!-- Transferencias de saldo aplicadas -->
+                        <?php if ($sumTransferencias != 0): ?>
+                        <div style="border-top:1px dashed #f1f5f9;padding:.18rem 0 0;">
+                            <?php $colorTr = $sumTransferencias >= 0 ? '#16a34a' : '#dc2626'; ?>
+                            <div style="display:flex;justify-content:space-between;padding:.18rem 0;">
+                                <span style="color:<?= $colorTr ?>;font-weight:600;font-size:.78rem;">
+                                    (<?= $sumTransferencias >= 0 ? '+' : '−' ?>) Transferencias de saldo
+                                </span>
+                                <span style="font-weight:600;color:<?= $colorTr ?>;font-size:.78rem;">
+                                    <?= $sumTransferencias >= 0 ? '+' : '−' ?>S/ <?= number_format(abs($sumTransferencias), 2) ?>
+                                </span>
+                            </div>
+                            <?php foreach ($transferencias ?? [] as $tr):
+                                $esEnvioTr = ((int)$tr['caja_origen_id'] === (int)$sesion['caja_id']);
+                                $cajaContraparte = $esEnvioTr ? ($tr['caja_destino_desc'] ?? '?') : ($tr['caja_origen_desc'] ?? '?');
+                            ?>
+                            <div style="display:flex;justify-content:space-between;
+                                        padding:.08rem 0 .08rem .65rem;font-size:.75rem;">
+                                <span style="color:#94a3b8;">
+                                    · <?= $esEnvioTr ? 'Enviada a' : 'Recibida de' ?> <?= htmlspecialchars($cajaContraparte) ?>
+                                </span>
+                                <span style="color:#64748b;"><?= $f2($tr['monto']) ?></span>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+
+                        <!-- Retiros para depósito a KGyR aplicados -->
+                        <?php if ($sumRetiros != 0): ?>
+                        <div style="border-top:1px dashed #f1f5f9;padding:.18rem 0 0;">
+                            <div style="display:flex;justify-content:space-between;padding:.18rem 0;">
+                                <span style="color:#dc2626;font-weight:600;font-size:.78rem;">
+                                    (−) Retiros para depósito a KGyR
+                                </span>
+                                <span style="font-weight:600;color:#dc2626;font-size:.78rem;">
+                                    −S/ <?= number_format(abs($sumRetiros), 2) ?>
+                                </span>
+                            </div>
+                            <?php foreach ($retirosAplicados ?? [] as $rt): ?>
+                            <div style="display:flex;justify-content:space-between;
+                                        padding:.08rem 0 .08rem .65rem;font-size:.75rem;">
+                                <span style="color:#94a3b8;">
+                                    · Retiro a <?= htmlspecialchars($rt['banco']) ?> por <?= htmlspecialchars($rt['registrado_por_nombre']) ?>
+                                </span>
+                                <span style="color:#64748b;"><?= $f2($rt['monto']) ?></span>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+
                         <!-- Total esperado -->
                         <div style="display:flex;justify-content:space-between;padding:.3rem 0;
                                     border-top:2px solid #e2e8f0;margin-top:.25rem;">
@@ -1447,6 +1537,12 @@ const PENDIENTE  = <?= $pendienteEfectivo ?>;  // diferencia efectiva actual
 const ORIGINAL   = <?= $original ?>;
 const CAJERA     = <?= json_encode($cajera) ?>;
 const VENDEDORA  = <?= json_encode($vendedora) ?>;
+const CAJERA_ID    = <?= $cajeraId ?>;
+const VENDEDORA_ID = <?= $vendedoraId ?>;
+const INC_TIPO     = <?= json_encode($incidencia['tipo']) ?>;
+// Para FALTANTE el descuento reduce "lo esperado" (AGREGAR); para SOBRANTE lo aumenta (QUITAR) —
+// misma convención que la sección "Ajustes al esperado".
+const AJUSTE_ACCION = INC_TIPO === 'FALTANTE' ? 'AGREGAR' : 'QUITAR';
 
 // Valores de referencia para calculadora
 let calcEfectivo  = <?= $totalContado ?>;
@@ -1457,6 +1553,8 @@ const CALC_GASTOS      = <?= $totalGastos ?>;
 const CALC_DIGITAL     = <?= $digitalDecl ?>;
 const CALC_AJUSTES_ESP = <?= round($sumAjustesEsp, 2) ?>;
 const CALC_RECTIFS     = <?= round($sumRectifs, 2) ?>;
+const CALC_TRANSF      = <?= round($sumTransferencias, 2) ?>;
+const CALC_RETIROS     = <?= round($sumRetiros, 2) ?>;
 
 // ── Conteo: recalcular total al escribir ────────────────
 function recalcConteo() {
@@ -1476,7 +1574,7 @@ function recalcConteo() {
 // ── Calculadora arqueo ──────────────────────────────────
 function actualizarCalc() {
     const loQueEs     = calcEfectivo + CALC_RECTIFS;
-    const loQueSeDice = CALC_SALDO_INI + CALC_VENTAS - CALC_GASTOS - CALC_DIGITAL + CALC_AJUSTES_ESP;
+    const loQueSeDice = CALC_SALDO_INI + CALC_VENTAS - CALC_GASTOS - CALC_DIGITAL + CALC_AJUSTES_ESP + CALC_TRANSF + CALC_RETIROS;
     const dif         = Math.round((loQueEs - loQueSeDice) * 100) / 100;
     const absDif      = Math.abs(dif);
     const color  = absDif < 0.01 ? '#16a34a' : (dif > 0 ? '#1e40af' : '#dc2626');
@@ -1567,10 +1665,12 @@ function showPreview(el, result) {
 }
 
 // ── Penalidades (pre-llenan bloque descuento) ───────────
+let penalidadQuien = null;
 function aplicarPenalidad(quien) {
     const montoEl = document.getElementById('montoMovDesc');
     const descEl  = document.getElementById('descMovDesc');
     if (!montoEl || !descEl) return;
+    penalidadQuien = quien;
     if (quien === 'cajera') {
         montoEl.value = PENDIENTE.toFixed(2);
         descEl.value  = `Descuento de sueldo — Cajera: ${CAJERA}`;
@@ -1829,9 +1929,36 @@ async function guardarDescuento() {
     const desc  = document.getElementById('descMovDesc').value.trim();
     if (!monto || monto <= 0) { mostrarAlerta('movAlertDesc', 'Ingresa un monto válido.', 'err'); return; }
     if (!desc) { mostrarAlerta('movAlertDesc', 'Agrega una nota con el nombre del trabajador.', 'err'); return; }
+    if (!penalidadQuien) {
+        mostrarAlerta('movAlertDesc', 'Selecciona a quién se aplica el descuento (Cajera / Vendedora / Ambos).', 'err');
+        return;
+    }
+
+    // Trabajador(es) a quien(es) se aplica el descuento como ajuste_esperado PERSONAL,
+    // para que aparezca en su economía (/staff/economia) y se refleje en la diferencia del cuadre.
+    let destinatarios = [];
+    if (penalidadQuien === 'cajera' && CAJERA_ID)         destinatarios = [{ ref_id: CAJERA_ID,    monto }];
+    else if (penalidadQuien === 'vendedora' && VENDEDORA_ID) destinatarios = [{ ref_id: VENDEDORA_ID, monto }];
+    else if (penalidadQuien === 'ambos' && CAJERA_ID && VENDEDORA_ID) {
+        const mitad = Math.round((monto / 2) * 100) / 100;
+        destinatarios = [{ ref_id: CAJERA_ID, monto: mitad }, { ref_id: VENDEDORA_ID, monto: mitad }];
+    }
+
     btn.disabled = true; btn.textContent = 'Guardando…';
     try {
         await apiPost(`${BASE}/incidencias/api/${INC_ID}/abonar`, { tipo: 'ABONO', monto, descripcion: desc });
+
+        for (const dest of destinatarios) {
+            await apiPost(`${BASE}/caja/api/sesion/${SESION_ID}/ajuste-esperado`, {
+                accion: AJUSTE_ACCION,
+                tipo: 'PERSONAL',
+                ref_id: dest.ref_id,
+                tipo_pago: 'MES_ACTUAL',
+                monto: dest.monto,
+                descripcion: desc,
+            });
+        }
+
         mostrarAlerta('movAlertDesc', '✓ Descuento registrado', 'ok');
         setTimeout(() => location.reload(), 800);
     } catch(e) {

@@ -531,6 +531,17 @@ class CajaRepository
             'res' => $resultado,
             'sid' => $sesionId,
         ]);
+
+        $this->db->prepare(
+            "UPDATE sesion_caja SET
+                saldo_final_sistema = :esp,
+                diferencia_final    = :dif
+             WHERE id_sesion = :sid"
+        )->execute([
+            'esp' => $totalEsperado,
+            'dif' => $diferencia,
+            'sid' => $sesionId,
+        ]);
     }
 
     // ── Gastos ─────────────────────────────────────────────
@@ -776,7 +787,14 @@ class CajaRepository
         $transferenciasPendientes = $this->getTransferenciasPendientesAplicar((int)$sesion['caja_id']);
         $transferenciasNetas = array_sum(array_column($transferenciasPendientes, 'efecto'));
 
-        $total_esperado   = round($saldo_inicial + $ventas - $total_gastos - $digital_aprobado + $transferenciasNetas, 2);
+        // Retiros de efectivo registrados por el admin para depósito a Grupo KGyR,
+        // pendientes de aplicar al cuadre de esta caja: restan de "lo que se dice"
+        // porque el efectivo físico ya salió de la caja. Se marcan como aplicados
+        // al primer cuadre que se calcule para esta caja después de registrarse.
+        $retirosPendientes = $this->getRetirosPendientesAplicar((int)$sesion['caja_id']);
+        $retirosNetos = array_sum(array_column($retirosPendientes, 'monto'));
+
+        $total_esperado   = round($saldo_inicial + $ventas - $total_gastos - $digital_aprobado + $transferenciasNetas - $retirosNetos, 2);
 
         // Diferencia: LO QUE ES − LO QUE SE DICE
         $total_contado = $efectivo_fisico;
@@ -828,6 +846,13 @@ class CajaRepository
                      ->execute(['sid' => $sesionId, 'tid' => $tr['id']]);
         }
 
+        // Marcar los retiros KGyR como aplicados en este cuadre, para que no se
+        // vuelvan a contar en el siguiente cuadre de esta caja.
+        foreach ($retirosPendientes as $rt) {
+            $this->db->prepare("UPDATE retiro_kgyr SET sesion_aplicada_id = :sid WHERE id = :rid")
+                     ->execute(['sid' => $sesionId, 'rid' => $rt['id']]);
+        }
+
         return [
             'saldo_inicial'      => $saldo_inicial,
             'total_ventas'       => $ventas,
@@ -836,6 +861,7 @@ class CajaRepository
             'efectivo_fisico'    => $efectivo_fisico,
             'digital_aprobado'   => $digital_aprobado,
             'transferencias_netas' => $transferenciasNetas,
+            'retiros_netos'      => $retirosNetos,
             'total_contado'      => $total_contado,
             'diferencia'         => $diferencia,
             'resultado'          => $resultado,
@@ -1182,9 +1208,10 @@ class CajaRepository
                 monto_billetes_caja_fuerte = :fue,
                 monto_agente_bcp           = :age,
                 total_efectivo_contado     = :efe,
+                total_contado_general      = :efe2,
                 saldo_proxima_efectivo     = :prox_ef,
                 saldo_proxima_agente_bcp   = :prox_age,
-                saldo_proximo_dia          = :efe2,
+                saldo_proximo_dia          = :proximo,
                 diferencia                 = :dif,
                 resultado_cuadre           = :res
              WHERE sesion_id = :sid"
@@ -1198,9 +1225,22 @@ class CajaRepository
             'efe2'     => $nuevoEfectivo,
             'prox_ef'  => $proxEfectivo,
             'prox_age' => $agenteBcp,
+            'proximo'  => $nuevoEfectivo,
             'dif'      => $diferencia,
             'res'      => $resultado,
             'sid'      => $sesionId,
+        ]);
+
+        // Mantener sesion_caja en sincronía con el conteo corregido
+        $this->db->prepare(
+            "UPDATE sesion_caja SET
+                saldo_final_contado = :con,
+                diferencia_final    = :dif
+             WHERE id_sesion = :sid"
+        )->execute([
+            'con' => $nuevoEfectivo,
+            'dif' => $diferencia,
+            'sid' => $sesionId,
         ]);
 
         $this->propagarBase($sesionId);
@@ -1643,6 +1683,162 @@ class CajaRepository
         );
         $stmt->execute(['sid' => $sesionId, 'sid2' => $sesionId]);
         return $stmt->fetchAll();
+    }
+
+    // ── Retiros de caja para depósito a Grupo KGyR ─────────
+
+    // Retiros ACTIVOS aún no aplicados a ningún cuadre de esta caja.
+    public function getRetirosPendientesAplicar(int $cajaId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT rk.*, p.nombres AS registrado_por_nombre
+             FROM retiro_kgyr rk
+             INNER JOIN postulante p ON p.id_postulante = rk.registrado_por_id
+             WHERE rk.caja_origen_id = :cid AND rk.estado = 'ACTIVO' AND rk.sesion_aplicada_id IS NULL
+             ORDER BY rk.registrado_en ASC"
+        );
+        $stmt->execute(['cid' => $cajaId]);
+        return $stmt->fetchAll();
+    }
+
+    // Retiros cuyo efecto ya quedó incorporado en el cuadre de esta sesión.
+    public function getRetirosAplicados(int $sesionId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT rk.*, p.nombres AS registrado_por_nombre
+             FROM retiro_kgyr rk
+             INNER JOIN postulante p ON p.id_postulante = rk.registrado_por_id
+             WHERE rk.sesion_aplicada_id = :sid
+             ORDER BY rk.registrado_en ASC"
+        );
+        $stmt->execute(['sid' => $sesionId]);
+        return $stmt->fetchAll();
+    }
+
+    public function registrarRetiroKgyr(int $cajaOrigenId, float $monto, string $banco, ?string $referencia, ?string $notas, int $userId): int
+    {
+        $this->db->prepare(
+            "INSERT INTO retiro_kgyr (caja_origen_id, monto, banco, referencia, notas, registrado_por_id)
+             VALUES (:cid, :monto, :banco, :ref, :notas, :uid)"
+        )->execute([
+            'cid'   => $cajaOrigenId,
+            'monto' => $monto,
+            'banco' => $banco,
+            'ref'   => $referencia,
+            'notas' => $notas,
+            'uid'   => $userId,
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+
+    public function anularRetiroKgyr(int $id, int $adminId, string $password): bool|string
+    {
+        if (!$this->verificarPasswordAdmin($adminId, $password)) return 'Contraseña incorrecta';
+
+        $stmt = $this->db->prepare("SELECT * FROM retiro_kgyr WHERE id = :id AND estado = 'ACTIVO'");
+        $stmt->execute(['id' => $id]);
+        $retiro = $stmt->fetch();
+        if (!$retiro) return 'Retiro no encontrado o ya anulado';
+
+        if ($retiro['sesion_aplicada_id'] !== null) {
+            return 'Este retiro ya se aplicó en un cuadre y no puede anularse. Registra un ajuste en sentido inverso si fue un error.';
+        }
+
+        $this->db->prepare(
+            "UPDATE retiro_kgyr SET estado = 'ANULADO', anulador_id = :aid, anulada_at = NOW()
+             WHERE id = :id"
+        )->execute(['aid' => $adminId, 'id' => $id]);
+
+        return true;
+    }
+
+    public function getRetirosKgyr(): array
+    {
+        return $this->db->query(
+            "SELECT rk.*,
+                    CONCAT(c.descripcion, ' (', l.descripcion, ')') AS caja_origen_desc,
+                    p.nombres AS registrado_por_nombre,
+                    pa.nombres AS anulador_nombre,
+                    pcd.nombres AS confirmador_directo_nombre
+             FROM retiro_kgyr rk
+             INNER JOIN caja c ON c.id_caja = rk.caja_origen_id
+             INNER JOIN local l ON l.id_local = c.local_id
+             INNER JOIN postulante p ON p.id_postulante = rk.registrado_por_id
+             LEFT JOIN postulante pa  ON pa.id_postulante  = rk.anulador_id
+             LEFT JOIN postulante pcd ON pcd.id_postulante = rk.confirmado_directo_por_id
+             ORDER BY rk.registrado_en DESC LIMIT 100"
+        )->fetchAll();
+    }
+
+    // Confirma de inmediato (sin esperar al próximo cuadre) un retiro POR APLICAR,
+    // ajustando directamente el saldo base (saldo_proximo_dia) del último cuadre
+    // cerrado de la caja origen. Solo permitido si la caja no tiene una sesión
+    // ABIERTA/PENDIENTE_VENTA en este momento, para no pisar un cuadre en curso.
+    public function confirmarRetiroKgyrForzado(int $id, int $adminId, string $password): bool|string
+    {
+        if (!$this->verificarPasswordAdmin($adminId, $password)) return 'Contraseña incorrecta';
+
+        $stmt = $this->db->prepare("SELECT * FROM retiro_kgyr WHERE id = :id AND estado = 'ACTIVO' AND sesion_aplicada_id IS NULL");
+        $stmt->execute(['id' => $id]);
+        $retiro = $stmt->fetch();
+        if (!$retiro) return 'Retiro no encontrado, ya anulado o ya aplicado';
+
+        $cajaId = (int)$retiro['caja_origen_id'];
+
+        $abiertaStmt = $this->db->prepare(
+            "SELECT id_sesion FROM sesion_caja
+             WHERE caja_id = :cid AND estado IN ('ABIERTA','PENDIENTE_VENTA') LIMIT 1"
+        );
+        $abiertaStmt->execute(['cid' => $cajaId]);
+        if ($abiertaStmt->fetch()) {
+            return 'Esta caja tiene una sesión abierta actualmente; el retiro se aplicará automáticamente en su cuadre de cierre.';
+        }
+
+        $ultimaStmt = $this->db->prepare(
+            "SELECT sc.id_sesion
+             FROM sesion_caja sc
+             INNER JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
+             WHERE sc.caja_id = :cid AND sc.estado IN ('APROBADA','CERRADA')
+             ORDER BY sc.id_sesion DESC LIMIT 1"
+        );
+        $ultimaStmt->execute(['cid' => $cajaId]);
+        $ultimaSesionId = $ultimaStmt->fetchColumn();
+        if (!$ultimaSesionId) {
+            return 'No hay un cuadre previo de esta caja sobre el cual aplicar el ajuste.';
+        }
+        $ultimaSesionId = (int)$ultimaSesionId;
+
+        $monto = (float)$retiro['monto'];
+
+        $antStmt = $this->db->prepare("SELECT saldo_proximo_dia FROM detalle_cuadre WHERE sesion_id = :sid");
+        $antStmt->execute(['sid' => $ultimaSesionId]);
+        $saldoAntes = (float)$antStmt->fetchColumn();
+
+        $this->db->prepare(
+            "UPDATE detalle_cuadre
+             SET saldo_proximo_dia      = saldo_proximo_dia - :mon,
+                 saldo_proxima_efectivo = saldo_proxima_efectivo - :mon2
+             WHERE sesion_id = :sid"
+        )->execute(['mon' => $monto, 'mon2' => $monto, 'sid' => $ultimaSesionId]);
+
+        $this->propagarBase($ultimaSesionId);
+
+        $this->db->prepare(
+            "UPDATE retiro_kgyr SET estado = 'APLICADO_DIRECTO',
+                confirmado_directo_por_id = :aid, confirmado_directo_en = NOW(),
+                sesion_base_ajustada_id = :sid
+             WHERE id = :id"
+        )->execute(['aid' => $adminId, 'sid' => $ultimaSesionId, 'id' => $id]);
+
+        $this->audit(
+            $ultimaSesionId, $adminId,
+            'RETIRO_KGYR_APLICADO_DIRECTO',
+            'saldo_proximo_dia',
+            'S/ ' . number_format($saldoAntes, 2),
+            'S/ ' . number_format($saldoAntes - $monto, 2) . ' — retiro KGyR de S/ ' . number_format($monto, 2) . ' aplicado directamente al saldo base'
+        );
+
+        return true;
     }
 
     // ── Correcciones de venta ──────────────────────────────

@@ -53,7 +53,8 @@ class IncidenciaContableRepository
                    t.descripcion  AS turno_desc,
                    p.nombres      AS responsable_nombre,
                    pr.nombres     AS registrado_por_nombre,
-                   pv.nombres     AS vendedora_nombre
+                   pv.nombres     AS vendedora_nombre,
+                   pv.id_postulante AS vendedora_id
             FROM incidencia_contable ic
             LEFT JOIN sesion_caja sc  ON ic.sesion_origen_id = sc.id_sesion
             LEFT JOIN caja c          ON sc.caja_id = c.id_caja

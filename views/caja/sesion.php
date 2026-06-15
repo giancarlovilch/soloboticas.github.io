@@ -241,6 +241,16 @@ $act = [
     </div>
     <?php endforeach; ?>
 
+    <?php foreach ($retirosPendientes ?? [] as $rp): ?>
+    <div class="caja-alert caja-alert--info" style="margin-top:.6rem;">
+        Se retiraron <strong>S/ <?= number_format((float)$rp['monto'], 2) ?></strong> de esta caja para depósito
+        a Grupo KGyR (<?= htmlspecialchars($rp['banco']) ?>), registrado el
+        <?= date('d/m/Y H:i', strtotime($rp['registrado_en'])) ?> por
+        <strong><?= htmlspecialchars($rp['registrado_por_nombre']) ?></strong>
+        — se reflejará en el cuadre de cierre de esta sesión.
+    </div>
+    <?php endforeach; ?>
+
     <input type="hidden" id="sesionId" value="<?= $sesionId ?>">
     <?php endif; ?>
 

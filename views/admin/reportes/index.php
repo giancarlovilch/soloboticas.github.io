@@ -122,6 +122,16 @@ $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
             <span class="rep-card__badge" style="background:#e0f7fa;color:#0097A7;">Caja · Visual</span>
         </a>
 
+        <a href="<?= $basePath ?>/admin/reportes/gastos" class="rep-card">
+            <div class="rep-card__icon">💳</div>
+            <div class="rep-card__title">Gastos por categoría</div>
+            <div class="rep-card__desc">
+                Total mensual de egresos agrupados por tipo: personal, alquiler, luz, agua,
+                internet, compras y otros. Filtrable por mes y local.
+            </div>
+            <span class="rep-card__badge" style="background:#fef3c7;color:#92400e;">Finanzas</span>
+        </a>
+
         <div class="rep-card rep-card--soon">
             <div class="rep-card__icon">💸</div>
             <div class="rep-card__title">Faltantes por cajero</div>

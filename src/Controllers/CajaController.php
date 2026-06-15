@@ -148,6 +148,9 @@ class CajaController extends Controller
         // Transferencias de saldo confirmadas que se aplicarán en el cuadre de cierre
         $transferenciasPendientes = $this->repo->getTransferenciasPendientesAplicar((int)$sesion['caja_id']);
 
+        // Retiros de efectivo para depósito a KGyR que se aplicarán en el cuadre de cierre
+        $retirosPendientes = $this->repo->getRetirosPendientesAplicar((int)$sesion['caja_id']);
+
         require_once __DIR__ . '/../../views/caja/sesion.php';
     }
 
@@ -442,6 +445,7 @@ class CajaController extends Controller
         extract($data); // $sesion, $detalle, $venta, $gastos, $rectifs
 
         $transferencias = $this->repo->getTransferenciasAplicadas($id);
+        $retirosAplicados = $this->repo->getRetirosAplicados($id);
 
         // Vales SoloBank disponibles para asignar retroactivamente
         require_once __DIR__ . '/../Repositories/SoloBankRepository.php';

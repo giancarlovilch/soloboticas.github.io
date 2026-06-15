@@ -491,6 +491,71 @@ class AdminController extends Controller
         $this->success($nuevo ? 'Confirmado' : 'Marcado como pendiente', ['confirmado' => $nuevo]);
     }
 
+    /** POST /admin/api/retiro-kgyr */
+    public function apiRetiroKgyrCrear(): void
+    {
+        $this->middlewareAdmin();
+        $data = $this->getAllInput();
+
+        $cajaOrigenId = isset($data['caja_origen_id']) ? (int)$data['caja_origen_id'] : 0;
+        $monto        = round((float)($data['monto'] ?? 0), 2);
+        $banco        = $data['banco'] ?? 'BCP';
+        $referencia   = trim($data['referencia'] ?? '') ?: null;
+        $notas        = trim($data['notas'] ?? '') ?: null;
+        $password     = $data['password'] ?? '';
+
+        if (!$cajaOrigenId) { $this->error('Selecciona la caja de origen', 422); return; }
+        if ($monto <= 0) { $this->error('El monto debe ser mayor a 0', 422); return; }
+        if (!in_array($banco, ['BCP','BBVA'], true)) { $this->error('Banco inválido', 422); return; }
+        if (empty($password)) { $this->error('Ingresa tu contraseña', 422); return; }
+
+        require_once __DIR__ . '/../Repositories/AuthRepository.php';
+        $adminUsername = $_SESSION['user_name'] ?? '';
+        $authRepo      = new AuthRepository();
+        $adminUser     = $authRepo->findByUsername($adminUsername);
+        if (!$adminUser || !password_verify($password, $adminUser['password'])) {
+            $this->error('Contraseña incorrecta. Operación cancelada.', 403); return;
+        }
+
+        require_once __DIR__ . '/../Repositories/CajaRepository.php';
+        $repo = new CajaRepository();
+        $id   = $repo->registrarRetiroKgyr($cajaOrigenId, $monto, $banco, $referencia, $notas, (int)$_SESSION['user_id']);
+
+        $this->success('Retiro registrado', ['id' => $id]);
+    }
+
+    /** POST /admin/api/retiro-kgyr/{id}/anular */
+    public function apiRetiroKgyrAnular(int $id): void
+    {
+        $this->middlewareAdmin();
+        $data     = $this->getAllInput();
+        $password = $data['password'] ?? '';
+        if (empty($password)) { $this->error('Ingresa tu contraseña', 422); return; }
+
+        require_once __DIR__ . '/../Repositories/CajaRepository.php';
+        $repo   = new CajaRepository();
+        $result = $repo->anularRetiroKgyr($id, (int)$_SESSION['user_id'], $password);
+
+        if ($result !== true) { $this->error($result, 422); return; }
+        $this->success('Retiro anulado');
+    }
+
+    /** POST /admin/api/retiro-kgyr/{id}/confirmar-directo */
+    public function apiRetiroKgyrConfirmarDirecto(int $id): void
+    {
+        $this->middlewareAdmin();
+        $data     = $this->getAllInput();
+        $password = $data['password'] ?? '';
+        if (empty($password)) { $this->error('Ingresa tu contraseña', 422); return; }
+
+        require_once __DIR__ . '/../Repositories/CajaRepository.php';
+        $repo   = new CajaRepository();
+        $result = $repo->confirmarRetiroKgyrForzado($id, (int)$_SESSION['user_id'], $password);
+
+        if ($result !== true) { $this->error($result, 422); return; }
+        $this->success('Retiro aplicado directamente al saldo base de la caja');
+    }
+
     /** POST /admin/api/tarifa-base/agregar */
     public function addTarifaBase(): void
     {

@@ -38,7 +38,15 @@ foreach ($transferencias ?? [] as $tr) {
     $sum_transferencias += $esEnvioRep ? -(float)$tr['monto'] : (float)$tr['monto'];
 }
 
-$loQueSeDice = round($saldo_ini + $total_ventas - $total_gastos - $digital_aprobado + $sum_ajustes_esp + $sum_transferencias, 2);
+// Retiros de efectivo registrados por el admin para depósito a Grupo KGyR: el efectivo
+// físico ya salió de la caja, así que resta de "lo que se dice" para evitar un
+// FALTANTE injustificado.
+$sum_retiros = 0.0;
+foreach ($retirosAplicados ?? [] as $rt) {
+    $sum_retiros -= (float)$rt['monto'];
+}
+
+$loQueSeDice = round($saldo_ini + $total_ventas - $total_gastos - $digital_aprobado + $sum_ajustes_esp + $sum_transferencias + $sum_retiros, 2);
 $diferencia  = round($loQueEs - $loQueSeDice, 2);
 $resultado   = abs($diferencia) < 0.01 ? 'CONSISTENTE' : ($diferencia > 0 ? 'SOBRANTE' : 'FALTANTE');
 $clsDif      = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobrante' : 'dif-faltante');
@@ -217,6 +225,18 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
                 <div class="caja-linea caja-linea--sub" style="font-size:.75rem;color:#94a3b8;">
                     <span><?= $esEnvioTr ? 'Enviada a' : 'Recibida de' ?> <?= htmlspecialchars($cajaContraparte) ?> · <?= date('d/m/Y H:i', strtotime($tr['confirmed_at'])) ?></span>
                     <span><?= $f2($tr['monto']) ?></span>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+                <?php if ($sum_retiros != 0): ?>
+                <div class="caja-linea caja-linea--sub">
+                    <span style="color:#dc2626;font-weight:600;">− Retiros para depósito a KGyR</span>
+                    <strong style="color:#dc2626;"><?= $f2(abs($sum_retiros)) ?></strong>
+                </div>
+                <?php foreach ($retirosAplicados ?? [] as $rt): ?>
+                <div class="caja-linea caja-linea--sub" style="font-size:.75rem;color:#94a3b8;">
+                    <span>Retiro a <?= htmlspecialchars($rt['banco']) ?> por <?= htmlspecialchars($rt['registrado_por_nombre']) ?> · <?= date('d/m/Y H:i', strtotime($rt['registrado_en'])) ?></span>
+                    <span><?= $f2($rt['monto']) ?></span>
                 </div>
                 <?php endforeach; ?>
                 <?php endif; ?>

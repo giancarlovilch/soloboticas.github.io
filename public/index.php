@@ -201,6 +201,7 @@ $router->get('/admin/reportes/coberturas',   [ReporteController::class, 'cobertu
 $router->get('/admin/reportes/asistencias',       [ReporteController::class, 'asistencias']);
 $router->get('/admin/reportes/resumen-trabajadores', [ReporteController::class, 'resumenTrabajadores']);
 $router->get('/admin/reportes/graficas',             [ReporteController::class, 'graficas']);
+$router->get('/admin/reportes/gastos',               [ReporteController::class, 'gastos']);
 
 // --- RUTAS DE ADMINISTRACIÓN (INTRANET) ---
 // Registramos las rutas de API antes del dispatch
@@ -218,6 +219,9 @@ $router->get('/admin/api/postulante-detalle', [AdminController::class, 'apiDetal
 $router->post('/admin/postulante/actualizar', [AdminController::class, 'actualizarPostulante']);
 $router->post('/admin/api/deposito-kgyr',                  [AdminController::class, 'apiDepositoCrear']);
 $router->post('/admin/api/deposito-kgyr/{id}/toggle',      [AdminController::class, 'apiDepositoToggle']);
+$router->post('/admin/api/retiro-kgyr',                    [AdminController::class, 'apiRetiroKgyrCrear']);
+$router->post('/admin/api/retiro-kgyr/{id}/anular',        [AdminController::class, 'apiRetiroKgyrAnular']);
+$router->post('/admin/api/retiro-kgyr/{id}/confirmar-directo', [AdminController::class, 'apiRetiroKgyrConfirmarDirecto']);
 $router->post('/admin/api/tarifa-base/agregar',      [AdminController::class, 'addTarifaBase']);
 $router->post('/admin/api/tarifa-base/{id}/eliminar',[AdminController::class, 'eliminarTarifaBase']);
 $router->post('/admin/api/bono/agregar',             [AdminController::class, 'addBono']);

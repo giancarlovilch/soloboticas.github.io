@@ -1055,16 +1055,16 @@ class HorarioRepository
         // ── Resumen personal ──────────────────────────────────
         $stmt = $this->db->prepare(
             "SELECT
-                SUM(CASE WHEN rol_codigo='VENDEDORA' AND ventas_monto    >= 500 THEN 1 ELSE 0 END) AS turnos_vend,
-                SUM(CASE WHEN rol_codigo='CAJERA'    AND operaciones_bcp >= 100 THEN 1 ELSE 0 END) AS turnos_caj,
-                ROUND(AVG(CASE WHEN rol_codigo='VENDEDORA' AND ventas_monto    >= 500 THEN ventas_monto    END), 2) AS prom_ventas,
-                ROUND(SUM(CASE WHEN rol_codigo='VENDEDORA' AND ventas_monto    >= 500 THEN ventas_monto    END), 2) AS total_ventas,
-                ROUND(MAX(CASE WHEN rol_codigo='VENDEDORA' AND ventas_monto    >= 500 THEN ventas_monto    END), 2) AS max_ventas,
-                ROUND(MIN(CASE WHEN rol_codigo='VENDEDORA' AND ventas_monto    >= 500 THEN ventas_monto    END), 2) AS min_ventas,
-                ROUND(AVG(CASE WHEN rol_codigo='CAJERA'    AND operaciones_bcp >= 100 THEN operaciones_bcp END), 1) AS prom_ops,
-                ROUND(SUM(CASE WHEN rol_codigo='CAJERA'    AND operaciones_bcp >= 100 THEN operaciones_bcp END), 0) AS total_ops,
-                ROUND(MAX(CASE WHEN rol_codigo='CAJERA'    AND operaciones_bcp >= 100 THEN operaciones_bcp END), 0) AS max_ops,
-                ROUND(MIN(CASE WHEN rol_codigo='CAJERA'    AND operaciones_bcp >= 100 THEN operaciones_bcp END), 0) AS min_ops,
+                SUM(CASE WHEN rol_codigo='VENDEDORA' AND ventas_monto    IS NOT NULL THEN 1 ELSE 0 END) AS turnos_vend,
+                SUM(CASE WHEN rol_codigo='CAJERA'    AND operaciones_bcp IS NOT NULL THEN 1 ELSE 0 END) AS turnos_caj,
+                ROUND(AVG(CASE WHEN rol_codigo='VENDEDORA' THEN ventas_monto    END), 2) AS prom_ventas,
+                ROUND(SUM(CASE WHEN rol_codigo='VENDEDORA' THEN ventas_monto    END), 2) AS total_ventas,
+                ROUND(MAX(CASE WHEN rol_codigo='VENDEDORA' THEN ventas_monto    END), 2) AS max_ventas,
+                ROUND(MIN(CASE WHEN rol_codigo='VENDEDORA' THEN ventas_monto    END), 2) AS min_ventas,
+                ROUND(AVG(CASE WHEN rol_codigo='CAJERA'    THEN operaciones_bcp END), 1) AS prom_ops,
+                ROUND(SUM(CASE WHEN rol_codigo='CAJERA'    THEN operaciones_bcp END), 0) AS total_ops,
+                ROUND(MAX(CASE WHEN rol_codigo='CAJERA'    THEN operaciones_bcp END), 0) AS max_ops,
+                ROUND(MIN(CASE WHEN rol_codigo='CAJERA'    THEN operaciones_bcp END), 0) AS min_ops,
                 COUNT(DISTINCT local_id)                                                   AS locales_distintos,
                 COUNT(DISTINCT fecha)                                                       AS dias_trabajados
              FROM horario_rendimiento
@@ -1082,7 +1082,7 @@ class HorarioRepository
              FROM horario_rendimiento hr
              INNER JOIN postulante p ON p.id_postulante = hr.postulante_id
              WHERE hr.rol_codigo   = 'VENDEDORA'
-               AND hr.ventas_monto >= 500
+               AND hr.ventas_monto IS NOT NULL
                AND hr.fecha BETWEEN :desde AND :hasta
              GROUP BY hr.postulante_id, p.nombres
              HAVING COUNT(*) >= 10
@@ -1101,7 +1101,7 @@ class HorarioRepository
              FROM horario_rendimiento hr
              INNER JOIN postulante p ON p.id_postulante = hr.postulante_id
              WHERE hr.rol_codigo       = 'CAJERA'
-               AND hr.operaciones_bcp  >= 100
+               AND hr.operaciones_bcp  IS NOT NULL
                AND hr.fecha BETWEEN :desde AND :hasta
              GROUP BY hr.postulante_id, p.nombres
              HAVING COUNT(*) >= 10
@@ -1122,7 +1122,7 @@ class HorarioRepository
                 "SELECT COUNT(*) + 1
                  FROM (SELECT AVG(ventas_monto) AS p
                        FROM horario_rendimiento
-                       WHERE rol_codigo='VENDEDORA' AND ventas_monto >= 500
+                       WHERE rol_codigo='VENDEDORA' AND ventas_monto IS NOT NULL
                          AND fecha BETWEEN :desde AND :hasta
                        GROUP BY postulante_id
                        HAVING COUNT(*) >= 10 AND p > :miprom) t"
@@ -1136,7 +1136,7 @@ class HorarioRepository
                 "SELECT COUNT(*) + 1
                  FROM (SELECT AVG(operaciones_bcp) AS p
                        FROM horario_rendimiento
-                       WHERE rol_codigo='CAJERA' AND operaciones_bcp >= 100
+                       WHERE rol_codigo='CAJERA' AND operaciones_bcp IS NOT NULL
                          AND fecha BETWEEN :desde AND :hasta
                        GROUP BY postulante_id
                        HAVING COUNT(*) >= 10 AND p > :miprom) t"

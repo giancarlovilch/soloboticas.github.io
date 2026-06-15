@@ -510,4 +510,167 @@ class ReporteController extends Controller
 
         require_once __DIR__ . '/../../views/admin/reportes/resumen_trabajadores.php';
     }
+
+    // ── GET /admin/reportes/gastos ─────────────────────────
+    public function gastos(): void
+    {
+        $this->requireAdmin();
+        $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $userName = $_SESSION['user_name'] ?? 'Administrador';
+        $db       = Database::getConnection();
+
+        $mes     = $_GET['mes']   ?? date('Y-m');
+        $localId = (isset($_GET['local']) && $_GET['local'] !== '') ? (int)$_GET['local'] : null;
+
+        [$year, $month] = explode('-', $mes . '-01');
+        $desde = "$year-$month-01";
+        $hasta = "$year-$month-" . date('t', mktime(0, 0, 0, (int)$month, 1, (int)$year));
+
+        $locales = $db->query("SELECT id_local, descripcion FROM local ORDER BY id_local")->fetchAll();
+
+        $filtroLocal = $localId ? 'AND c.local_id = :lid' : '';
+        $params      = $localId
+            ? ['desde' => $desde, 'hasta' => $hasta, 'lid' => $localId]
+            : ['desde' => $desde, 'hasta' => $hasta];
+
+        $rows = [];
+
+        // 1. Personal
+        $s = $db->prepare("
+            SELECT sc.fecha_operacion AS fecha,
+                   l.id_local, l.descripcion AS local_desc,
+                   'PERSONAL' AS categoria, pp.tipo_pago AS sub_categoria,
+                   pb.nombres AS descripcion,
+                   pp.monto
+            FROM pago_personal pp
+            JOIN sesion_caja sc ON sc.id_sesion = pp.sesion_id
+            JOIN caja c         ON c.id_caja    = sc.caja_id
+            JOIN local l        ON l.id_local   = c.local_id
+            JOIN postulante pb  ON pb.id_postulante = pp.postulante_beneficiario_id
+            WHERE pp.estado IN ('APROBADO','PAGADO','CONFIRMADO_BENEFICIARIO')
+              AND sc.fecha_operacion BETWEEN :desde AND :hasta
+              $filtroLocal
+            ORDER BY sc.fecha_operacion");
+        $s->execute($params);
+        foreach ($s->fetchAll() as $r) $rows[] = $r;
+
+        // 2. Local (alquiler, luz, agua, etc.)
+        $s = $db->prepare("
+            SELECT sc.fecha_operacion AS fecha,
+                   l.id_local, l.descripcion AS local_desc,
+                   'LOCAL' AS categoria,
+                   COALESCE(cg.descripcion, 'Sin concepto') AS sub_categoria,
+                   l2.descripcion AS descripcion,
+                   pl.monto
+            FROM pago_local pl
+            JOIN sesion_caja sc         ON sc.id_sesion  = pl.sesion_id
+            JOIN caja c                 ON c.id_caja     = sc.caja_id
+            JOIN local l                ON l.id_local    = c.local_id
+            JOIN local l2               ON l2.id_local   = pl.local_id
+            LEFT JOIN concepto_gastos_local cg ON cg.id_concepto = pl.concepto_id
+            WHERE pl.estado = 'APROBADO'
+              AND sc.fecha_operacion BETWEEN :desde AND :hasta
+              $filtroLocal
+            ORDER BY sc.fecha_operacion");
+        $s->execute($params);
+        foreach ($s->fetchAll() as $r) $rows[] = $r;
+
+        // 3. Otros (gastos libres)
+        $s = $db->prepare("
+            SELECT sc.fecha_operacion AS fecha,
+                   l.id_local, l.descripcion AS local_desc,
+                   'LIBRE' AS categoria,
+                   NULL AS sub_categoria,
+                   ms.descripcion,
+                   ms.monto
+            FROM movimiento_sesion ms
+            JOIN sesion_caja sc ON sc.id_sesion = ms.sesion_id
+            JOIN caja c         ON c.id_caja    = sc.caja_id
+            JOIN local l        ON l.id_local   = c.local_id
+            WHERE ms.tipo_movimiento_id = 2 AND ms.estado = 'APROBADO'
+              AND sc.fecha_operacion BETWEEN :desde AND :hasta
+              $filtroLocal
+            ORDER BY sc.fecha_operacion");
+        $s->execute($params);
+        foreach ($s->fetchAll() as $r) $rows[] = $r;
+
+        // 4. Depósitos a KGyR
+        $s = $db->prepare("
+            SELECT sc.fecha_operacion AS fecha,
+                   l.id_local, l.descripcion AS local_desc,
+                   'DEPOSITO' AS categoria,
+                   NULL AS sub_categoria,
+                   pd.numero_comprobante AS descripcion,
+                   pd.monto
+            FROM pago_deposito pd
+            JOIN sesion_caja sc ON sc.id_sesion = pd.sesion_id
+            JOIN caja c         ON c.id_caja    = sc.caja_id
+            JOIN local l        ON l.id_local   = c.local_id
+            WHERE sc.fecha_operacion BETWEEN :desde AND :hasta
+              $filtroLocal
+            ORDER BY sc.fecha_operacion");
+        $s->execute($params);
+        foreach ($s->fetchAll() as $r) $rows[] = $r;
+
+        // 5. Facturas / comprobantes
+        $s = $db->prepare("
+            SELECT sc.fecha_operacion AS fecha,
+                   l.id_local, l.descripcion AS local_desc,
+                   'FACTURA' AS categoria,
+                   pf.tipo_documento AS sub_categoria,
+                   pf.numero_comprobante AS descripcion,
+                   pf.monto
+            FROM pago_factura pf
+            JOIN sesion_caja sc ON sc.id_sesion = pf.sesion_id
+            JOIN caja c         ON c.id_caja    = sc.caja_id
+            JOIN local l        ON l.id_local   = c.local_id
+            WHERE sc.fecha_operacion BETWEEN :desde AND :hasta
+              $filtroLocal
+            ORDER BY sc.fecha_operacion");
+        $s->execute($params);
+        foreach ($s->fetchAll() as $r) $rows[] = $r;
+
+        // 6. Ajustes esperados PERSONAL (pagos a personal registrados como ajuste al cuadre)
+        $s = $db->prepare("
+            SELECT sc.fecha_operacion AS fecha,
+                   l.id_local, l.descripcion AS local_desc,
+                   'PERSONAL' AS categoria, ae.tipo_pago AS sub_categoria,
+                   COALESCE(NULLIF(ae.descripcion, ''), pr.nombres) AS descripcion,
+                   ae.monto
+            FROM ajuste_esperado ae
+            JOIN sesion_caja sc  ON sc.id_sesion       = ae.sesion_id
+            JOIN caja c          ON c.id_caja           = sc.caja_id
+            JOIN local l         ON l.id_local          = c.local_id
+            LEFT JOIN postulante pr ON pr.id_postulante = ae.ref_id
+            WHERE ae.tipo = 'PERSONAL' AND ae.accion = 'AGREGAR'
+              AND sc.fecha_operacion BETWEEN :desde AND :hasta
+              $filtroLocal
+            ORDER BY sc.fecha_operacion");
+        $s->execute($params);
+        foreach ($s->fetchAll() as $r) $rows[] = $r;
+
+        usort($rows, fn($a, $b) => strcmp($a['fecha'], $b['fecha']));
+
+        // Resumen por categoría → sub_categoría
+        $resumen      = [];
+        $totalGeneral = 0.0;
+        foreach ($rows as $r) {
+            $cat   = $r['categoria'];
+            $sub   = $r['sub_categoria'] ?? '';
+            $monto = (float)$r['monto'];
+            if (!isset($resumen[$cat])) $resumen[$cat] = ['total' => 0.0, 'subs' => []];
+            $resumen[$cat]['total'] += $monto;
+            if ($sub !== '') $resumen[$cat]['subs'][$sub] = ($resumen[$cat]['subs'][$sub] ?? 0.0) + $monto;
+            $totalGeneral += $monto;
+        }
+        foreach ($resumen as &$v) {
+            $v['total'] = round($v['total'], 2);
+            foreach ($v['subs'] as &$sv) $sv = round($sv, 2);
+            arsort($v['subs']);
+        }
+        unset($v, $sv);
+        $totalGeneral = round($totalGeneral, 2);
+
+        require_once __DIR__ . '/../../views/admin/reportes/gastos.php';
+    }
 }
