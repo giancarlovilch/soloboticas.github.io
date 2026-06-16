@@ -514,7 +514,30 @@ class CajaRepository
         $saldoInicial   = (float)($sesion['saldo_inicial']      ?? 0);
 
         $digitalAprobado = $this->sumDigitalDeclarado($sesionId);
-        $totalEsperado   = round($saldoInicial + $ventas - $gastos - $digitalAprobado, 2);
+
+        // Incluir transferencias/retiros/ingresos ya aplicados a este cuadre,
+        // igual que calcularYGuardarCuadre(), para no sobreescribir dc.diferencia
+        // con un valor incompleto que no refleje esos movimientos.
+        $trStmt = $this->db->prepare(
+            "SELECT COALESCE(SUM(CASE
+                WHEN sesion_aplicada_origen_id = :s1 THEN -monto
+                WHEN sesion_aplicada_destino_id = :s2 THEN monto
+                ELSE 0 END), 0)
+             FROM transferencia_saldo
+             WHERE sesion_aplicada_origen_id = :s3 OR sesion_aplicada_destino_id = :s4"
+        );
+        $trStmt->execute(['s1'=>$sesionId,'s2'=>$sesionId,'s3'=>$sesionId,'s4'=>$sesionId]);
+        $transferenciasNetas = (float)$trStmt->fetchColumn();
+
+        $rtStmt = $this->db->prepare("SELECT COALESCE(SUM(monto),0) FROM retiro_kgyr  WHERE sesion_aplicada_id = :sid");
+        $rtStmt->execute(['sid' => $sesionId]);
+        $retirosNetos = (float)$rtStmt->fetchColumn();
+
+        $igStmt = $this->db->prepare("SELECT COALESCE(SUM(monto),0) FROM ingreso_kgyr WHERE sesion_aplicada_id = :sid");
+        $igStmt->execute(['sid' => $sesionId]);
+        $ingresosNetos = (float)$igStmt->fetchColumn();
+
+        $totalEsperado = round($saldoInicial + $ventas - $gastos - $digitalAprobado + $transferenciasNetas - $retirosNetos + $ingresosNetos, 2);
         $diferencia      = round($efectivoFisico - $totalEsperado, 2);
         $resultado       = abs($diferencia) < 0.01 ? 'CONSISTENTE'
                          : ($diferencia > 0 ? 'SOBRANTE' : 'FALTANTE');
