@@ -794,7 +794,10 @@ class CajaRepository
         $retirosPendientes = $this->getRetirosPendientesAplicar((int)$sesion['caja_id']);
         $retirosNetos = array_sum(array_column($retirosPendientes, 'monto'));
 
-        $total_esperado   = round($saldo_inicial + $ventas - $total_gastos - $digital_aprobado + $transferenciasNetas - $retirosNetos, 2);
+        $ingresosPendientes = $this->getIngresosPendientesAplicar((int)$sesion['caja_id']);
+        $ingresosNetos = array_sum(array_column($ingresosPendientes, 'monto'));
+
+        $total_esperado   = round($saldo_inicial + $ventas - $total_gastos - $digital_aprobado + $transferenciasNetas - $retirosNetos + $ingresosNetos, 2);
 
         // Diferencia: LO QUE ES − LO QUE SE DICE
         $total_contado = $efectivo_fisico;
@@ -853,6 +856,11 @@ class CajaRepository
                      ->execute(['sid' => $sesionId, 'rid' => $rt['id']]);
         }
 
+        foreach ($ingresosPendientes as $ig) {
+            $this->db->prepare("UPDATE ingreso_kgyr SET sesion_aplicada_id = :sid WHERE id = :iid")
+                     ->execute(['sid' => $sesionId, 'iid' => $ig['id']]);
+        }
+
         return [
             'saldo_inicial'      => $saldo_inicial,
             'total_ventas'       => $ventas,
@@ -862,6 +870,7 @@ class CajaRepository
             'digital_aprobado'   => $digital_aprobado,
             'transferencias_netas' => $transferenciasNetas,
             'retiros_netos'      => $retirosNetos,
+            'ingresos_netos'     => $ingresosNetos,
             'total_contado'      => $total_contado,
             'diferencia'         => $diferencia,
             'resultado'          => $resultado,
@@ -1836,6 +1845,138 @@ class CajaRepository
             'saldo_proximo_dia',
             'S/ ' . number_format($saldoAntes, 2),
             'S/ ' . number_format($saldoAntes - $monto, 2) . ' — retiro KGyR de S/ ' . number_format($monto, 2) . ' aplicado directamente al saldo base'
+        );
+
+        return true;
+    }
+
+    // ── Ingresos bancarios a caja ─────────────────────────
+
+    public function getIngresosPendientesAplicar(int $cajaId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT ig.*, p.nombres AS registrado_por_nombre
+             FROM ingreso_kgyr ig
+             INNER JOIN postulante p ON p.id_postulante = ig.registrado_por_id
+             WHERE ig.caja_destino_id = :cid AND ig.estado = 'ACTIVO' AND ig.sesion_aplicada_id IS NULL
+             ORDER BY ig.registrado_en ASC"
+        );
+        $stmt->execute(['cid' => $cajaId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getIngresosAplicados(int $sesionId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT ig.*, p.nombres AS registrado_por_nombre
+             FROM ingreso_kgyr ig
+             INNER JOIN postulante p ON p.id_postulante = ig.registrado_por_id
+             WHERE ig.sesion_aplicada_id = :sid
+             ORDER BY ig.registrado_en ASC"
+        );
+        $stmt->execute(['sid' => $sesionId]);
+        return $stmt->fetchAll();
+    }
+
+    public function registrarIngresoKgyr(int $cajaDestinoId, float $monto, string $banco, ?string $referencia, ?string $notas, int $userId): int
+    {
+        $this->db->prepare(
+            "INSERT INTO ingreso_kgyr (caja_destino_id, monto, banco, referencia, notas, registrado_por_id)
+             VALUES (:cid, :monto, :banco, :ref, :notas, :uid)"
+        )->execute([
+            'cid'   => $cajaDestinoId,
+            'monto' => $monto,
+            'banco' => $banco,
+            'ref'   => $referencia,
+            'notas' => $notas,
+            'uid'   => $userId,
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+
+    public function anularIngresoKgyr(int $id, int $adminId, string $password): bool|string
+    {
+        if (!$this->verificarPasswordAdmin($adminId, $password)) return 'Contraseña incorrecta';
+
+        $stmt = $this->db->prepare("SELECT * FROM ingreso_kgyr WHERE id = :id AND estado = 'ACTIVO'");
+        $stmt->execute(['id' => $id]);
+        $ingreso = $stmt->fetch();
+        if (!$ingreso) return 'Ingreso no encontrado o ya anulado';
+
+        if ($ingreso['sesion_aplicada_id'] !== null) {
+            return 'Este ingreso ya se aplicó en un cuadre y no puede anularse. Registra un retiro equivalente si fue un error.';
+        }
+
+        $this->db->prepare(
+            "UPDATE ingreso_kgyr SET estado = 'ANULADO', anulador_id = :aid, anulada_at = NOW()
+             WHERE id = :id"
+        )->execute(['aid' => $adminId, 'id' => $id]);
+
+        return true;
+    }
+
+    public function confirmarIngresoKgyrForzado(int $id, int $adminId, string $password): bool|string
+    {
+        if (!$this->verificarPasswordAdmin($adminId, $password)) return 'Contraseña incorrecta';
+
+        $stmt = $this->db->prepare("SELECT * FROM ingreso_kgyr WHERE id = :id AND estado = 'ACTIVO' AND sesion_aplicada_id IS NULL");
+        $stmt->execute(['id' => $id]);
+        $ingreso = $stmt->fetch();
+        if (!$ingreso) return 'Ingreso no encontrado, ya anulado o ya aplicado';
+
+        $cajaId = (int)$ingreso['caja_destino_id'];
+
+        $abiertaStmt = $this->db->prepare(
+            "SELECT id_sesion FROM sesion_caja
+             WHERE caja_id = :cid AND estado IN ('ABIERTA','PENDIENTE_VENTA') LIMIT 1"
+        );
+        $abiertaStmt->execute(['cid' => $cajaId]);
+        if ($abiertaStmt->fetch()) {
+            return 'Esta caja tiene una sesión abierta actualmente; el ingreso se aplicará automáticamente en su cuadre de cierre.';
+        }
+
+        $ultimaStmt = $this->db->prepare(
+            "SELECT sc.id_sesion
+             FROM sesion_caja sc
+             INNER JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
+             WHERE sc.caja_id = :cid AND sc.estado IN ('APROBADA','CERRADA')
+             ORDER BY sc.id_sesion DESC LIMIT 1"
+        );
+        $ultimaStmt->execute(['cid' => $cajaId]);
+        $ultimaSesionId = $ultimaStmt->fetchColumn();
+        if (!$ultimaSesionId) {
+            return 'No hay un cuadre previo de esta caja sobre el cual aplicar el ajuste.';
+        }
+        $ultimaSesionId = (int)$ultimaSesionId;
+
+        $monto = (float)$ingreso['monto'];
+
+        $antStmt = $this->db->prepare("SELECT saldo_proximo_dia FROM detalle_cuadre WHERE sesion_id = :sid");
+        $antStmt->execute(['sid' => $ultimaSesionId]);
+        $saldoAntes = (float)$antStmt->fetchColumn();
+
+        $this->db->prepare(
+            "UPDATE detalle_cuadre
+             SET saldo_proximo_dia      = saldo_proximo_dia + :mon,
+                 saldo_proxima_efectivo = saldo_proxima_efectivo + :mon2
+             WHERE sesion_id = :sid"
+        )->execute(['mon' => $monto, 'mon2' => $monto, 'sid' => $ultimaSesionId]);
+
+        $this->propagarBase($ultimaSesionId);
+
+        $this->db->prepare(
+            "UPDATE ingreso_kgyr SET estado = 'APLICADO_DIRECTO',
+                confirmado_directo_por_id = :aid, confirmado_directo_en = NOW(),
+                sesion_base_ajustada_id = :sid
+             WHERE id = :id"
+        )->execute(['aid' => $adminId, 'sid' => $ultimaSesionId, 'id' => $id]);
+
+        $this->audit(
+            $ultimaSesionId, $adminId,
+            'INGRESO_KGYR_APLICADO_DIRECTO',
+            'saldo_proximo_dia',
+            'S/ ' . number_format($saldoAntes, 2),
+            'S/ ' . number_format($saldoAntes + $monto, 2) . ' — ingreso bancario de S/ ' . number_format($monto, 2) . ' aplicado directamente al saldo base'
         );
 
         return true;

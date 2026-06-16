@@ -222,6 +222,9 @@ $router->post('/admin/api/deposito-kgyr/{id}/toggle',      [AdminController::cla
 $router->post('/admin/api/retiro-kgyr',                    [AdminController::class, 'apiRetiroKgyrCrear']);
 $router->post('/admin/api/retiro-kgyr/{id}/anular',        [AdminController::class, 'apiRetiroKgyrAnular']);
 $router->post('/admin/api/retiro-kgyr/{id}/confirmar-directo', [AdminController::class, 'apiRetiroKgyrConfirmarDirecto']);
+$router->post('/admin/api/ingreso-kgyr',                      [AdminController::class, 'apiIngresoKgyrCrear']);
+$router->post('/admin/api/ingreso-kgyr/{id}/anular',          [AdminController::class, 'apiIngresoKgyrAnular']);
+$router->post('/admin/api/ingreso-kgyr/{id}/confirmar-directo', [AdminController::class, 'apiIngresoKgyrConfirmarDirecto']);
 $router->post('/admin/api/tarifa-base/agregar',      [AdminController::class, 'addTarifaBase']);
 $router->post('/admin/api/tarifa-base/{id}/eliminar',[AdminController::class, 'eliminarTarifaBase']);
 $router->post('/admin/api/bono/agregar',             [AdminController::class, 'addBono']);

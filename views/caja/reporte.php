@@ -46,7 +46,12 @@ foreach ($retirosAplicados ?? [] as $rt) {
     $sum_retiros -= (float)$rt['monto'];
 }
 
-$loQueSeDice = round($saldo_ini + $total_ventas - $total_gastos - $digital_aprobado + $sum_ajustes_esp + $sum_transferencias + $sum_retiros, 2);
+$sum_ingresos = 0.0;
+foreach ($ingresosAplicados ?? [] as $ig) {
+    $sum_ingresos += (float)$ig['monto'];
+}
+
+$loQueSeDice = round($saldo_ini + $total_ventas - $total_gastos - $digital_aprobado + $sum_ajustes_esp + $sum_transferencias + $sum_retiros + $sum_ingresos, 2);
 $diferencia  = round($loQueEs - $loQueSeDice, 2);
 $resultado   = abs($diferencia) < 0.01 ? 'CONSISTENTE' : ($diferencia > 0 ? 'SOBRANTE' : 'FALTANTE');
 $clsDif      = abs($diferencia) < 0.01 ? 'dif-ok' : ($diferencia > 0 ? 'dif-sobrante' : 'dif-faltante');
@@ -237,6 +242,18 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
                 <div class="caja-linea caja-linea--sub" style="font-size:.75rem;color:#94a3b8;">
                     <span>Retiro a <?= htmlspecialchars($rt['banco']) ?> por <?= htmlspecialchars($rt['registrado_por_nombre']) ?> · <?= date('d/m/Y H:i', strtotime($rt['registrado_en'])) ?></span>
                     <span><?= $f2($rt['monto']) ?></span>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+                <?php if ($sum_ingresos != 0): ?>
+                <div class="caja-linea caja-linea--sub">
+                    <span style="color:#16a34a;font-weight:600;">+ Ingresos bancarios a caja</span>
+                    <strong style="color:#16a34a;"><?= $f2($sum_ingresos) ?></strong>
+                </div>
+                <?php foreach ($ingresosAplicados ?? [] as $ig): ?>
+                <div class="caja-linea caja-linea--sub" style="font-size:.75rem;color:#94a3b8;">
+                    <span>Ingreso desde <?= htmlspecialchars($ig['banco']) ?> por <?= htmlspecialchars($ig['registrado_por_nombre']) ?> · <?= date('d/m/Y H:i', strtotime($ig['registrado_en'])) ?></span>
+                    <span><?= $f2($ig['monto']) ?></span>
                 </div>
                 <?php endforeach; ?>
                 <?php endif; ?>

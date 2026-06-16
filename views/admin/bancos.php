@@ -70,6 +70,25 @@ $retiros = $db->query(
      LEFT JOIN postulante pcd ON pcd.id_postulante = rk.confirmado_directo_por_id
      ORDER BY rk.registrado_en DESC LIMIT 100"
 )->fetchAll();
+
+$ingresos = $db->query(
+    "SELECT ig.*,
+            CONCAT(c.descripcion, ' (', l.descripcion, ')') AS caja_destino_desc,
+            p.nombres AS registrado_por_nombre,
+            pa.nombres AS anulador_nombre,
+            pcd.nombres AS confirmador_directo_nombre,
+            EXISTS(
+                SELECT 1 FROM sesion_caja sc
+                WHERE sc.caja_id = ig.caja_destino_id AND sc.estado IN ('ABIERTA','PENDIENTE_VENTA')
+            ) AS caja_abierta
+     FROM ingreso_kgyr ig
+     INNER JOIN caja c ON c.id_caja = ig.caja_destino_id
+     INNER JOIN local l ON l.id_local = c.local_id
+     INNER JOIN postulante p ON p.id_postulante = ig.registrado_por_id
+     LEFT JOIN postulante pa  ON pa.id_postulante  = ig.anulador_id
+     LEFT JOIN postulante pcd ON pcd.id_postulante = ig.confirmado_directo_por_id
+     ORDER BY ig.registrado_en DESC LIMIT 100"
+)->fetchAll();
 ?>
 
 <style>
@@ -310,6 +329,81 @@ $retiros = $db->query(
             <?php endif; ?>
         </div>
     </div>
+
+    <!-- Ingresos bancarios a caja -->
+    <div class="card" style="margin-top:1.25rem;">
+        <div class="card-head">
+            <p class="card-title">Ingresos bancarios a caja</p>
+            <button class="btn-sm" style="background:#065f46;color:#fff;border-color:#065f46;"
+                    onclick="document.getElementById('modalIngreso').style.display='flex'">
+                + Registrar ingreso
+            </button>
+        </div>
+        <div class="card-body" style="padding:0;overflow-x:auto;">
+            <?php if (empty($ingresos)): ?>
+            <p style="padding:1.5rem;font-size:.85rem;color:#94a3b8;text-align:center;">Sin ingresos registrados.</p>
+            <?php else: ?>
+            <table class="dep-table">
+                <thead>
+                    <tr>
+                        <th>Caja destino</th>
+                        <th>Monto</th>
+                        <th>Banco</th>
+                        <th>Referencia</th>
+                        <th>Registrado por</th>
+                        <th>Estado</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($ingresos as $ig): ?>
+                    <tr id="ingreso-row-<?= $ig['id'] ?>">
+                        <td style="font-size:.78rem;color:#64748b;"><?= htmlspecialchars($ig['caja_destino_desc']) ?></td>
+                        <td style="font-weight:700;white-space:nowrap;color:#16a34a;">+<?= $f2($ig['monto']) ?></td>
+                        <td>
+                            <span class="badge <?= $ig['banco']==='BCP'?'badge-bcp':'badge-bbva' ?>">
+                                <?= $ig['banco'] ?>
+                            </span>
+                        </td>
+                        <td style="color:#475569;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            <?= htmlspecialchars($ig['referencia'] ?? '—') ?>
+                        </td>
+                        <td style="font-size:.78rem;color:#64748b;white-space:nowrap;">
+                            <?= htmlspecialchars($ig['registrado_por_nombre']) ?><br>
+                            <span style="color:#94a3b8;"><?= date('d/m/Y H:i', strtotime($ig['registrado_en'])) ?></span>
+                        </td>
+                        <td>
+                            <?php if ($ig['estado'] === 'ANULADO'): ?>
+                            <span class="badge" style="background:#f1f5f9;color:#64748b;">ANULADO</span>
+                            <?php elseif ($ig['estado'] === 'APLICADO_DIRECTO'): ?>
+                            <a href="<?= $base ?>/caja/reporte/<?= $ig['sesion_base_ajustada_id'] ?>" target="_blank" class="badge badge-ok" style="text-decoration:none;">
+                                Aplicado directo (cuadre #<?= $ig['sesion_base_ajustada_id'] ?>)
+                            </a>
+                            <?php elseif ($ig['sesion_aplicada_id']): ?>
+                            <a href="<?= $base ?>/caja/reporte/<?= $ig['sesion_aplicada_id'] ?>" target="_blank" class="badge badge-ok" style="text-decoration:none;">
+                                Aplicado a sesión #<?= $ig['sesion_aplicada_id'] ?>
+                            </a>
+                            <?php else: ?>
+                            <span class="badge badge-pend">POR APLICAR</span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="white-space:nowrap;">
+                            <?php if ($ig['estado'] === 'ACTIVO' && !$ig['sesion_aplicada_id']): ?>
+                            <?php if (!$ig['caja_abierta']): ?>
+                            <button class="btn-sm" style="background:#dbeafe;color:#1e40af;border-color:#bfdbfe;"
+                                    onclick="confirmarIngresoDirecto(<?= $ig['id'] ?>, this)" title="La caja está cerrada: ajusta el saldo base ahora sin esperar al próximo cuadre">Confirmar ahora</button>
+                            <?php endif; ?>
+                            <button class="btn-sm" style="background:#fee2e2;color:#991b1b;border-color:#fecaca;"
+                                    onclick="anularIngresoKgyr(<?= $ig['id'] ?>, this)">Anular</button>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
+        </div>
+    </div>
 </div>
 
 <!-- Modal nuevo depósito manual -->
@@ -363,6 +457,68 @@ $retiros = $db->query(
             </button>
         </div>
         <p id="modalAlert" style="display:none;margin-top:.5rem;font-size:.78rem;font-weight:600;color:#991b1b;"></p>
+    </div>
+</div>
+
+<!-- Modal nuevo ingreso bancario a caja -->
+<div id="modalIngreso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);
+     z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:420px;margin:1rem;">
+        <p style="font-size:.95rem;font-weight:800;color:#1e293b;margin:0 0 1rem;">Registrar ingreso bancario a caja</p>
+        <div style="margin-bottom:.6rem;">
+            <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Caja destino *</label>
+            <select id="ig_caja" style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;">
+                <?php foreach ($cajasActivas as $ca): ?>
+                <option value="<?= $ca['id_caja'] ?>"><?= htmlspecialchars($ca['desc_completa']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.6rem;">
+            <div>
+                <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Monto (S/) *</label>
+                <input type="number" step="0.01" min="0.01" id="ig_monto"
+                       style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;"
+                       placeholder="0.00">
+            </div>
+            <div>
+                <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Banco origen *</label>
+                <select id="ig_banco" style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;">
+                    <option value="BCP">BCP</option>
+                    <option value="BBVA">BBVA</option>
+                </select>
+            </div>
+        </div>
+        <div style="margin-bottom:.6rem;">
+            <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Referencia / N° operación</label>
+            <input type="text" id="ig_ref"
+                   style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;"
+                   placeholder="Opcional">
+        </div>
+        <div style="margin-bottom:.6rem;">
+            <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Notas</label>
+            <input type="text" id="ig_notas"
+                   style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;"
+                   placeholder="Opcional">
+        </div>
+        <div style="margin-bottom:.85rem;">
+            <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;display:block;margin-bottom:.3rem;">Tu contraseña *</label>
+            <input type="password" id="ig_password"
+                   style="width:100%;padding:.45rem .7rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.875rem;font-family:inherit;"
+                   placeholder="Confirma tu contraseña de admin">
+        </div>
+        <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+            <button onclick="document.getElementById('modalIngreso').style.display='none'"
+                    style="padding:.5rem 1rem;border-radius:7px;border:1.5px solid #e2e8f0;background:#f1f5f9;
+                           color:#475569;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;">
+                Cancelar
+            </button>
+            <button onclick="guardarIngresoKgyr()"
+                    style="padding:.5rem 1rem;border-radius:7px;border:none;background:#065f46;
+                           color:#fff;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;">
+                Guardar
+            </button>
+        </div>
+        <p id="modalIngresoAlert" style="display:none;margin-top:.5rem;font-size:.78rem;font-weight:600;color:#991b1b;"></p>
     </div>
 </div>
 
@@ -512,6 +668,64 @@ async function anularRetiroKgyr(id, btn) {
     if (!password) return;
     try {
         const r    = await fetch(`${BASE}/admin/api/retiro-kgyr/${id}/anular`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ password })
+        });
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.message || 'Error');
+        location.reload();
+    } catch(e) { alert(e.message); }
+}
+
+async function guardarIngresoKgyr() {
+    const caja_destino_id = parseInt(document.getElementById('ig_caja').value);
+    const banco    = document.getElementById('ig_banco').value;
+    const monto    = parseFloat(document.getElementById('ig_monto').value) || 0;
+    const ref      = document.getElementById('ig_ref').value.trim();
+    const notas    = document.getElementById('ig_notas').value.trim();
+    const password = document.getElementById('ig_password').value;
+    const alertEl  = document.getElementById('modalIngresoAlert');
+
+    if (!monto || monto <= 0) { alertEl.textContent='Ingresa un monto válido'; alertEl.style.display='block'; return; }
+    if (!password) { alertEl.textContent='Ingresa tu contraseña'; alertEl.style.display='block'; return; }
+
+    try {
+        const r    = await fetch(`${BASE}/admin/api/ingreso-kgyr`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ caja_destino_id, monto, banco, referencia: ref||null, notas: notas||null, password })
+        });
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.message || 'Error');
+        location.reload();
+    } catch(e) {
+        alertEl.textContent = e.message;
+        alertEl.style.display = 'block';
+    }
+}
+
+async function confirmarIngresoDirecto(id, btn) {
+    if (!confirm('Esto sumará el monto al saldo base del último cuadre de esta caja de inmediato. ¿Continuar?')) return;
+    const password = prompt('Ingresa tu contraseña de admin:');
+    if (!password) return;
+    try {
+        const r    = await fetch(`${BASE}/admin/api/ingreso-kgyr/${id}/confirmar-directo`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ password })
+        });
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.message || 'Error');
+        location.reload();
+    } catch(e) { alert(e.message); }
+}
+
+async function anularIngresoKgyr(id, btn) {
+    const password = prompt('Ingresa tu contraseña de admin para anular este ingreso:');
+    if (!password) return;
+    try {
+        const r    = await fetch(`${BASE}/admin/api/ingreso-kgyr/${id}/anular`, {
             method:'POST',
             headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ password })

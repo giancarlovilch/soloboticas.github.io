@@ -251,6 +251,16 @@ $act = [
     </div>
     <?php endforeach; ?>
 
+    <?php foreach ($ingresosPendientes ?? [] as $ig): ?>
+    <div class="caja-alert caja-alert--info" style="margin-top:.6rem;border-left-color:#16a34a;">
+        Ingreso de <strong>S/ <?= number_format((float)$ig['monto'], 2) ?></strong> desde
+        <?= htmlspecialchars($ig['banco']) ?> a esta caja, registrado el
+        <?= date('d/m/Y H:i', strtotime($ig['registrado_en'])) ?> por
+        <strong><?= htmlspecialchars($ig['registrado_por_nombre']) ?></strong>
+        — se sumará al esperado en el cuadre de cierre de esta sesión.
+    </div>
+    <?php endforeach; ?>
+
     <input type="hidden" id="sesionId" value="<?= $sesionId ?>">
     <?php endif; ?>
 
