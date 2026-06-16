@@ -119,6 +119,7 @@ $router->post('/caja/api/{id}/ventas',         [CajaController::class, 'submitVe
 $router->post('/caja/api/reporte/{id}/rectificar',        [CajaController::class, 'rectificar']);
 $router->post('/caja/api/rectificacion/{id}/eliminar',    [CajaController::class, 'eliminarRectificacion']);
 $router->post('/caja/api/sesion/{id}/conteo',                [CajaController::class, 'apiConteo']);
+$router->post('/caja/api/sesion/{id}/num-ops-bcp',           [CajaController::class, 'apiUpdateNumOpsBcp']);
 $router->post('/caja/api/sesion/{id}/ajuste-esperado',       [CajaController::class, 'addAjusteEsperado']);
 $router->post('/caja/api/ajuste-esperado/{id}/eliminar',     [CajaController::class, 'deleteAjusteEsperado']);
 $router->post('/caja/api/sesion/{id}/comentario',            [CajaController::class, 'guardarComentario']);

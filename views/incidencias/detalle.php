@@ -267,6 +267,21 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
 
         /* Correction ventas */
         .corr-row { display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem; }
+
+        /* Section group labels */
+        .group-label { font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;
+                       color:#94a3b8;margin:.6rem 0 .35rem;display:flex;align-items:center;gap:.5rem; }
+        .group-label::after { content:'';flex:1;height:1px;background:#e2e8f0; }
+
+        /* Card color variants */
+        .card--blue   { border-left:3px solid #3b82f6; }
+        .card--blue   .card-head { background:#f0f9ff; }
+        .card--amber  { border-left:3px solid #f59e0b; }
+        .card--amber  .card-head { background:#fffbeb; }
+        .card--purple { border-left:3px solid #7c3aed; }
+        .card--purple .card-head { background:#faf5ff; }
+        .card--slate  { border-left:3px solid #94a3b8; }
+        .card--slate  .card-head { background:#f8fafc; }
     </style>
 </head>
 <body>
@@ -331,8 +346,10 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
         <!-- ═══════════════════════════════════════════════════════════ -->
         <div>
 
+            <div class="group-label">Datos del arqueo</div>
+
             <!-- ── 1. Conteo de efectivo ──────────────────────── -->
-            <div class="card">
+            <div class="card card--blue">
                 <div class="card-head">
                     <p class="card-title">Conteo de efectivo</p>
                     <span style="font-size:.72rem;color:#94a3b8;">
@@ -418,11 +435,54 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     </ul>
                     <?php endif; ?>
 
+                    <!-- Operaciones BCP -->
+                    <?php $numOpsBcp = $dc['num_operaciones_bcp'] ?? null; ?>
+                    <hr class="sec-divider" style="margin:.9rem 0 .6rem;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;">
+                        <span class="form-label" style="margin:0;">Operaciones BCP (agente)</span>
+                        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                            <span style="font-size:.8rem;color:#64748b;">
+                                Actual: <strong id="numBcpActual"><?= $numOpsBcp !== null ? (int)$numOpsBcp : '—' ?></strong>
+                            </span>
+                            <input type="number" min="0" step="1" id="numBcpInput"
+                                   value="<?= $numOpsBcp !== null ? (int)$numOpsBcp : 0 ?>"
+                                   style="width:70px;padding:.25rem .4rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:.82rem;text-align:right;font-family:inherit;outline:none;">
+                            <button class="btn btn-primary btn-sm" onclick="guardarNumBcp()">Guardar</button>
+                            <span id="bcpAlert" style="display:none;" class="alert"></span>
+                        </div>
+                    </div>
+                    <?php
+                    $histBcp = array_values(array_filter(
+                        $auditoriaCaja ?? [],
+                        fn($a) => $a['accion'] === 'CONTEO_MODIFICADO' && ($a['campo_modificado'] ?? '') === 'num_operaciones_bcp'
+                    ));
+                    if (!empty($histBcp)):
+                    ?>
+                    <ul class="item-list" style="margin-top:.4rem;">
+                        <?php foreach (array_reverse($histBcp) as $h): ?>
+                        <li style="flex-direction:column;align-items:flex-start;gap:.1rem;">
+                            <div style="display:flex;justify-content:space-between;width:100%;">
+                                <span style="font-size:.73rem;color:#64748b;">Ops BCP</span>
+                                <span style="font-size:.73rem;color:#64748b;">
+                                    <?= htmlspecialchars($h['valor_anterior'] ?? '') ?>
+                                    <span style="color:#94a3b8;">→</span>
+                                    <strong style="color:#1e293b;"><?= htmlspecialchars($h['valor_nuevo'] ?? '') ?></strong>
+                                </span>
+                            </div>
+                            <div style="font-size:.65rem;color:#94a3b8;">
+                                <?= htmlspecialchars($h['registrado_por'] ?? '—') ?>
+                                · <?= date('d/m/Y H:i', strtotime($h['fecha'])) ?>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
+
                 </div>
             </div>
 
             <!-- ── 2. Ventas del turno ────────────────────────── -->
-            <div class="card">
+            <div class="card card--blue">
                 <div class="card-head">
                     <p class="card-title">Ventas del turno</p>
                 </div>
@@ -477,6 +537,8 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                 </div>
             </div>
 
+            <div class="group-label">Ajustes</div>
+
             <!-- ── 3. Cobros electrónicos ─────────────────────── -->
             <?php
             $cobrosElec = array_values(array_filter(
@@ -484,7 +546,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                 fn($d) => strtolower(trim($d['modo_desc'] ?? '')) !== 'solobank'
             ));
             ?>
-            <div class="card">
+            <div class="card card--amber">
                 <div class="card-head">
                     <p class="card-title">Cobros electrónicos</p>
                     <span style="font-size:.72rem;color:#94a3b8;">Yape · Plin · Visa POS · otros</span>
@@ -560,7 +622,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
 
             <?php if (!empty($transferenciasPendientes)): ?>
             <!-- ── Transferencias de saldo por aplicar ───────────── -->
-            <div class="card">
+            <div class="card card--amber">
                 <div class="card-head">
                     <p class="card-title">Transferencias de saldo por aplicar</p>
                 </div>
@@ -585,7 +647,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
 
             <?php if (!empty($retirosPendientes)): ?>
             <!-- ── Retiros de caja para depósito a KGyR por aplicar ── -->
-            <div class="card">
+            <div class="card card--amber">
                 <div class="card-head">
                     <p class="card-title">Retiros de caja por aplicar</p>
                 </div>
@@ -605,7 +667,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
             <?php endif; ?>
 
             <!-- ── 4. Ajustes al esperado ─────────────────────── -->
-            <div class="card">
+            <div class="card card--amber">
                 <div class="card-head">
                     <p class="card-title">Ajustes al esperado</p>
                 </div>
@@ -801,7 +863,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
             </div>
 
             <!-- ── 5. Vales SoloBank ───────────────────────────── -->
-            <div class="card">
+            <div class="card card--amber">
                 <div class="card-head">
                     <p class="card-title">Vales SoloBank</p>
                 </div>
@@ -849,7 +911,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
             </div>
 
             <!-- ── 6. Vales de regularización ────────────────────── -->
-            <div class="card">
+            <div class="card card--amber">
                 <div class="card-head">
                     <p class="card-title">Vales de regularización</p>
                     <span style="font-size:.7rem;color:#94a3b8;">Regulariza cobros entre sesiones</span>
@@ -981,8 +1043,10 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                 </div>
             </div>
 
+            <div class="group-label">Resolución</div>
+
             <!-- ── 7. Movimiento de incidencia ── -->
-            <div class="card">
+            <div class="card card--purple">
                 <div class="card-head">
                     <p class="card-title">Resolución de incidencia</p>
                 </div>
@@ -1095,7 +1159,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
             </div>
 
             <!-- ── 7. Descripción del caso ────────────────────── -->
-            <div class="card">
+            <div class="card card--slate">
                 <div class="card-head">
                     <p class="card-title">Descripción del caso</p>
                 </div>
@@ -1723,6 +1787,20 @@ async function guardarConteo() {
     } catch(e) {
         mostrarAlerta('conteoAlert', e.message, 'err');
         btn.disabled = false; btn.textContent = 'Guardar conteo';
+    }
+}
+
+// ── Guardar operaciones BCP ─────────────────────────────
+async function guardarNumBcp() {
+    const val = parseInt(document.getElementById('numBcpInput').value, 10);
+    if (isNaN(val) || val < 0) { mostrarAlerta('bcpAlert', 'Valor inválido', 'err'); return; }
+    try {
+        await apiPost(`${BASE}/caja/api/sesion/${SESION_ID}/num-ops-bcp`, { num_operaciones_bcp: val });
+        mostrarAlerta('bcpAlert', '✓ Actualizado', 'ok');
+        document.getElementById('numBcpActual').textContent = val;
+        setTimeout(() => location.reload(), 900);
+    } catch(e) {
+        mostrarAlerta('bcpAlert', e.message, 'err');
     }
 }
 

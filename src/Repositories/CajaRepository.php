@@ -255,21 +255,6 @@ class CajaRepository
                                )
                            )
                        ) AS diferencia,
-                       COALESCE((
-                           SELECT SUM(rc.monto)
-                           FROM rectificacion_cuadre rc
-                           WHERE rc.sesion_id = sc.id_sesion
-                       ), 0) AS sum_rectifs,
-                       COALESCE((
-                           SELECT SUM(CASE WHEN ae.accion = 'AGREGAR' THEN ae.monto ELSE -ae.monto END)
-                           FROM ajuste_esperado ae
-                           WHERE ae.sesion_id = sc.id_sesion
-                       ), 0) AS sum_ajustes,
-                       COALESCE((
-                           SELECT SUM(cv.monto_nuevo - cv.monto_anterior)
-                           FROM correccion_venta cv
-                           WHERE cv.sesion_id = sc.id_sesion
-                       ), 0) AS sum_corr_ventas,
                        ic.id_incidencia   AS inc_id,
                        ic.tipo            AS inc_tipo,
                        ic.estado          AS inc_estado,
@@ -391,12 +376,35 @@ class CajaRepository
 
     public function deletePagoDigital(int $movId): bool
     {
+        // Leer sesion_id antes de borrar para poder recalcular si la sesión ya está cerrada
+        $rowStmt = $this->db->prepare(
+            "SELECT sesion_id FROM movimiento_sesion
+             WHERE id_movimiento = :id AND tipo_movimiento_id = 1 AND estado = 'PENDIENTE'"
+        );
+        $rowStmt->execute(['id' => $movId]);
+        $sesionId = (int)($rowStmt->fetchColumn() ?: 0);
+
         $stmt = $this->db->prepare(
             "DELETE FROM movimiento_sesion
              WHERE id_movimiento = :id AND tipo_movimiento_id = 1 AND estado = 'PENDIENTE'"
         );
         $stmt->execute(['id' => $movId]);
-        return $stmt->rowCount() > 0;
+        if ($stmt->rowCount() === 0) return false;
+
+        // Si la sesión ya tiene cuadre guardado (está cerrada/observada/rechazada),
+        // recalcular diferencia para que dc.diferencia refleje el pago eliminado.
+        if ($sesionId > 0) {
+            $estadoStmt = $this->db->prepare(
+                "SELECT estado FROM sesion_caja WHERE id_sesion = :sid"
+            );
+            $estadoStmt->execute(['sid' => $sesionId]);
+            $estado = $estadoStmt->fetchColumn();
+            if (in_array($estado, ['CERRADA', 'OBSERVADA', 'RECHAZADA'], true)) {
+                $this->recalcularDiferenciaCompleta($sesionId);
+            }
+        }
+
+        return true;
     }
 
     public function getMovimientoById(int $movId, int $sesionId): ?array
@@ -496,9 +504,17 @@ class CajaRepository
         return (float)$stmt->fetchColumn();
     }
 
-    /** Recalcula diferencia/resultado en detalle_cuadre tras cambios retroactivos
-     *  (asignación o liberación de vales SoloBank en sesiones ya cerradas). */
-    public function recalcularDiferencia(int $sesionId): void
+    /**
+     * Fuente de verdad única para diferencia/resultado.
+     * Usa la misma fórmula que reporte.php:
+     *   loQueEs     = efectivo físico + rectificaciones post-cierre
+     *   loQueSeDice = saldo_inicial + ventas + correcciones_venta
+     *                 - gastos - digital_declarado + ajustes_esperado
+     *                 + transferencias_netas - retiros + ingresos
+     * Se llama tras cualquier cambio post-cierre para mantener dc.diferencia
+     * siempre actualizado y consistente entre el índice, el reporte y las incidencias.
+     */
+    public function recalcularDiferenciaCompleta(int $sesionId): void
     {
         $sesion = $this->getSesionById($sesionId);
         if (!$sesion) return;
@@ -508,16 +524,37 @@ class CajaRepository
         $dc = $dcStmt->fetch();
         if (!$dc) return;
 
-        $ventas         = (float)($dc['total_ventas_sistema']  ?? 0);
-        $gastos         = (float)($dc['total_gastos_sistema']  ?? 0);
+        // LO QUE ES: efectivo físico + rectificaciones (dinero encontrado / devuelto)
         $efectivoFisico = (float)($dc['total_efectivo_contado'] ?? 0);
-        $saldoInicial   = (float)($sesion['saldo_inicial']      ?? 0);
+        $rectStmt = $this->db->prepare(
+            "SELECT COALESCE(SUM(monto),0) FROM rectificacion_cuadre WHERE sesion_id = :sid"
+        );
+        $rectStmt->execute(['sid' => $sesionId]);
+        $sumRectifs = (float)$rectStmt->fetchColumn();
+        $loQueEs = round($efectivoFisico + $sumRectifs, 2);
 
-        $digitalAprobado = $this->sumDigitalDeclarado($sesionId);
+        // LO QUE SE DICE
+        $saldoInicial = (float)($sesion['saldo_inicial'] ?? 0);
+        $ventas       = (float)($dc['total_ventas_sistema'] ?? 0);
+        $gastos       = (float)($dc['total_gastos_sistema'] ?? 0);
 
-        // Incluir transferencias/retiros/ingresos ya aplicados a este cuadre,
-        // igual que calcularYGuardarCuadre(), para no sobreescribir dc.diferencia
-        // con un valor incompleto que no refleje esos movimientos.
+        $cvStmt = $this->db->prepare(
+            "SELECT COALESCE(SUM(monto_nuevo - monto_anterior),0) FROM correccion_venta WHERE sesion_id = :sid"
+        );
+        $cvStmt->execute(['sid' => $sesionId]);
+        $sumCorrVentas = (float)$cvStmt->fetchColumn();
+
+        $digitalDeclarado = $this->sumDigitalDeclarado($sesionId);
+
+        // AGREGAR → -monto (reduce lo esperado, disminuye el faltante)
+        // QUITAR  → +monto (aumenta lo esperado)
+        $ajStmt = $this->db->prepare(
+            "SELECT COALESCE(SUM(CASE WHEN accion = 'AGREGAR' THEN -monto ELSE monto END),0)
+             FROM ajuste_esperado WHERE sesion_id = :sid"
+        );
+        $ajStmt->execute(['sid' => $sesionId]);
+        $sumAjustesEsp = (float)$ajStmt->fetchColumn();
+
         $trStmt = $this->db->prepare(
             "SELECT COALESCE(SUM(CASE
                 WHEN sesion_aplicada_origen_id = :s1 THEN -monto
@@ -529,7 +566,7 @@ class CajaRepository
         $trStmt->execute(['s1'=>$sesionId,'s2'=>$sesionId,'s3'=>$sesionId,'s4'=>$sesionId]);
         $transferenciasNetas = (float)$trStmt->fetchColumn();
 
-        $rtStmt = $this->db->prepare("SELECT COALESCE(SUM(monto),0) FROM retiro_kgyr  WHERE sesion_aplicada_id = :sid");
+        $rtStmt = $this->db->prepare("SELECT COALESCE(SUM(monto),0) FROM retiro_kgyr WHERE sesion_aplicada_id = :sid");
         $rtStmt->execute(['sid' => $sesionId]);
         $retirosNetos = (float)$rtStmt->fetchColumn();
 
@@ -537,10 +574,15 @@ class CajaRepository
         $igStmt->execute(['sid' => $sesionId]);
         $ingresosNetos = (float)$igStmt->fetchColumn();
 
-        $totalEsperado = round($saldoInicial + $ventas - $gastos - $digitalAprobado + $transferenciasNetas - $retirosNetos + $ingresosNetos, 2);
-        $diferencia      = round($efectivoFisico - $totalEsperado, 2);
-        $resultado       = abs($diferencia) < 0.01 ? 'CONSISTENTE'
-                         : ($diferencia > 0 ? 'SOBRANTE' : 'FALTANTE');
+        $loQueSeDice = round(
+            $saldoInicial + $ventas + $sumCorrVentas - $gastos - $digitalDeclarado
+            + $sumAjustesEsp + $transferenciasNetas - $retirosNetos + $ingresosNetos,
+            2
+        );
+
+        $diferencia = round($loQueEs - $loQueSeDice, 2);
+        $resultado  = abs($diferencia) < 0.01 ? 'CONSISTENTE'
+                    : ($diferencia > 0 ? 'SOBRANTE' : 'FALTANTE');
 
         $this->db->prepare(
             "UPDATE detalle_cuadre SET
@@ -549,7 +591,7 @@ class CajaRepository
                 resultado_cuadre       = :res
              WHERE sesion_id = :sid"
         )->execute([
-            'esp' => $totalEsperado,
+            'esp' => $loQueSeDice,
             'dif' => $diferencia,
             'res' => $resultado,
             'sid' => $sesionId,
@@ -561,10 +603,16 @@ class CajaRepository
                 diferencia_final    = :dif
              WHERE id_sesion = :sid"
         )->execute([
-            'esp' => $totalEsperado,
+            'esp' => $loQueSeDice,
             'dif' => $diferencia,
             'sid' => $sesionId,
         ]);
+    }
+
+    /** @deprecated Usar recalcularDiferenciaCompleta() */
+    public function recalcularDiferencia(int $sesionId): void
+    {
+        $this->recalcularDiferenciaCompleta($sesionId);
     }
 
     // ── Gastos ─────────────────────────────────────────────
@@ -1278,6 +1326,22 @@ class CajaRepository
         $this->propagarBase($sesionId);
     }
 
+    public function updateNumOperacionesBcp(int $sesionId, int $numOps, int $postulanteId): void
+    {
+        $old = $this->db->prepare("SELECT num_operaciones_bcp FROM detalle_cuadre WHERE sesion_id = :sid");
+        $old->execute(['sid' => $sesionId]);
+        $prev = $old->fetchColumn();
+        if ($prev === false) return;
+
+        $this->audit($sesionId, $postulanteId, 'CONTEO_MODIFICADO', 'num_operaciones_bcp',
+            (string)(int)$prev,
+            (string)$numOps);
+
+        $this->db->prepare(
+            "UPDATE detalle_cuadre SET num_operaciones_bcp = :ops WHERE sesion_id = :sid"
+        )->execute(['ops' => $numOps, 'sid' => $sesionId]);
+    }
+
     // ── Rectificaciones ────────────────────────────────────
 
     public function addRectificacion(int $sesionId, int $registraId, int $tipoRectId, float $monto, string $descripcion): void
@@ -1319,6 +1383,7 @@ class CajaRepository
             'S/ ' . number_format($saldoAntes + $montoFirmado, 2) . ' — ' . $descripcion
         );
 
+        $this->recalcularDiferenciaCompleta($sesionId);
         $this->propagarBase($sesionId);
     }
 
@@ -1359,6 +1424,7 @@ class CajaRepository
             'S/ ' . number_format($saldoAntes + $montoInverso, 2) . ' — eliminada: ' . $rect['descripcion_contexto']
         );
 
+        $this->recalcularDiferenciaCompleta($sesionId);
         $this->propagarBase($sesionId);
 
         return true;
@@ -1408,48 +1474,8 @@ class CajaRepository
 
         // Si ya tiene cuadre guardado, recalcular con la nueva base y continuar la cadena
         if (in_array($nextEstado, ['CERRADA', 'EN_REVISION', 'OBSERVADA', 'RECHAZADA'])) {
-            $dcStmt = $this->db->prepare("SELECT * FROM detalle_cuadre WHERE sesion_id = :sid");
-            $dcStmt->execute(['sid' => $nextId]);
-            $dc = $dcStmt->fetch();
-
-            if ($dc) {
-                $ventas          = (float)($dc['total_ventas_sistema'] ?? 0);
-                $gastos          = (float)($dc['total_gastos_sistema'] ?? 0);
-                $digitalAprobado = $this->sumDigitalDeclarado($nextId);
-                $efectivoFisico  = (float)($dc['total_efectivo_contado'] ?? 0);
-
-                $nuevoEsperado = round($saldo + $ventas - $gastos - $digitalAprobado, 2);
-                $nuevaDif      = round($efectivoFisico - $nuevoEsperado, 2);
-                $nuevoResult   = abs($nuevaDif) < 0.01 ? 'CONSISTENTE'
-                               : ($nuevaDif > 0       ? 'SOBRANTE'    : 'FALTANTE');
-
-                $this->db->prepare(
-                    "UPDATE detalle_cuadre SET
-                        total_esperado_sistema = :esp,
-                        diferencia             = :dif,
-                        resultado_cuadre       = :res
-                     WHERE sesion_id = :sid"
-                )->execute([
-                    'esp' => $nuevoEsperado,
-                    'dif' => $nuevaDif,
-                    'res' => $nuevoResult,
-                    'sid' => $nextId,
-                ]);
-
-                $this->db->prepare(
-                    "UPDATE sesion_caja SET
-                        saldo_final_sistema = :esp,
-                        diferencia_final    = :dif
-                     WHERE id_sesion = :sid"
-                )->execute([
-                    'esp' => $nuevoEsperado,
-                    'dif' => $nuevaDif,
-                    'sid' => $nextId,
-                ]);
-
-                // Propagar en cascada: continúa con la sesión siguiente de nextId
-                $this->propagarBase($nextId);
-            }
+            $this->recalcularDiferenciaCompleta($nextId);
+            $this->propagarBase($nextId);
         }
         // Si nextEstado es ABIERTA o PENDIENTE_VENTA: solo se actualizó saldo_inicial
         // y la cadena se detiene — esa sesión aún no tiene saldo_proximo_dia real.
@@ -1505,6 +1531,8 @@ class CajaRepository
             "{$accion} S/ " . number_format(abs($monto), 2) . " ({$tipo}) — {$desc}"
         );
 
+        $this->recalcularDiferenciaCompleta($sesionId);
+
         // Auto-registrar en deposito_kgyr cuando es un depósito a KGyR
         if ($tipo === 'DEPOSITO') {
             $ajusteId = (int)$this->db->lastInsertId();
@@ -1545,6 +1573,8 @@ class CajaRepository
             "{$ajuste['accion']} S/ " . number_format((float)$ajuste['monto'], 2) . " ({$ajuste['tipo']}) — {$ajuste['descripcion']}",
             '—'
         );
+
+        $this->recalcularDiferenciaCompleta((int)$ajuste['sesion_id']);
 
         return true;
     }
@@ -2054,5 +2084,7 @@ class CajaRepository
             'S/ ' . number_format($montoAnterior, 2),
             'S/ ' . number_format(round($montoNuevo, 2), 2) . ($motivo !== '' ? " — {$motivo}" : '')
         );
+
+        $this->recalcularDiferenciaCompleta($sesionId);
     }
 }

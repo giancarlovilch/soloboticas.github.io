@@ -207,21 +207,7 @@ class ReporteController extends Controller
                     sc.comentario_cajera,
                     sc.respuesta_admin,
                     (sc.comentario_cajera IS NOT NULL AND sc.respuesta_admin IS NULL) AS por_responder,
-                    COALESCE((
-                        SELECT SUM(rc.monto)
-                        FROM rectificacion_cuadre rc
-                        WHERE rc.sesion_id = sc.id_sesion
-                    ), 0) AS sum_rectifs,
-                    COALESCE((
-                        SELECT SUM(CASE WHEN ae.accion = 'AGREGAR' THEN ae.monto ELSE -ae.monto END)
-                        FROM ajuste_esperado ae
-                        WHERE ae.sesion_id = sc.id_sesion
-                    ), 0) AS sum_ajustes,
-                    COALESCE((
-                        SELECT SUM(cv.monto_nuevo - cv.monto_anterior)
-                        FROM correccion_venta cv
-                        WHERE cv.sesion_id = sc.id_sesion
-                    ), 0) AS sum_corr_ventas
+                    dc.resultado_cuadre
                 FROM sesion_caja sc
                 INNER JOIN caja c      ON sc.caja_id              = c.id_caja
                 INNER JOIN local l     ON c.local_id               = l.id_local
@@ -245,16 +231,12 @@ class ReporteController extends Controller
              WHERE c.activo = 1 ORDER BY l.descripcion, c.descripcion"
         )->fetchAll();
 
-        // Totales basados en difCorr (valor real tras rectificaciones y correcciones)
         $totalFaltante = 0;
         $totalSobrante = 0;
         $countFaltante = 0;
         $countSobrante = 0;
         foreach ($registros as $r) {
-            $difCorr = (float)($r['diferencia']      ?? 0)
-                     + (float)($r['sum_rectifs']      ?? 0)
-                     + (float)($r['sum_ajustes']      ?? 0)
-                     - (float)($r['sum_corr_ventas']  ?? 0);
+            $difCorr = (float)($r['diferencia'] ?? 0);
             if ($difCorr < -0.01)     { $countFaltante++; $totalFaltante += abs($difCorr); }
             elseif ($difCorr > 0.01)  { $countSobrante++; $totalSobrante += $difCorr; }
         }

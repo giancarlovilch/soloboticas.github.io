@@ -145,13 +145,8 @@ $diasLabel  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
                     <tr><td colspan="12" class="caja-table__empty">Sin registros para los filtros seleccionados.</td></tr>
                 <?php endif; ?>
                 <?php foreach ($registros as $r):
-                    $diferencia = (float)($r['diferencia']     ?? 0);
-                    $corrVentas = (float)($r['sum_corr_ventas'] ?? 0);
-                    $difCorr    = $diferencia
-                                + (float)($r['sum_rectifs'] ?? 0)
-                                + (float)($r['sum_ajustes'] ?? 0)
-                                - $corrVentas;
-                    $dow        = $diasLabel[(int)date('w', strtotime($r['fecha_operacion']))];
+                    $difCorr = (float)($r['diferencia'] ?? 0);
+                    $dow     = $diasLabel[(int)date('w', strtotime($r['fecha_operacion']))];
 
                     if (abs($difCorr) < 0.01)    { $badgeCls = 'badge-conforme';  $label = 'Conforme'; }
                     elseif ($difCorr > 0.01)     { $badgeCls = 'badge-superavit'; $label = 'Superávit'; }

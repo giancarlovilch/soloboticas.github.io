@@ -188,9 +188,7 @@ $estadoLabel = [
                     $hora = $s['fecha_apertura'] ? date('H:i', strtotime($s['fecha_apertura'])) : '—';
                     $tieneDetalle = in_array($s['estado'], ['CERRADA','APROBADA','OBSERVADA','RECHAZADA'], true)
                                  && $s['diferencia'] !== null;
-                    $difCorr = $tieneDetalle
-                        ? (float)$s['diferencia'] + (float)$s['sum_rectifs'] + (float)$s['sum_ajustes'] - (float)$s['sum_corr_ventas']
-                        : null;
+                    $difCorr = $tieneDetalle ? (float)$s['diferencia'] : null;
                 ?>
                     <tr>
                         <td><code style="font-size:0.75rem;color:#475569;">#<?= $s['id_sesion'] ?></code></td>

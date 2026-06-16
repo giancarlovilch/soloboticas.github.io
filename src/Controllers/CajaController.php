@@ -542,7 +542,7 @@ class CajaController extends Controller
         (new SoloBankRepository())->liberarVale($movId);
 
         // Actualizar detalle_cuadre con la nueva diferencia
-        $this->repo->recalcularDiferencia($sesionId);
+        $this->repo->recalcularDiferenciaCompleta($sesionId);
 
         $this->success('Cobro eliminado', [
             'modo'  => $mov['modo_desc'],
@@ -811,6 +811,29 @@ class CajaController extends Controller
             'diferencia'             => $reporte['detalle']['diferencia']             ?? 0,
             'resultado_cuadre'       => $reporte['detalle']['resultado_cuadre']       ?? '',
         ]);
+    }
+
+    // ── POST /caja/api/sesion/{id}/num-ops-bcp ────────────
+    public function apiUpdateNumOpsBcp(int $id): void
+    {
+        $postulanteId = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Solo administradores pueden editar operaciones BCP', 403);
+            return;
+        }
+
+        $data = $this->getAllInput();
+        $numOps = (int)($data['num_operaciones_bcp'] ?? -1);
+        if ($numOps < 0) {
+            $this->error('Valor inválido', 422);
+            return;
+        }
+
+        $sesion = $this->repo->getSesionById($id);
+        if (!$sesion) { $this->error('Sesión no encontrada', 404); return; }
+
+        $this->repo->updateNumOperacionesBcp($id, $numOps, $postulanteId);
+        $this->success('Operaciones BCP actualizadas', ['num_operaciones_bcp' => $numOps]);
     }
 
     // ── Helper: transacción ────────────────────────────────
