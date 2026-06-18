@@ -414,6 +414,12 @@ class IncidenciaContableController extends Controller
         $movId = $this->cajaRepo()->addPagoDigital($sesionId, $postulanteId, $modo, $monto, $num);
         $this->cajaRepo()->recalcularDiferencia($sesionId);
 
+        // Reflejar el cobro también en el caso: reduce el pendiente igual que un vale.
+        $this->repo->addMovimiento(
+            $id, 'ABONO', $monto, $postulanteId, $sesionId,
+            "Cobro electrónico registrado (mov. #{$movId})"
+        );
+
         $this->success('Cobro registrado', ['id_movimiento' => $movId]);
     }
 
