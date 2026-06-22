@@ -399,7 +399,7 @@ class CajaRepository
             );
             $estadoStmt->execute(['sid' => $sesionId]);
             $estado = $estadoStmt->fetchColumn();
-            if (in_array($estado, ['CERRADA', 'OBSERVADA', 'RECHAZADA'], true)) {
+            if (in_array($estado, ['CERRADA', 'APROBADA', 'OBSERVADA', 'RECHAZADA'], true)) {
                 $this->recalcularDiferenciaCompleta($sesionId);
             }
         }
@@ -613,6 +613,137 @@ class CajaRepository
     public function recalcularDiferencia(int $sesionId): void
     {
         $this->recalcularDiferenciaCompleta($sesionId);
+    }
+
+    /**
+     * Auditoría de consistencia: compara dc.diferencia (lo que muestra /caja)
+     * contra la fórmula live (lo que calculan /caja/reporte/{id} e /incidencias/{id})
+     * en todas las sesiones con cuadre. Registra cada desviación encontrada en
+     * log_consistencia_cuadre. Si $fix=true, corrige dc.diferencia de inmediato.
+     */
+    public function auditarConsistencia(bool $fix = false): array
+    {
+        $sesiones = $this->db->query(
+            "SELECT sc.id_sesion, sc.saldo_inicial, sc.fecha_operacion,
+                    p.nombres AS cajera,
+                    dc.total_efectivo_contado, dc.total_ventas_sistema, dc.total_gastos_sistema,
+                    dc.diferencia AS dif_guardada
+             FROM sesion_caja sc
+             INNER JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
+             INNER JOIN postulante p ON p.id_postulante = sc.postulante_apertura_id
+             WHERE sc.estado IN ('CERRADA','APROBADA','OBSERVADA','RECHAZADA')
+             ORDER BY sc.id_sesion ASC"
+        )->fetchAll();
+
+        $resultado = ['revisadas' => count($sesiones), 'ok' => 0, 'fallidas' => []];
+
+        foreach ($sesiones as $s) {
+            $sid = (int)$s['id_sesion'];
+
+            $rectStmt = $this->db->prepare("SELECT COALESCE(SUM(monto),0) FROM rectificacion_cuadre WHERE sesion_id=:sid");
+            $rectStmt->execute(['sid' => $sid]);
+            $loQueEs = round((float)$s['total_efectivo_contado'] + (float)$rectStmt->fetchColumn(), 2);
+
+            $cvStmt = $this->db->prepare("SELECT COALESCE(SUM(monto_nuevo - monto_anterior),0) FROM correccion_venta WHERE sesion_id=:sid");
+            $cvStmt->execute(['sid' => $sid]);
+
+            $digStmt = $this->db->prepare("SELECT COALESCE(SUM(monto),0) FROM movimiento_sesion WHERE sesion_id=:sid AND tipo_movimiento_id=1 AND estado IN ('PENDIENTE','APROBADO')");
+            $digStmt->execute(['sid' => $sid]);
+
+            $ajStmt = $this->db->prepare("SELECT COALESCE(SUM(CASE WHEN accion='AGREGAR' THEN -monto ELSE monto END),0) FROM ajuste_esperado WHERE sesion_id=:sid");
+            $ajStmt->execute(['sid' => $sid]);
+
+            $trStmt = $this->db->prepare(
+                "SELECT COALESCE(SUM(CASE
+                    WHEN sesion_aplicada_origen_id=:s1 THEN -monto
+                    WHEN sesion_aplicada_destino_id=:s2 THEN monto
+                    ELSE 0 END),0)
+                 FROM transferencia_saldo
+                 WHERE sesion_aplicada_origen_id=:s3 OR sesion_aplicada_destino_id=:s4"
+            );
+            $trStmt->execute(['s1'=>$sid,'s2'=>$sid,'s3'=>$sid,'s4'=>$sid]);
+
+            $rtStmt = $this->db->prepare("SELECT COALESCE(SUM(monto),0) FROM retiro_kgyr WHERE sesion_aplicada_id=:sid");
+            $rtStmt->execute(['sid' => $sid]);
+
+            $igStmt = $this->db->prepare("SELECT COALESCE(SUM(monto),0) FROM ingreso_kgyr WHERE sesion_aplicada_id=:sid");
+            $igStmt->execute(['sid' => $sid]);
+
+            $loQueSeDice = round(
+                (float)$s['saldo_inicial']
+                + (float)$s['total_ventas_sistema']
+                + (float)$cvStmt->fetchColumn()
+                - (float)$s['total_gastos_sistema']
+                - (float)$digStmt->fetchColumn()
+                + (float)$ajStmt->fetchColumn()
+                + (float)$trStmt->fetchColumn()
+                - (float)$rtStmt->fetchColumn()
+                + (float)$igStmt->fetchColumn(),
+                2
+            );
+
+            $difLive     = round($loQueEs - $loQueSeDice, 2);
+            $difGuardada = round((float)$s['dif_guardada'], 2);
+
+            if (abs($difLive - $difGuardada) < 0.01) {
+                $resultado['ok']++;
+                // Si había un log pendiente de una desviación previa que ya quedó
+                // resuelta (por un fix anterior u otra corrección), cerrarlo.
+                try {
+                    $this->db->prepare(
+                        "UPDATE log_consistencia_cuadre
+                            SET resuelto = 1, resuelto_en = NOW()
+                          WHERE sesion_id = :sid AND resuelto = 0"
+                    )->execute(['sid' => $sid]);
+                } catch (\PDOException) { /* tabla log_consistencia_cuadre aún no existe */ }
+                continue;
+            }
+
+            if ($fix) $this->recalcularDiferenciaCompleta($sid);
+
+            try {
+                $pendStmt = $this->db->prepare(
+                    "SELECT id FROM log_consistencia_cuadre WHERE sesion_id = :sid AND resuelto = 0"
+                );
+                $pendStmt->execute(['sid' => $sid]);
+                $pendId = $pendStmt->fetchColumn();
+
+                $params = [
+                    'sid'   => $sid,
+                    'dg'    => $difGuardada,
+                    'dl'    => $difLive,
+                    'delta' => round($difLive - $difGuardada, 2),
+                    'res'   => $fix ? 1 : 0,
+                    'resen' => $fix ? date('Y-m-d H:i:s') : null,
+                ];
+
+                if ($pendId) {
+                    $this->db->prepare(
+                        "UPDATE log_consistencia_cuadre SET
+                            diferencia_guardada = :dg, diferencia_calculada = :dl, delta = :delta,
+                            detectado_en = NOW(), resuelto = :res, resuelto_en = :resen
+                         WHERE id = :id"
+                    )->execute($params + ['id' => $pendId]);
+                } else {
+                    $this->db->prepare(
+                        "INSERT INTO log_consistencia_cuadre
+                            (sesion_id, diferencia_guardada, diferencia_calculada, delta, resuelto, resuelto_en)
+                         VALUES (:sid, :dg, :dl, :delta, :res, :resen)"
+                    )->execute($params);
+                }
+            } catch (\PDOException) { /* tabla log_consistencia_cuadre aún no existe */ }
+
+            $resultado['fallidas'][] = [
+                'id_sesion'    => $sid,
+                'cajera'       => $s['cajera'],
+                'fecha'        => $s['fecha_operacion'],
+                'dif_guardada' => $difGuardada,
+                'dif_live'     => $difLive,
+                'delta'        => round($difLive - $difGuardada, 2),
+            ];
+        }
+
+        return $resultado;
     }
 
     // ── Gastos ─────────────────────────────────────────────

@@ -140,11 +140,11 @@ $estadoLabel = [
 
     <!-- ── Historial de cuadres ──────────────────────────── -->
     <section class="caja-section">
-        <div class="caja-section__header" style="flex-wrap:wrap;gap:.75rem;">
+        <div class="caja-section__header" style="flex-direction:column;align-items:stretch;gap:.75rem;">
             <h2>Registro de arqueos</h2>
             <!-- Filtros -->
-            <form method="GET" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
-                <select name="caja" class="caja-input" style="max-width:140px;" onchange="this.form.submit()">
+            <form method="GET" style="display:flex;gap:.5rem;flex-wrap:nowrap;align-items:center;">
+                <select name="caja" class="caja-input" style="max-width:140px;flex:1;" onchange="this.form.submit()">
                     <option value="0">Todas las cajas</option>
                     <?php foreach ($cajas as $c): ?>
                         <option value="<?= $c['id'] ?>" <?= $filtroCaja == $c['id'] ? 'selected' : '' ?>>
@@ -152,7 +152,7 @@ $estadoLabel = [
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <select name="cajera" class="caja-input" style="max-width:150px;" onchange="this.form.submit()">
+                <select name="cajera" class="caja-input" style="max-width:150px;flex:1;" onchange="this.form.submit()">
                     <option value="0">Todas las cajeras</option>
                     <?php foreach ($cajeras as $cj): ?>
                         <option value="<?= $cj['id'] ?>" <?= $filtroCajera == $cj['id'] ? 'selected' : '' ?>>
@@ -160,9 +160,9 @@ $estadoLabel = [
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <input type="month" name="mes" class="caja-input" style="max-width:140px;"
+                <input type="month" name="mes" class="caja-input" style="max-width:140px;flex:1;"
                        value="<?= htmlspecialchars($filtroMes) ?>" onchange="this.form.submit()">
-                <a href="<?= $basePath ?>/caja" class="caja-btn caja-btn--outline" style="font-size:0.78rem;padding:5px 10px;">Limpiar</a>
+                <a href="<?= $basePath ?>/caja" class="caja-btn caja-btn--outline" style="font-size:0.78rem;padding:5px 10px;flex-shrink:0;white-space:nowrap;">Limpiar</a>
             </form>
         </div>
         <div class="caja-table-wrap">

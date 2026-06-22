@@ -28,7 +28,7 @@ $sesiones = $db->query("
     FROM sesion_caja sc
     INNER JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
     INNER JOIN postulante p ON sc.postulante_apertura_id = p.id_postulante
-    WHERE sc.estado IN ('CERRADA','OBSERVADA','RECHAZADA')
+    WHERE sc.estado IN ('CERRADA','APROBADA','OBSERVADA','RECHAZADA')
     ORDER BY sc.id_sesion ASC
 ")->fetchAll();
 

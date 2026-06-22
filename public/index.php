@@ -126,6 +126,7 @@ $router->post('/caja/api/sesion/{id}/comentario',            [CajaController::cl
 $router->post('/caja/api/sesion/{id}/respuesta',       [CajaController::class, 'guardarRespuesta']);
 $router->post('/caja/api/sesion/{id}/eliminar',        [CajaController::class, 'eliminarSesion']);
 $router->post('/caja/api/sesion/{id}/sincronizar-base', [CajaController::class, 'sincronizarBase']);
+$router->post('/caja/api/auditar-consistencia',        [CajaController::class, 'auditarConsistencia']);
 $router->get('/caja/pagos-digitales',                    [CajaController::class, 'pagosDigitalesView']);
 $router->get('/caja/api/sesion/{id}/pagos-digitales',    [CajaController::class, 'getPagosDigitales']);
 $router->post('/caja/api/sesion/{id}/pago-digital',      [CajaController::class, 'addPagoDigital']);

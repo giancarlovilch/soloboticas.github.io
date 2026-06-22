@@ -570,6 +570,22 @@ class CajaController extends Controller
     }
 
     // ── POST /caja/api/sesion/{id}/sincronizar-base ────────
+    // ── POST /caja/api/auditar-consistencia (testing) ──────
+    // Compara dc.diferencia (lo que muestra /caja) contra la fórmula live
+    // (lo que calculan /caja/reporte/{id} e /incidencias/{id}) en todas las
+    // sesiones con cuadre, y registra cualquier desviación en log_consistencia_cuadre.
+    public function auditarConsistencia(): void
+    {
+        $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Solo administradores', 403);
+            return;
+        }
+        $fix       = !empty($this->getAllInput()['fix']);
+        $resultado = $this->repo->auditarConsistencia($fix);
+        $this->success('Verificación completada', $resultado);
+    }
+
     public function sincronizarBase(int $id): void
     {
         $this->requireAuth();

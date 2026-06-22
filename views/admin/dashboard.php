@@ -184,6 +184,13 @@ $navActive = [
                     </a>
                 </li>
 
+                <li class="list__item <?= ($page === 'logs-consistencia') ? 'list__item--active' : '' ?>">
+                    <a href="?page=logs-consistencia" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Logs Consistencia</span>
+                    </a>
+                </li>
+
                 <li class="list__item--bottom">
                     <a href="<?= $basePath ?>/logout" class="list__button list__button--logout">
                         <img src="<?= $basePath ?>/assets/img/icons/logout.svg" class="list__img">
@@ -220,6 +227,9 @@ $navActive = [
                         break;
                     case 'horario':
                         require_once __DIR__ . '/horario_admin.php';
+                        break;
+                    case 'logs-consistencia':
+                        require_once __DIR__ . '/logs_consistencia.php';
                         break;
                     case 'update':
                         if (isset($p) && !empty($p)) {
