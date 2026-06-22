@@ -1471,6 +1471,10 @@ class CajaRepository
         $this->db->prepare(
             "UPDATE detalle_cuadre SET num_operaciones_bcp = :ops WHERE sesion_id = :sid"
         )->execute(['ops' => $numOps, 'sid' => $sesionId]);
+
+        // Resincronizar horario_rendimiento, que se llenó al cerrar el cuadre
+        // y quedaría desactualizado si el conteo se corrige después.
+        $this->registrarRendimientoCajera($sesionId);
     }
 
     // ── Rectificaciones ────────────────────────────────────

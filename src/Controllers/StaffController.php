@@ -327,7 +327,10 @@ class StaffController extends Controller
         $getSesionParticipante = function(int $pid, string $rolPart, int $localId, int $turnoId, string $fecha) use ($db): ?array {
             $s = $db->prepare(
                 "SELECT sc.id_sesion, dc.num_operaciones_bcp,
-                        COALESCE(rv.monto, 0) AS ventas
+                        COALESCE(rv.monto, 0) + COALESCE((
+                            SELECT SUM(cv.monto_nuevo - cv.monto_anterior)
+                            FROM correccion_venta cv WHERE cv.sesion_id = sc.id_sesion
+                        ), 0) AS ventas
                  FROM sesion_participante sp
                  INNER JOIN sesion_caja sc ON sc.id_sesion   = sp.sesion_id
                  INNER JOIN caja ca        ON ca.id_caja     = sc.caja_id
