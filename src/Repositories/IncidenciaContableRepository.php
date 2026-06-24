@@ -378,6 +378,10 @@ class IncidenciaContableRepository
                AND accion = 'QUITAR'
                AND descripcion LIKE :desc
         ")->execute(['sid' => (int)$vale['sesion_origen_id'], 'desc' => "Vale regularización {$vale['codigo']}%"]);
+
+        // Recalcular dc.diferencia de la sesión origen: cambió el total esperado
+        require_once __DIR__ . '/CajaRepository.php';
+        (new \CajaRepository())->recalcularDiferenciaCompleta((int)$vale['sesion_origen_id']);
     }
 
     public function eliminarMovimiento(int $movId): void
@@ -465,5 +469,13 @@ class IncidenciaContableRepository
 
         // 5. Recalcular pendiente de la incidencia origen
         $this->recalcularPendiente($incOrigen);
+
+        // 6. Recalcular dc.diferencia de ambas sesiones afectadas (origen y destino)
+        require_once __DIR__ . '/CajaRepository.php';
+        $cajaRepo = new \CajaRepository();
+        $cajaRepo->recalcularDiferenciaCompleta((int)$vale['sesion_origen_id']);
+        if ($sesionDest) {
+            $cajaRepo->recalcularDiferenciaCompleta($sesionDest);
+        }
     }
 }
