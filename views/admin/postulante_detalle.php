@@ -17,9 +17,17 @@ $catalogos = $catalogos ?? [];
 
         <!-- CABECERA -->
         <div class="exp-header">
-            <div>
-                <p class="exp-header__kicker">Expediente del Colaborador</p>
-                <h2 class="exp-header__title"><?= htmlspecialchars($nombre) ?></h2>
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <?php if (!empty($p['foto_url'])): ?>
+                    <img src="<?= htmlspecialchars($p['foto_url']) ?>" alt="Foto de <?= htmlspecialchars($nombre) ?>"
+                         style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--exp-border, #e2e8f0);">
+                <?php else: ?>
+                    <span style="display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:#e5e7eb;color:#9ca3af;font-size:0.7rem;">Sin foto</span>
+                <?php endif; ?>
+                <div>
+                    <p class="exp-header__kicker">Expediente del Colaborador</p>
+                    <h2 class="exp-header__title"><?= htmlspecialchars($nombre) ?></h2>
+                </div>
             </div>
             <div style="display:flex; gap:0.75rem;">
                 <button type="button" class="btn btn--secondary" onclick="window.location.href='?page=postulantes'">Cancelar</button>

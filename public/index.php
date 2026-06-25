@@ -32,6 +32,7 @@ require_once __DIR__ . '/../src/Core/Database.php';
 
 // Inclusión de Controladores
 require_once __DIR__ . '/../src/Controllers/PostulanteController.php';
+require_once __DIR__ . '/../src/Controllers/CaptchaController.php';
 require_once __DIR__ . '/../src/Controllers/CatalogoController.php';
 require_once __DIR__ . '/../src/Controllers/HomeController.php';
 require_once __DIR__ . '/../src/Controllers/AuthController.php';
@@ -70,6 +71,7 @@ $router->get('/login', [HomeController::class, 'loginView']);
 $router->get('/postulacion/acceso', [PostulanteController::class, 'accessView']);
 $router->get('/postulacion/formulario', [PostulanteController::class, 'formView']);
 $router->get('/catalogos/postulacion', [CatalogoController::class, 'getAll']);
+$router->get('/captcha', [CaptchaController::class, 'generate']);
 
 // --- RUTAS DE PROCESO DE POSTULANTE ---
 $router->post('/postulantes/check-dni', [PostulanteController::class, 'checkDni']);

@@ -54,7 +54,7 @@ $today    = date('Y-m-d');
                             <input type="file" id="fotoInput" accept="image/jpeg,image/png,image/webp"
                                    style="display:none;">
                         </label>
-                        <p class="foto-hint">JPG/PNG/WebP · Máx. 5 MB · Se recortará a 400×400 px</p>
+                        <p class="foto-hint">JPG, JPEG o PNG · Cualquier tamaño, se comprime automáticamente a 400×400 px</p>
                     </div>
                     <div class="foto-info">
                         <div class="form-section-header">
@@ -236,6 +236,18 @@ $today    = date('Y-m-d');
                         <select id="turno_id" name="turno_id">
                             <option value="">Seleccione</option>
                         </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── VERIFICACIÓN ANTI-SPAM ─────────────────────────── -->
+            <section class="form-section">
+                <div class="form-grid form-grid-2">
+                    <div class="input-group">
+                        <label for="captcha_answer" id="captchaLabel">Verificación: cargando...</label>
+                        <input type="text" id="captcha_answer" name="captcha_answer" inputmode="numeric"
+                               autocomplete="off" placeholder="Escribe el resultado">
+                        <small class="input-help">Resuelve la operación antes de enviar tu postulación.</small>
                     </div>
                 </div>
             </section>

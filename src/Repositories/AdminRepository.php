@@ -21,6 +21,7 @@ class AdminRepository
         $sql = "SELECT p.id_postulante AS id,
                    CONCAT(p.nombres, ' ', p.apellidos) AS nombre_completo,
                    p.num_documento,
+                   p.foto_url,
                    e.descripcion AS etapa_nombre,
                    u.activo,
                    u.username,

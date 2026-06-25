@@ -11,7 +11,8 @@ const buildUrl  = (p) => `${BASE_PATH}${p}`;
 
 const form              = document.getElementById('accessForm');
 const dniInput          = document.getElementById('num_documento');
-const accessKeyInput    = document.getElementById('access_key');
+const captchaInput      = document.getElementById('captcha_answer');
+const captchaLabel      = document.getElementById('captchaLabel');
 const birthDateContainer = document.getElementById('birthDateContainer');
 const birthDateInput    = document.getElementById('fecha_nacimiento');
 const messageBox        = document.getElementById('messageBox');
@@ -20,32 +21,51 @@ const submitBtnText     = document.getElementById('submitBtnText');
 
 let requiresBirthValidation = false;
 
+loadCaptcha();
+
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearMessage();
 
-    const dni  = dniInput.value.trim();
-    const key  = accessKeyInput.value.trim();
-    const dob  = birthDateInput?.value.trim() ?? '';
+    const dni     = dniInput.value.trim();
+    const captcha = captchaInput.value.trim();
+    const dob     = birthDateInput?.value.trim() ?? '';
 
-    if (!dni || !key) { showMessage('Completa todos los campos.', 'error'); return; }
+    if (!dni || !captcha) { showMessage('Completa todos los campos.', 'error'); return; }
 
     requiresBirthValidation
-        ? await validateAccess(dni, key, dob)
-        : await checkDni(dni, key);
+        ? await validateAccess(dni, captcha, dob)
+        : await checkDni(dni, captcha);
 });
 
-async function checkDni(dni, key) {
+async function loadCaptcha() {
+    try {
+        const r   = await fetch(buildUrl('/captcha'), { headers: { Accept: 'application/json' } });
+        const res = await r.json();
+        if (res.success && captchaLabel) {
+            captchaLabel.textContent = res.data.question;
+        }
+    } catch {
+        if (captchaLabel) captchaLabel.textContent = 'Verificación: error al cargar, recarga la página.';
+    }
+}
+
+async function checkDni(dni, captcha) {
     setLoading(true);
     try {
         const r   = await fetch(buildUrl('/postulantes/check-dni'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ num_documento: dni, access_key: key }),
+            body: JSON.stringify({ num_documento: dni, captcha_answer: captcha }),
         });
         const res = await r.json();
 
-        if (!res.success) { showMessage(res.message, 'error'); return; }
+        if (!res.success) {
+            showMessage(res.message, 'error');
+            captchaInput.value = '';
+            await loadCaptcha();
+            return;
+        }
 
         if (res.data.requires_birth_validation) {
             requiresBirthValidation = true;
@@ -54,6 +74,8 @@ async function checkDni(dni, key) {
             birthDateInput.required = true;
             showMessage('DNI encontrado. Ingresa tu fecha de nacimiento para ver tu solicitud.', 'info');
             submitBtnText && (submitBtnText.textContent = 'Verificar identidad');
+            captchaInput.value = '';
+            await loadCaptcha();
             return;
         }
 
@@ -65,18 +87,23 @@ async function checkDni(dni, key) {
     }
 }
 
-async function validateAccess(dni, key, dob) {
+async function validateAccess(dni, captcha, dob) {
     if (!dob) { showMessage('Ingresa tu fecha de nacimiento.', 'error'); return; }
     setLoading(true);
     try {
         const r   = await fetch(buildUrl('/postulantes/validate-access'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ num_documento: dni, access_key: key, fecha_nacimiento: dob }),
+            body: JSON.stringify({ num_documento: dni, captcha_answer: captcha, fecha_nacimiento: dob }),
         });
         const res = await r.json();
 
-        if (!res.success) { showMessage(res.message, 'error'); return; }
+        if (!res.success) {
+            showMessage(res.message, 'error');
+            captchaInput.value = '';
+            await loadCaptcha();
+            return;
+        }
 
         window.location.href = buildUrl(`/postulacion/formulario?dni=${encodeURIComponent(dni)}`);
     } catch {

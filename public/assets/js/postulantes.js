@@ -28,8 +28,12 @@ async function cargarPostulantes() {
                 ? '<span class="badge badge-contratado">Activo</span>'
                 : '<span class="badge badge-rechazado">Inactivo</span>';
             const nombreSafe = (p.nombre_completo || '').replace(/'/g, "\\'");
+            const fotoHtml = p.foto_url
+                ? `<img src="${p.foto_url}" alt="Foto" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">`
+                : `<span style="display:inline-block;width:36px;height:36px;border-radius:50%;background:#e5e7eb;"></span>`;
             const tr = document.createElement('tr');
             tr.innerHTML = `
+                <td>${fotoHtml}</td>
                 <td><strong>${p.num_documento}</strong></td>
                 <td>${p.nombre_completo}</td>
                 <td>${p.puesto_nombre || '<span style="color:#9ca3af">—</span>'}</td>

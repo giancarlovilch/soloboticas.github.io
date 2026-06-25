@@ -93,8 +93,8 @@ $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
                         <p class="section-kicker">Acceso a postulación</p>
                         <h2>Ingresa tus datos</h2>
                         <p>
-                            Ingresa tu DNI y la clave de acceso para continuar. Si ya existe una solicitud enviada,
-                            validaremos tu fecha de nacimiento para mostrar tu información.
+                            Ingresa tu DNI y resuelve la verificación para continuar. Si ya existe una solicitud
+                            enviada, validaremos tu fecha de nacimiento para mostrar tu información.
                         </p>
                     </div>
 
@@ -114,15 +114,16 @@ $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
                         </div>
 
                         <div class="input-group">
-                            <label for="access_key">Clave de acceso</label>
+                            <label for="captcha_answer" id="captchaLabel">Verificación: cargando...</label>
                             <input
                                 type="text"
-                                id="access_key"
-                                name="access_key"
+                                id="captcha_answer"
+                                name="captcha_answer"
+                                inputmode="numeric"
                                 autocomplete="off"
-                                placeholder="Ingresa la clave entregada en botica"
+                                placeholder="Escribe el resultado"
                                 required>
-                            <small class="input-help">Solicítala personalmente en cualquiera de nuestros locales.</small>
+                            <small class="input-help">Resuelve la operación para confirmar que no eres un robot.</small>
                         </div>
 
                         <div id="birthDateContainer" class="input-group input-group-hidden" aria-hidden="true">

@@ -45,6 +45,7 @@ if (!isset($_SESSION['user_rol'])) exit('Acceso denegado');
         <table class="fl-table" id="tablaPostulantes">
             <thead>
                 <tr>
+                    <th>Foto</th>
                     <th>DNI</th>
                     <th>Postulante</th>
                     <th>Puesto</th>
@@ -58,7 +59,7 @@ if (!isset($_SESSION['user_rol'])) exit('Acceso denegado');
             <!-- Contenedor dinámico poblado por postulantes.js -->
             <tbody id="tbodyPostulantes">
                 <tr>
-                    <td colspan="6" class="text-center">Cargando registros...</td>
+                    <td colspan="7" class="text-center">Cargando registros...</td>
                 </tr>
             </tbody>
         </table>

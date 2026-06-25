@@ -161,6 +161,9 @@ class PostulanteController extends Controller
         }
 
         $file = $_FILES['foto'] ?? null;
+        if (!$file || $file['error'] === UPLOAD_ERR_INI_SIZE || $file['error'] === UPLOAD_ERR_FORM_SIZE) {
+            $this->error('La imagen es demasiado grande para el servidor', 422);
+        }
         if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
             $this->error('No se recibió ningún archivo o hubo un error al subirlo', 400);
         }
@@ -168,11 +171,7 @@ class PostulanteController extends Controller
         $allowed = ['image/jpeg', 'image/png', 'image/webp'];
         $mime = mime_content_type($file['tmp_name']);
         if (!in_array($mime, $allowed, true)) {
-            $this->error('Solo se aceptan imágenes JPEG, PNG o WebP', 422);
-        }
-
-        if ($file['size'] > 5 * 1024 * 1024) {
-            $this->error('La imagen no puede superar los 5 MB', 422);
+            $this->error('Solo se aceptan imágenes JPG, JPEG o PNG', 422);
         }
 
         $uploadDir = __DIR__ . '/../../public/uploads/fotos/';
@@ -180,8 +179,12 @@ class PostulanteController extends Controller
             mkdir($uploadDir, 0755, true);
         }
 
-        // Redimensionar a máximo 400×400 y guardar como JPEG
-        [$srcW, $srcH] = getimagesize($file['tmp_name']);
+        // Sin importar el tamaño de origen, siempre se redimensiona a 400×400 y se comprime a JPEG.
+        $size = getimagesize($file['tmp_name']);
+        if (!$size) {
+            $this->error('La imagen está dañada o no es válida', 422);
+        }
+        [$srcW, $srcH] = $size;
         $ratio = min(400 / $srcW, 400 / $srcH, 1);
         $newW  = (int)round($srcW * $ratio);
         $newH  = (int)round($srcH * $ratio);
@@ -191,6 +194,10 @@ class PostulanteController extends Controller
             'image/webp' => imagecreatefromwebp($file['tmp_name']),
             default      => imagecreatefromjpeg($file['tmp_name']),
         };
+
+        if (!$src) {
+            $this->error('No se pudo procesar la imagen', 422);
+        }
 
         $dst = imagecreatetruecolor($newW, $newH);
 

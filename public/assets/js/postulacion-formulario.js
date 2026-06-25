@@ -37,6 +37,9 @@ if (fotoInput) {
     });
 }
 
+const captchaInput = document.getElementById('captcha_answer');
+const captchaLabel = document.getElementById('captchaLabel');
+
 // ── Inicialización ────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
     if (!dni) {
@@ -45,7 +48,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     await loadCatalogos();
     await loadApplicationView();
+    if (mode !== 'readonly') await loadCaptcha();
 });
+
+async function loadCaptcha() {
+    if (!captchaLabel) return;
+    try {
+        const r   = await fetch(buildUrl('/captcha'), { headers: { Accept: 'application/json' } });
+        const res = await r.json();
+        if (res.success) captchaLabel.textContent = res.data.question;
+    } catch {
+        captchaLabel.textContent = 'Verificación: error al cargar, recarga la página.';
+    }
+}
 
 // ── Catálogos ─────────────────────────────────────────────────
 async function loadCatalogos() {
@@ -136,6 +151,7 @@ form.addEventListener('submit', async (e) => {
         puesto_id:            toInt(getValue('puesto_id')),
         experiencias,
         skills,
+        captcha_answer:       getValue('captcha_answer'),
     };
 
     setLoading(true);
@@ -150,6 +166,8 @@ form.addEventListener('submit', async (e) => {
 
         if (!res.success) {
             showStatus(res.message || 'No se pudo enviar la postulación.', 'error');
+            if (captchaInput) captchaInput.value = '';
+            await loadCaptcha();
             return;
         }
 
@@ -158,11 +176,12 @@ form.addEventListener('submit', async (e) => {
         disableForm();
 
         // Si hay foto seleccionada, subirla ahora
+        let fotoWarning = '';
         if (postulanteId && fotoInput?.files[0]) {
-            await uploadFoto(postulanteId, fotoInput.files[0]);
+            fotoWarning = await uploadFoto(postulanteId, fotoInput.files[0]);
         }
 
-        startSuccessCountdown();
+        startSuccessCountdown(fotoWarning);
 
     } catch {
         showStatus('Error al enviar la postulación. Intenta nuevamente.', 'error');
@@ -171,15 +190,18 @@ form.addEventListener('submit', async (e) => {
     }
 });
 
+// Devuelve un mensaje de advertencia si la foto no se pudo guardar; '' si todo salió bien.
 async function uploadFoto(id, file) {
     const fd = new FormData();
     fd.append('postulante_id', id);
     fd.append('foto', file);
 
     try {
-        await fetch(buildUrl('/postulantes/foto'), { method: 'POST', body: fd });
+        const r   = await fetch(buildUrl('/postulantes/foto'), { method: 'POST', body: fd });
+        const res = await r.json();
+        return res.success ? '' : (res.message || 'No se pudo guardar la foto.');
     } catch {
-        // La foto es opcional; un fallo no cancela la postulación
+        return 'No se pudo guardar la foto por un error de conexión.';
     }
 }
 
@@ -388,14 +410,15 @@ function disableForm() {
 }
 
 // ── Countdown de éxito ────────────────────────────────────────
-function startSuccessCountdown() {
+function startSuccessCountdown(fotoWarning = '') {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     let sec = 6;
-    showStatus(`✅ ¡Postulación enviada! Serás redirigido en ${sec} segundos...`, 'success');
+    const suffix = fotoWarning ? ` (Aviso: ${fotoWarning})` : '';
+    showStatus(`✅ ¡Postulación enviada! Serás redirigido en ${sec} segundos...${suffix}`, fotoWarning ? 'info' : 'success');
     const iv = setInterval(() => {
         sec--;
         if (sec <= 0) { clearInterval(iv); window.location.href = buildUrl('/postulacion/acceso'); return; }
-        showStatus(`✅ ¡Postulación enviada! Serás redirigido en ${sec} segundos...`, 'success');
+        showStatus(`✅ ¡Postulación enviada! Serás redirigido en ${sec} segundos...${suffix}`, fotoWarning ? 'info' : 'success');
     }, 1000);
 }
 

@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../Repositories/PostulanteRepository.php';
 require_once __DIR__ . '/../Repositories/PostulacionRepository.php';
 require_once __DIR__ . '/../Helpers/Validator.php';
-require_once __DIR__ . '/../../config/env.php';
+require_once __DIR__ . '/../Helpers/Captcha.php';
 
 class PostulanteService
 {
@@ -270,22 +270,11 @@ class PostulanteService
         return null;
     }
 
-    private function isValidAccessKey(?string $accessKey): bool
-    {
-        $expectedKey = env('APP_ACCESS_KEY', '');
-
-        if ($expectedKey === '') {
-            return false;
-        }
-
-        return trim((string) $accessKey) === trim($expectedKey);
-    }
-
     public function checkDni(array $data): array
     {
         $validator = new Validator($data);
 
-        $validator->required(['num_documento', 'access_key'])
+        $validator->required(['num_documento', 'captcha_answer'])
             ->numeric('num_documento')
             ->exactLength('num_documento', 8);
 
@@ -298,12 +287,12 @@ class PostulanteService
             ];
         }
 
-        if (!$this->isValidAccessKey($data['access_key'] ?? null)) {
+        if (!Captcha::verify($data['captcha_answer'] ?? null)) {
             return [
                 'success' => false,
-                'message' => 'Clave de acceso inválida',
+                'message' => 'Captcha inválido o expirado',
                 'errors' => [
-                    'access_key' => ['La clave ingresada no es válida.']
+                    'captcha_answer' => ['La respuesta del captcha no es correcta.']
                 ],
                 'status' => 401
             ];
@@ -354,7 +343,7 @@ class PostulanteService
     {
         $validator = new Validator($data);
 
-        $validator->required(['num_documento', 'access_key', 'fecha_nacimiento'])
+        $validator->required(['num_documento', 'captcha_answer', 'fecha_nacimiento'])
             ->numeric('num_documento')
             ->exactLength('num_documento', 8)
             ->date('fecha_nacimiento');
@@ -368,12 +357,12 @@ class PostulanteService
             ];
         }
 
-        if (!$this->isValidAccessKey($data['access_key'] ?? null)) {
+        if (!Captcha::verify($data['captcha_answer'] ?? null)) {
             return [
                 'success' => false,
-                'message' => 'Clave de acceso inválida',
+                'message' => 'Captcha inválido o expirado',
                 'errors' => [
-                    'access_key' => ['La clave ingresada no es válida.']
+                    'captcha_answer' => ['La respuesta del captcha no es correcta.']
                 ],
                 'status' => 401
             ];
@@ -452,7 +441,8 @@ class PostulanteService
             'tipo_estudio_id',
             'estado_id',
             'turno_id',
-            'fecha_inicio'
+            'fecha_inicio',
+            'captcha_answer'
         ])
             ->numeric('num_documento')
             ->exactLength('num_documento', 8)
@@ -470,6 +460,17 @@ class PostulanteService
                 'message' => 'Datos inválidos',
                 'errors' => $validator->errors(),
                 'status' => 422
+            ];
+        }
+
+        if (!Captcha::verify($data['captcha_answer'] ?? null)) {
+            return [
+                'success' => false,
+                'message' => 'Captcha inválido o expirado',
+                'errors' => [
+                    'captcha_answer' => ['La respuesta del captcha no es correcta.']
+                ],
+                'status' => 401
             ];
         }
 
