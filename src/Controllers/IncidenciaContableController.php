@@ -76,17 +76,19 @@ class IncidenciaContableController extends Controller
         $cajaRepo = new CajaRepository();
         $reporte  = $cajaRepo->getReporte($sesionId);
         $dc       = $reporte['detalle'] ?? [];
+        $sesion   = $reporte['sesion'] ?? [];
 
-        $diferencia = (float)($dc['diferencia'] ?? 0);
-        $tipo       = $diferencia >= 0 ? 'SOBRANTE' : 'FALTANTE';
-        $monto      = round(abs($diferencia), 2);
+        $diferencia    = (float)($dc['diferencia'] ?? 0);
+        $tipo          = $diferencia >= 0 ? 'SOBRANTE' : 'FALTANTE';
+        $monto         = round(abs($diferencia), 2);
+        $responsableId = (int)($sesion['postulante_apertura_id'] ?? 0) ?: null;
 
         $id = $this->repo->crear(
             $sesionId,
             $tipo,
             $monto,
             $postulanteId,
-            null,
+            $responsableId,
             null,
             true
         );
