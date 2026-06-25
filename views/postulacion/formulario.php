@@ -117,13 +117,11 @@ $today    = date('Y-m-d');
 
             <!-- ── SECCIÓN 2: HABILIDADES ─────────────────────────── -->
             <section class="form-section">
-                <div class="form-section-header with-action">
-                    <div>
-                        <p class="section-kicker">Sección 2</p>
-                        <h2>Habilidades</h2>
-                    </div>
-                    <button type="button" id="addSkillBtn" class="btn-outline">+ Agregar</button>
+                <div class="form-section-header">
+                    <p class="section-kicker">Sección 2</p>
+                    <h2>Habilidades</h2>
                 </div>
+                <p class="section-hint">Completa la habilidad de abajo (no es obligatorio). Si quieres agregar más de una, usa el botón al final.</p>
 
                 <div id="skillsContainer" class="dynamic-stack">
                     <div class="skill-item dynamic-card">
@@ -139,6 +137,8 @@ $today    = date('Y-m-d');
                         </div>
                     </div>
                 </div>
+
+                <button type="button" id="addSkillBtn" class="btn-outline btn-add-below">+ Agregar otra habilidad</button>
             </section>
 
             <!-- ── SECCIÓN 3: ESTUDIOS ─────────────────────────────── -->
@@ -184,13 +184,11 @@ $today    = date('Y-m-d');
 
             <!-- ── SECCIÓN 4: EXPERIENCIA ─────────────────────────── -->
             <section class="form-section">
-                <div class="form-section-header with-action">
-                    <div>
-                        <p class="section-kicker">Sección 4</p>
-                        <h2>Experiencia laboral</h2>
-                    </div>
-                    <button type="button" id="addExperienciaBtn" class="btn-outline">+ Agregar</button>
+                <div class="form-section-header">
+                    <p class="section-kicker">Sección 4</p>
+                    <h2>Experiencia laboral</h2>
                 </div>
+                <p class="section-hint">Completa la experiencia de abajo (no es obligatorio). Si quieres agregar más de una, usa el botón al final.</p>
 
                 <div id="experienciasContainer" class="dynamic-stack">
                     <div class="experiencia-item dynamic-card">
@@ -214,6 +212,8 @@ $today    = date('Y-m-d');
                         </div>
                     </div>
                 </div>
+
+                <button type="button" id="addExperienciaBtn" class="btn-outline btn-add-below">+ Agregar otra experiencia</button>
             </section>
 
             <!-- ── SECCIÓN 5: POSTULACIÓN ─────────────────────────── -->
