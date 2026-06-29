@@ -382,11 +382,25 @@ class StaffController extends Controller
 
         $bonoEstudioMonto = 0.0;
         if ($estudioInfo) {
-            $tipoEst   = (int)$estudioInfo['tipo_id'];
-            $estadoEst = (int)$estudioInfo['estado_id'];
-            $avanzado  = in_array($estadoEst, [1, 3]); // Egreso=1, Titulado=3
-            if ($tipoEst === 3)      $bonoEstudioMonto = $avanzado ? 6.0 : 3.0; // Universitario
-            elseif ($tipoEst === 2)  $bonoEstudioMonto = $avanzado ? 4.0 : 2.0; // Técnico
+            $tipoEst  = (int)$estudioInfo['tipo_id'];
+            $estadoId = (int)$estudioInfo['estado_id'];
+            $avanzado = $estadoId === 3 ? 2 : ($estadoId === 1 ? 1 : 0);
+            try {
+                $stmtBE = $db->prepare(
+                    "SELECT monto FROM bono_estudio_config
+                     WHERE tipo_id = :tipo AND avanzado = :av
+                       AND fecha_vigencia <= CURDATE()
+                     ORDER BY fecha_vigencia DESC LIMIT 1"
+                );
+                $stmtBE->execute(['tipo' => $tipoEst, 'av' => $avanzado]);
+                $montoRow = $stmtBE->fetchColumn();
+            } catch (\Exception $e) { $montoRow = false; }
+            if ($montoRow !== false) {
+                $bonoEstudioMonto = (float)$montoRow;
+            } else {
+                $fallback = [3 => [0 => 3.0, 1 => 6.0, 2 => 9.0], 2 => [0 => 2.0, 1 => 4.0, 2 => 6.0]];
+                $bonoEstudioMonto = $fallback[$tipoEst][$avanzado] ?? 0.0;
+            }
         }
 
         // ── Pago por supervisión: S/ monto_dia × turno trabajado dentro del periodo asignado ──
@@ -495,6 +509,22 @@ class StaffController extends Controller
                 $$varName = $stmtB->fetchAll();
             }
         }
+
+        $estBonoRef = [3=>[0=>3.0,1=>6.0,2=>9.0],2=>[0=>2.0,1=>4.0,2=>6.0]];
+        try {
+            $estBonoRows2 = $db->query(
+                "SELECT b1.tipo_id, b1.avanzado, b1.monto
+                 FROM bono_estudio_config b1
+                 WHERE b1.fecha_vigencia = (
+                     SELECT MAX(b2.fecha_vigencia) FROM bono_estudio_config b2
+                     WHERE b2.tipo_id = b1.tipo_id AND b2.avanzado = b1.avanzado
+                       AND b2.fecha_vigencia <= CURDATE()
+                 )"
+            )->fetchAll();
+            foreach ($estBonoRows2 as $ebr) {
+                $estBonoRef[(int)$ebr['tipo_id']][(int)$ebr['avanzado']] = (float)$ebr['monto'];
+            }
+        } catch (\Exception $e) { /* usa fallback */ }
 
         require_once __DIR__ . '/../../views/staff/economia.php';
     }

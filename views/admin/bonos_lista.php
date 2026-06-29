@@ -4,6 +4,7 @@ extract($bonosDatos ?? []);
 $tarifas  = $tarifas  ?? [];
 $bonosV   = $bonosV   ?? [];
 $bonosOps = $bonosOps ?? [];
+$bonosEst = $bonosEst ?? [];
 
 // Agrupar tarifas por rol (vigencia más reciente primero)
 $tarifaActual = [];
@@ -182,6 +183,99 @@ $hoy = date('Y-m-d');
         <?php echo renderFormBono('OPERACIONES_BCP'); ?>
         <div id="msgBonoOps" class="bn-msg"></div>
     </div>
+
+    <!-- ── Bono por estudios ────────────────────── -->
+    <div class="bn-section">
+        <p class="bn-title">Bono por estudios (por turno)</p>
+
+        <?php
+        $combosEst = [
+            ['tipo_id'=>2,'avanzado'=>0,'label'=>'Técnico · Básico'],
+            ['tipo_id'=>2,'avanzado'=>1,'label'=>'Técnico · Egresado'],
+            ['tipo_id'=>2,'avanzado'=>2,'label'=>'Técnico · Titulado'],
+            ['tipo_id'=>3,'avanzado'=>0,'label'=>'Universitario · Básico'],
+            ['tipo_id'=>3,'avanzado'=>1,'label'=>'Universitario · Egresado'],
+            ['tipo_id'=>3,'avanzado'=>2,'label'=>'Universitario · Titulado'],
+        ];
+        $estActual = [];
+        foreach ($bonosEst as $be) {
+            $key = $be['tipo_id'].'_'.$be['avanzado'];
+            if (!isset($estActual[$key])) $estActual[$key] = $be;
+        }
+        ?>
+
+        <div class="bn-rol-grid" style="grid-template-columns:repeat(3,1fr);">
+            <?php foreach ($combosEst as $c):
+                $key = $c['tipo_id'].'_'.$c['avanzado'];
+                $be  = $estActual[$key] ?? null;
+            ?>
+            <div class="bn-rol-card">
+                <div class="bn-rol-card__num">S/ <?= $be ? number_format($be['monto'],2,'.','') : '—' ?></div>
+                <div class="bn-rol-card__label"><?= $c['label'] ?></div>
+                <div class="bn-rol-card__sub">Desde <?= $be ? date('d/m/Y', strtotime($be['fecha_vigencia'])) : '—' ?></div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="bn-card">
+            <p style="font-size:.75rem;font-weight:600;color:#475569;margin-bottom:.5rem;">Actualizar montos</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:.75rem;">
+                <?php foreach ($combosEst as $i => $c):
+                    $key = $c['tipo_id'].'_'.$c['avanzado'];
+                    $cur = $estActual[$key]['monto'] ?? '';
+                ?>
+                <div>
+                    <label style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;display:block;margin-bottom:2px;"><?= $c['label'] ?></label>
+                    <input type="number" id="beM<?= $i ?>" min="0" step="0.50" placeholder="S/" value="<?= $cur ?>"
+                           style="padding:.38rem .65rem;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.8rem;width:100%;box-sizing:border-box;">
+                    <input type="hidden" id="beTipo<?= $i ?>" value="<?= $c['tipo_id'] ?>">
+                    <input type="hidden" id="beAv<?= $i ?>" value="<?= $c['avanzado'] ?>">
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <div class="bn-add-form" style="padding-top:.5rem;border-top:1px dashed #e2e8f0;">
+                <div style="min-width:140px;flex:1;">
+                    <label>Vigente desde</label>
+                    <input type="date" id="beFecha" value="<?= $hoy ?>">
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                    <button class="asist-btn asist-btn--primary" onclick="addBonosEstudio()" style="white-space:nowrap;">+ Guardar</button>
+                </div>
+            </div>
+            <div id="msgBonoEst" class="bn-msg"></div>
+        </div>
+
+        <?php
+        $gruposEst = [];
+        foreach ($bonosEst as $be) { $gruposEst[$be['fecha_vigencia']][] = $be; }
+        krsort($gruposEst);
+        $tipoDescMap = [2=>'Técnico', 3=>'Universitario'];
+        ?>
+        <div class="bn-card" style="padding:.75rem 1rem;">
+            <p style="font-size:.72rem;font-weight:700;color:#475569;margin-bottom:.5rem;">Historial</p>
+            <table class="bn-table">
+                <thead><tr><th>Tipo</th><th>Nivel</th><th>Monto</th><th>Vigente desde</th><th>Registrado</th><th></th></tr></thead>
+                <tbody id="tbBonosEst">
+                <?php if (empty($bonosEst)): ?>
+                <tr><td colspan="6" style="color:#94a3b8;text-align:center;font-size:.78rem;">Sin configuración aún.</td></tr>
+                <?php else: ?>
+                <?php foreach ($gruposEst as $vig => $rows): ?>
+                <?php foreach ($rows as $be): ?>
+                <tr id="best-<?= $be['id'] ?>">
+                    <td><?= $tipoDescMap[$be['tipo_id']] ?? '—' ?></td>
+                    <td><?= ['Básico', 'Egresado', 'Titulado'][$be['avanzado']] ?? '—' ?></td>
+                    <td style="font-weight:700;color:#059669;">S/ <?= number_format($be['monto'],2,'.','') ?></td>
+                    <td><?= date('d/m/Y', strtotime($be['fecha_vigencia'])) ?></td>
+                    <td style="font-size:.72rem;color:#94a3b8;"><?= date('d/m/Y H:i', strtotime($be['creado_en'])) ?></td>
+                    <td><button onclick="delBonoEstudio(<?= $be['id'] ?>)" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:.75rem;">✕</button></td>
+                </tr>
+                <?php endforeach; ?>
+                <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <?php
@@ -278,6 +372,43 @@ async function delBono(id) {
     });
     const res = await r.json();
     if (res.success) { document.getElementById(`bono-${id}`)?.remove(); }
+    else alert(res.message || 'Error.');
+}
+
+async function addBonosEstudio() {
+    const fecha = document.getElementById('beFecha').value;
+    if (!fecha) { showMsg('msgBonoEst', 'Selecciona una fecha de vigencia.', false); return; }
+    const combos = [
+        {i:0},{i:1},{i:2},{i:3},{i:4},{i:5}
+    ];
+    let ok = 0, err = '';
+    for (const c of combos) {
+        const monto = document.getElementById(`beM${c.i}`).value;
+        if (monto === '') continue;
+        const data = {
+            tipo_id:        document.getElementById(`beTipo${c.i}`).value,
+            avanzado:       document.getElementById(`beAv${c.i}`).value,
+            monto,
+            fecha_vigencia: fecha,
+        };
+        const r   = await fetch(apiUrl('/admin/api/bono-estudio/agregar'), {
+            method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)
+        });
+        const res = await r.json();
+        if (res.success) ok++;
+        else err = res.message || 'Error.';
+    }
+    if (ok > 0) { showMsg('msgBonoEst', `${ok} monto(s) guardado(s).`, true); setTimeout(() => location.reload(), 1000); }
+    else showMsg('msgBonoEst', err || 'No se guardó ningún monto.', false);
+}
+
+async function delBonoEstudio(id) {
+    if (!confirm('¿Eliminar este registro?')) return;
+    const r   = await fetch(apiUrl(`/admin/api/bono-estudio/${id}/eliminar`), {
+        method:'POST', headers:{'Content-Type':'application/json'}
+    });
+    const res = await r.json();
+    if (res.success) { document.getElementById(`best-${id}`)?.remove(); }
     else alert(res.message || 'Error.');
 }
 </script>

@@ -280,6 +280,22 @@ class AdminController extends Controller
             // ── Bono estudios por trabajador ──────────────────
             $estudioBonoMap  = [];
             $estudioInfoMap  = [];
+            // Cargar montos vigentes desde BD (fallback a hardcoded si tabla no existe o vacía)
+            $estBonoRef = [3 => [0 => 3.0, 1 => 6.0, 2 => 9.0], 2 => [0 => 2.0, 1 => 4.0, 2 => 6.0]];
+            try {
+                $estBonoRows = $db->query(
+                    "SELECT b1.tipo_id, b1.avanzado, b1.monto
+                     FROM bono_estudio_config b1
+                     WHERE b1.fecha_vigencia = (
+                         SELECT MAX(b2.fecha_vigencia) FROM bono_estudio_config b2
+                         WHERE b2.tipo_id = b1.tipo_id AND b2.avanzado = b1.avanzado
+                           AND b2.fecha_vigencia <= CURDATE()
+                     )"
+                )->fetchAll();
+                foreach ($estBonoRows as $ebr) {
+                    $estBonoRef[(int)$ebr['tipo_id']][(int)$ebr['avanzado']] = (float)$ebr['monto'];
+                }
+            } catch (\Exception $e) { /* tabla aún no existe, usa fallback */ }
             if (!empty($workerIds)) {
                 $inList = implode(',', array_map('intval', $workerIds));
                 $estRows = $db->query(
@@ -296,9 +312,10 @@ class AdminController extends Controller
                     $pid = (int)$r['postulante_id'];
                     if (isset($seen[$pid])) continue;
                     $seen[$pid] = true;
-                    $avanzado = in_array((int)$r['estado_id'], [1, 3]);
+                    $estadoId = (int)$r['estado_id'];
+                    $avanzado = $estadoId === 3 ? 2 : ($estadoId === 1 ? 1 : 0);
                     $tipo     = (int)$r['tipo_id'];
-                    $estudioBonoMap[$pid] = $tipo === 3 ? ($avanzado ? 6.0 : 3.0) : ($avanzado ? 4.0 : 2.0);
+                    $estudioBonoMap[$pid] = $estBonoRef[$tipo][$avanzado] ?? 0.0;
                     $estudioInfoMap[$pid] = $r;
                 }
             }
@@ -396,7 +413,8 @@ class AdminController extends Controller
                 'ecoPagos','ecoTrabajadores','ecoMes','ecoMesActual','ecoPid','ecoTipo',
                 'ecoIngresos','ecoTotalIngresos','ecoTotalBonos','ecoEstudioInfo',
                 'ecoTarifasInfo','ecoBonosVInfo','ecoBonosOInfo','ecoBonoEstudioMonto',
-                'ecoBonoServicioMonto','ecoNombreTrabajador','ecoSupervisorPeriodos'
+                'ecoBonoServicioMonto','ecoNombreTrabajador','ecoSupervisorPeriodos',
+                'estBonoRef'
             );
         }
 
@@ -428,7 +446,15 @@ class AdminController extends Controller
             $tarifas  = $db->query("SELECT * FROM tarifa_base_rol ORDER BY rol_codigo, fecha_vigencia DESC")->fetchAll();
             $bonosV   = $db->query("SELECT * FROM configuracion_bono WHERE tipo='VENTAS' ORDER BY fecha_vigencia DESC, desde ASC")->fetchAll();
             $bonosOps = $db->query("SELECT * FROM configuracion_bono WHERE tipo='OPERACIONES_BCP' ORDER BY fecha_vigencia DESC, desde ASC")->fetchAll();
-            $bonosDatos = compact('tarifas','bonosV','bonosOps');
+            try {
+                $bonosEst = $db->query(
+                    "SELECT be.*, te.descripcion AS tipo_desc
+                     FROM bono_estudio_config be
+                     INNER JOIN tipo_estudio te ON te.id_tipo = be.tipo_id
+                     ORDER BY be.fecha_vigencia DESC, be.tipo_id, be.avanzado"
+                )->fetchAll();
+            } catch (\Exception $e) { $bonosEst = []; }
+            $bonosDatos = compact('tarifas','bonosV','bonosOps','bonosEst');
         }
 
         // Datos para la página de supervisores
@@ -691,6 +717,45 @@ class AdminController extends Controller
         if (!$check->fetch()) { $this->error('No encontrado', 404); return; }
         $db->prepare("DELETE FROM configuracion_bono WHERE id = :id")->execute(['id' => $id]);
         $this->success('Rango eliminado.');
+    }
+
+    /** POST /admin/api/bono-estudio/agregar */
+    public function addBonoEstudio(): void
+    {
+        $this->middlewareAdmin();
+        $data     = $this->getAllInput();
+        $tipoId   = (int)($data['tipo_id']        ?? 0);
+        $avanzado = (int)($data['avanzado']        ?? 0);
+        $monto    = (float)($data['monto']         ?? -1);
+        $fecha    = $data['fecha_vigencia']        ?? '';
+        if (!in_array($tipoId, [2, 3]) || !in_array($avanzado, [0, 1, 2]) || $monto < 0 || !$fecha) {
+            $this->error('Datos inválidos', 422); return;
+        }
+        require_once __DIR__ . '/../Core/Database.php';
+        \Database::getConnection()->prepare(
+            "INSERT INTO bono_estudio_config (tipo_id, avanzado, monto, fecha_vigencia)
+             VALUES (:tipo, :av, :monto, :fecha)"
+        )->execute(['tipo' => $tipoId, 'av' => $avanzado, 'monto' => $monto, 'fecha' => $fecha]);
+        $this->success('Bono estudio agregado.');
+    }
+
+    /** POST /admin/api/bono-estudio/{id}/eliminar */
+    public function eliminarBonoEstudio(int $id): void
+    {
+        $this->middlewareAdmin();
+        require_once __DIR__ . '/../Core/Database.php';
+        $db = \Database::getConnection();
+        $check = $db->prepare("SELECT tipo_id, avanzado FROM bono_estudio_config WHERE id = :id");
+        $check->execute(['id' => $id]);
+        $row = $check->fetch();
+        if (!$row) { $this->error('No encontrado', 404); return; }
+        $count = $db->prepare("SELECT COUNT(*) FROM bono_estudio_config WHERE tipo_id = :t AND avanzado = :av");
+        $count->execute(['t' => $row['tipo_id'], 'av' => $row['avanzado']]);
+        if ((int)$count->fetchColumn() <= 1) {
+            $this->error('No se puede eliminar el único registro de esta combinación.', 400); return;
+        }
+        $db->prepare("DELETE FROM bono_estudio_config WHERE id = :id")->execute(['id' => $id]);
+        $this->success('Registro eliminado.');
     }
 
     /** POST /admin/api/supervisor/agregar */

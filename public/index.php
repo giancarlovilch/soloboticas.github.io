@@ -231,9 +231,11 @@ $router->post('/admin/api/ingreso-kgyr/{id}/anular',          [AdminController::
 $router->post('/admin/api/ingreso-kgyr/{id}/confirmar-directo', [AdminController::class, 'apiIngresoKgyrConfirmarDirecto']);
 $router->post('/admin/api/tarifa-base/agregar',      [AdminController::class, 'addTarifaBase']);
 $router->post('/admin/api/tarifa-base/{id}/eliminar',[AdminController::class, 'eliminarTarifaBase']);
-$router->post('/admin/api/bono/agregar',             [AdminController::class, 'addBono']);
-$router->post('/admin/api/bono/{id}/eliminar',       [AdminController::class, 'eliminarBono']);
-$router->post('/admin/api/supervisor/agregar',       [AdminController::class, 'addSupervisor']);
+$router->post('/admin/api/bono/agregar',                   [AdminController::class, 'addBono']);
+$router->post('/admin/api/bono/{id}/eliminar',             [AdminController::class, 'eliminarBono']);
+$router->post('/admin/api/bono-estudio/agregar',           [AdminController::class, 'addBonoEstudio']);
+$router->post('/admin/api/bono-estudio/{id}/eliminar',     [AdminController::class, 'eliminarBonoEstudio']);
+$router->post('/admin/api/supervisor/agregar',             [AdminController::class, 'addSupervisor']);
 $router->post('/admin/api/supervisor/{id}/eliminar', [AdminController::class, 'eliminarSupervisor']);
 // BBVA/PLIN — Vista admin y API recepción (rutas originales intactas para el celular)
 $router->get('/admin/bbva-pagos',      [PagoBBVAController::class, 'vista']);

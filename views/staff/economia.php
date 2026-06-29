@@ -239,26 +239,21 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
                         </tr>
                     </thead>
                     <tbody>
+                        <?php
+                        $estBonoRef = $estBonoRef ?? [3=>[0=>3.0,1=>6.0,2=>9.0],2=>[0=>2.0,1=>4.0,2=>6.0]];
+                        $estFilas = [
+                            [3,'En curso / Trunco',0],[3,'Egresado',1],[3,'Titulado',2],
+                            [2,'En curso / Trunco',0],[2,'Egresado',1],[2,'Titulado',2],
+                        ];
+                        $tipoNombre = [2=>'Técnico',3=>'Universitario'];
+                        foreach ($estFilas as [$tid,$label,$av]):
+                        ?>
                         <tr>
-                            <td>Universitario</td>
-                            <td>En curso / Trunco</td>
-                            <td class="eco-bono-monto">S/ 3.00</td>
+                            <td><?= $tipoNombre[$tid] ?></td>
+                            <td><?= $label ?></td>
+                            <td class="eco-bono-monto">S/ <?= number_format($estBonoRef[$tid][$av] ?? 0, 2) ?></td>
                         </tr>
-                        <tr>
-                            <td>Universitario</td>
-                            <td>Egreso / Titulado</td>
-                            <td class="eco-bono-monto">S/ 6.00</td>
-                        </tr>
-                        <tr>
-                            <td>Técnico</td>
-                            <td>En curso / Trunco</td>
-                            <td class="eco-bono-monto">S/ 2.00</td>
-                        </tr>
-                        <tr>
-                            <td>Técnico</td>
-                            <td>Egreso / Titulado</td>
-                            <td class="eco-bono-monto">S/ 4.00</td>
-                        </tr>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
                 <?php if ($estudioInfo): ?>
