@@ -163,9 +163,6 @@ if ($semana) {
                         <?php if ($cantidad > 1): ?>
                             <span class="hor-slot-num"><?= $n ?></span>
                         <?php endif; ?>
-                        <?php if ($esOpcional): ?>
-                            <span class="hor-opcional-badge">opc.</span>
-                        <?php endif; ?>
                     </div>
                     <?php for ($dia = 1; $dia <= 7; $dia++): ?>
                     <div class="hor-asiento hor-asiento--libre"

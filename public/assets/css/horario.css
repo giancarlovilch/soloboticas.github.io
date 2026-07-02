@@ -139,8 +139,8 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
 .hor-grid__row--opcional .hor-grid__rol-label { opacity: .7; }
 
 .hor-slot-num {
-    background: #e2e8f0; color: var(--hor-muted);
-    border-radius: 50%; width: 16px; height: 16px;
+    background: #fcd5bb; color: var(--hor-muted);
+    border-radius: 50%; width: 26px; height: 26px;
     display: flex; align-items: center; justify-content: center;
     font-size: 0.62rem; font-weight: 700; flex-shrink: 0;
 }

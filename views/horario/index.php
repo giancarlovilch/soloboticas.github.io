@@ -18,6 +18,14 @@ $LOCALES     = [
 $slotsConfig = $slotsConfig ?? [];
 $roles       = $roles       ?? [];
 
+$slotLabels = [
+    3 => [
+        'VENDEDORA'  => [1 => 'sb3', 2 => 'sb5'],
+        'CAJERA'     => [1 => 'sb3', 2 => 'sb7', 3 => 'sb5'],
+        'ALMACENERA' => [1 => false, 2 => false],
+    ],
+];
+
 // Formatear fechas de la semana
 $fechasSemana = [];
 if ($semana) {
@@ -205,12 +213,9 @@ if ($semana) {
                     <div class="hor-grid__rol-label">
                         <span class="hor-rol-full"><?= $rolDesc ?></span>
                         <span class="hor-rol-short"><?= $rolAbrev ?></span>
-                        <?php if ($cantidad > 1): ?>
-                            <span class="hor-slot-num"><?= $n ?></span>
-                        <?php endif; ?>
-                        <?php if ($esOpcional): ?>
-                            <span class="hor-opcional-badge">opc.</span>
-                        <?php endif; ?>
+                        <?php if ($cantidad > 1): $slotLabel = $slotLabels[$localId][$rol][$n] ?? $n; if ($slotLabel !== false): ?>
+                            <span class="hor-slot-num"><?= $slotLabel ?></span>
+                        <?php endif; endif; ?>
                     </div>
 
                     <!-- Celdas de cada día -->
