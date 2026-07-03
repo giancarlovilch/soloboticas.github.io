@@ -124,6 +124,8 @@ $router->post('/caja/api/sesion/{id}/conteo',                [CajaController::cl
 $router->post('/caja/api/sesion/{id}/num-ops-bcp',           [CajaController::class, 'apiUpdateNumOpsBcp']);
 $router->post('/caja/api/sesion/{id}/ajuste-esperado',       [CajaController::class, 'addAjusteEsperado']);
 $router->post('/caja/api/ajuste-esperado/{id}/eliminar',     [CajaController::class, 'deleteAjusteEsperado']);
+$router->post('/caja/api/gasto/{modo}/{id}/editar',          [CajaController::class, 'editarGasto']);
+$router->post('/caja/api/gasto/{modo}/{id}/eliminar',        [CajaController::class, 'eliminarGasto']);
 $router->post('/caja/api/sesion/{id}/comentario',            [CajaController::class, 'guardarComentario']);
 $router->post('/caja/api/sesion/{id}/respuesta',       [CajaController::class, 'guardarRespuesta']);
 $router->post('/caja/api/sesion/{id}/eliminar',        [CajaController::class, 'eliminarSesion']);

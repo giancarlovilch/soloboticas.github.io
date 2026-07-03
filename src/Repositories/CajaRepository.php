@@ -311,7 +311,12 @@ class CajaRepository
                  + $d($activos['billetes'])      + $d($activos['caja_fuerte'])
                  + $d($activos['agente_bcp']);
 
-        $numOps = $int($activos['num_operaciones_bcp'] ?? 0);
+        // Operaciones BCP divididas: solo ingresos + salida cuentan para el bono/ranking
+        // (num_operaciones_bcp se sigue derivando de estas dos, "otros" queda solo como registro).
+        $opIngresos = $int($activos['oper_ingresos_bcp'] ?? null);
+        $opSalida   = $int($activos['oper_salida_bcp']   ?? null);
+        $opOtros    = $int($activos['oper_otros_bcp']    ?? null);
+        $numOps     = $opIngresos + $opSalida;
 
         $sql = "INSERT INTO detalle_cuadre
                     (sesion_id, monto_caja_exterior, monto_monedas, monto_billetes_caja,
@@ -341,12 +346,20 @@ class CajaRepository
             'spd'  => $loQueEs, // base día siguiente = LO QUE ES (físico + BCP agente)
         ]);
 
-        // Guardar número de operaciones BCP (columna opcional)
+        // Guardar número de operaciones BCP (columnas opcionales)
         try {
             $this->db->prepare(
-                "UPDATE detalle_cuadre SET num_operaciones_bcp = :ops WHERE sesion_id = :sid"
-            )->execute(['ops' => $numOps, 'sid' => $sesionId]);
-        } catch (\PDOException) { /* columna aún no existe en BD antigua */ }
+                "UPDATE detalle_cuadre SET
+                    num_operaciones_bcp = :ops,
+                    oper_ingresos_bcp   = :ing,
+                    oper_salida_bcp     = :sal,
+                    oper_otros_bcp      = :otr
+                 WHERE sesion_id = :sid"
+            )->execute([
+                'ops' => $numOps, 'ing' => $opIngresos, 'sal' => $opSalida, 'otr' => $opOtros,
+                'sid' => $sesionId,
+            ]);
+        } catch (\PDOException) { /* columnas aún no existen en BD antigua */ }
     }
 
     // ── Pagos digitales individuales (movimiento_sesion INGRESO) ──
@@ -930,6 +943,104 @@ class CajaRepository
         return array_sum(array_column($gastos, 'monto'));
     }
 
+    private const GASTO_TABLAS = [
+        'PERSONAL' => ['pago_personal',    'id_pago_personal'],
+        'LOCAL'    => ['pago_local',       'id_pago_local'],
+        'FACTURA'  => ['pago_factura',     'id_pago_factura'],
+        'DEPOSITO' => ['pago_deposito',    'id_pago_deposito'],
+        'LIBRE'    => ['movimiento_sesion','id_movimiento'],
+    ];
+
+    private function getGastoRow(string $modoRef, int $id): ?array
+    {
+        if (!isset(self::GASTO_TABLAS[$modoRef])) return null;
+        [$tabla, $pk] = self::GASTO_TABLAS[$modoRef];
+        $sql = "SELECT * FROM {$tabla} WHERE {$pk} = :id";
+        if ($modoRef === 'LIBRE') $sql .= " AND tipo_movimiento_id = 2";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    /** Recalcula total_gastos_sistema desde las tablas de gasto vivas y propaga la diferencia. */
+    private function actualizarTotalGastos(int $sesionId): void
+    {
+        $this->db->prepare("UPDATE detalle_cuadre SET total_gastos_sistema = :g WHERE sesion_id = :sid")
+            ->execute(['g' => $this->sumGastosSesion($sesionId), 'sid' => $sesionId]);
+        $this->recalcularDiferenciaCompleta($sesionId);
+    }
+
+    /**
+     * Edita el monto (y texto de referencia: N° operación/comprobante/descripción según el tipo)
+     * de un egreso ya registrado. Requiere contraseña admin porque afecta sesiones cerradas.
+     */
+    public function editarGasto(string $modoRef, int $id, float $monto, ?string $texto, int $adminId, string $password): bool|string
+    {
+        if (!$this->verificarPasswordAdmin($adminId, $password)) return 'Contraseña incorrecta';
+        if ($monto <= 0) return 'El monto debe ser mayor a 0';
+
+        $gasto = $this->getGastoRow($modoRef, $id);
+        if (!$gasto) return 'Egreso no encontrado';
+        $sesionId = (int)$gasto['sesion_id'];
+
+        switch ($modoRef) {
+            case 'PERSONAL':
+                $this->db->prepare("UPDATE pago_personal SET monto = :m WHERE id_pago_personal = :id")
+                    ->execute(['m' => $monto, 'id' => $id]);
+                break;
+            case 'LOCAL':
+                $this->db->prepare("UPDATE pago_local SET monto = :m, numero_operacion = :t WHERE id_pago_local = :id")
+                    ->execute(['m' => $monto, 't' => $texto, 'id' => $id]);
+                break;
+            case 'FACTURA':
+                $this->db->prepare("UPDATE pago_factura SET monto = :m, numero_comprobante = :t WHERE id_pago_factura = :id")
+                    ->execute(['m' => $monto, 't' => $texto, 'id' => $id]);
+                break;
+            case 'DEPOSITO':
+                $this->db->prepare("UPDATE pago_deposito SET monto = :m, numero_comprobante = :t WHERE id_pago_deposito = :id")
+                    ->execute(['m' => $monto, 't' => $texto, 'id' => $id]);
+                break;
+            case 'LIBRE':
+                $this->db->prepare("UPDATE movimiento_sesion SET monto = :m, descripcion = :t WHERE id_movimiento = :id")
+                    ->execute(['m' => $monto, 't' => $texto ?: 'Otros pagos', 'id' => $id]);
+                break;
+            default:
+                return 'Tipo de egreso inválido';
+        }
+
+        $this->audit(
+            $sesionId, $adminId, 'GASTO_MODIFICADO', "{$modoRef} #{$id}",
+            'S/ ' . number_format((float)$gasto['monto'], 2),
+            'S/ ' . number_format($monto, 2)
+        );
+
+        $this->actualizarTotalGastos($sesionId);
+        return true;
+    }
+
+    /** Elimina un egreso ya registrado. Requiere contraseña admin porque afecta sesiones cerradas. */
+    public function eliminarGasto(string $modoRef, int $id, int $adminId, string $password): bool|string
+    {
+        if (!$this->verificarPasswordAdmin($adminId, $password)) return 'Contraseña incorrecta';
+        if (!isset(self::GASTO_TABLAS[$modoRef])) return 'Tipo de egreso inválido';
+
+        $gasto = $this->getGastoRow($modoRef, $id);
+        if (!$gasto) return 'Egreso no encontrado';
+        $sesionId = (int)$gasto['sesion_id'];
+
+        [$tabla, $pk] = self::GASTO_TABLAS[$modoRef];
+        $this->db->prepare("DELETE FROM {$tabla} WHERE {$pk} = :id")->execute(['id' => $id]);
+
+        $this->audit(
+            $sesionId, $adminId, 'GASTO_ELIMINADO', "{$modoRef} #{$id}",
+            'S/ ' . number_format((float)$gasto['monto'], 2), '—'
+        );
+
+        $this->actualizarTotalGastos($sesionId);
+        return true;
+    }
+
     // ── Cerrar sesión (→ PENDIENTE_VENTA) ──────────────────
     public function cerrarSesion(int $sesionId, int $postulanteId): void
     {
@@ -1217,7 +1328,8 @@ class CajaRepository
             // Datos de la sesión
             $stmt = $this->db->prepare(
                 "SELECT sc.postulante_apertura_id, sc.turno_id, sc.fecha_operacion,
-                        ca.local_id, dc.num_operaciones_bcp
+                        ca.local_id, dc.num_operaciones_bcp,
+                        dc.oper_ingresos_bcp, dc.oper_salida_bcp, dc.oper_otros_bcp
                  FROM sesion_caja sc
                  INNER JOIN caja ca ON ca.id_caja = sc.caja_id
                  LEFT  JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
@@ -1249,9 +1361,15 @@ class CajaRepository
 
             $this->db->prepare(
                 "INSERT INTO horario_rendimiento
-                    (horario_slot_id, postulante_id, sesion_caja_id, fecha, local_id, turno_id, rol_codigo, operaciones_bcp)
-                 VALUES (:slot, :pid, :sid, :fecha, :lid, :tid, 'CAJERA', :ops)
-                 ON DUPLICATE KEY UPDATE operaciones_bcp = VALUES(operaciones_bcp), sesion_caja_id = VALUES(sesion_caja_id)"
+                    (horario_slot_id, postulante_id, sesion_caja_id, fecha, local_id, turno_id, rol_codigo,
+                     operaciones_bcp, oper_ingresos_bcp, oper_salida_bcp, oper_otros_bcp)
+                 VALUES (:slot, :pid, :sid, :fecha, :lid, :tid, 'CAJERA', :ops, :ing, :sal, :otr)
+                 ON DUPLICATE KEY UPDATE
+                    operaciones_bcp    = VALUES(operaciones_bcp),
+                    oper_ingresos_bcp  = VALUES(oper_ingresos_bcp),
+                    oper_salida_bcp    = VALUES(oper_salida_bcp),
+                    oper_otros_bcp     = VALUES(oper_otros_bcp),
+                    sesion_caja_id     = VALUES(sesion_caja_id)"
             )->execute([
                 'slot'  => $slotId,
                 'pid'   => $s['postulante_apertura_id'],
@@ -1260,6 +1378,9 @@ class CajaRepository
                 'lid'   => $s['local_id'],
                 'tid'   => $s['turno_id'],
                 'ops'   => $s['num_operaciones_bcp'] ?? 0,
+                'ing'   => $s['oper_ingresos_bcp'],
+                'sal'   => $s['oper_salida_bcp'],
+                'otr'   => $s['oper_otros_bcp'],
             ]);
         } catch (\Throwable) { /* no bloquear el flujo de caja */ }
     }
@@ -1457,20 +1578,35 @@ class CajaRepository
         $this->propagarBase($sesionId);
     }
 
-    public function updateNumOperacionesBcp(int $sesionId, int $numOps, int $postulanteId): void
+    public function updateNumOperacionesBcp(int $sesionId, int $opIngresos, int $opSalida, int $opOtros, int $postulanteId): void
     {
-        $old = $this->db->prepare("SELECT num_operaciones_bcp FROM detalle_cuadre WHERE sesion_id = :sid");
+        $old = $this->db->prepare(
+            "SELECT num_operaciones_bcp, oper_ingresos_bcp, oper_salida_bcp, oper_otros_bcp
+             FROM detalle_cuadre WHERE sesion_id = :sid"
+        );
         $old->execute(['sid' => $sesionId]);
-        $prev = $old->fetchColumn();
-        if ($prev === false) return;
+        $prev = $old->fetch();
+        if (!$prev) return;
 
-        $this->audit($sesionId, $postulanteId, 'CONTEO_MODIFICADO', 'num_operaciones_bcp',
-            (string)(int)$prev,
-            (string)$numOps);
+        $numOps = $opIngresos + $opSalida;
+
+        $this->audit($sesionId, $postulanteId, 'CONTEO_MODIFICADO', 'operaciones_bcp',
+            sprintf('ingresos %d, salida %d, otros %d (total %d)',
+                (int)$prev['oper_ingresos_bcp'], (int)$prev['oper_salida_bcp'],
+                (int)$prev['oper_otros_bcp'], (int)$prev['num_operaciones_bcp']),
+            sprintf('ingresos %d, salida %d, otros %d (total %d)', $opIngresos, $opSalida, $opOtros, $numOps));
 
         $this->db->prepare(
-            "UPDATE detalle_cuadre SET num_operaciones_bcp = :ops WHERE sesion_id = :sid"
-        )->execute(['ops' => $numOps, 'sid' => $sesionId]);
+            "UPDATE detalle_cuadre SET
+                num_operaciones_bcp = :ops,
+                oper_ingresos_bcp   = :ing,
+                oper_salida_bcp     = :sal,
+                oper_otros_bcp      = :otr
+             WHERE sesion_id = :sid"
+        )->execute([
+            'ops' => $numOps, 'ing' => $opIngresos, 'sal' => $opSalida, 'otr' => $opOtros,
+            'sid' => $sesionId,
+        ]);
 
         // Resincronizar horario_rendimiento, que se llenó al cerrar el cuadre
         // y quedaría desactualizado si el conteo se corrige después.
@@ -2221,5 +2357,9 @@ class CajaRepository
         );
 
         $this->recalcularDiferenciaCompleta($sesionId);
+
+        // Resincronizar horario_rendimiento, que se llenó al cerrar el cuadre
+        // y quedaría desactualizado si la venta se corrige después (ver reportes de asistencia).
+        $this->registrarRendimientoVendedora($sesionId, round($montoNuevo, 2));
     }
 }

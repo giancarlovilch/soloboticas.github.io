@@ -436,17 +436,36 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     <?php endif; ?>
 
                     <!-- Operaciones BCP -->
-                    <?php $numOpsBcp = $dc['num_operaciones_bcp'] ?? null; ?>
+                    <?php
+                    $numOpsBcp   = $dc['num_operaciones_bcp'] ?? null;
+                    $opIngActual = (int)($dc['oper_ingresos_bcp'] ?? 0);
+                    $opSalActual = (int)($dc['oper_salida_bcp']   ?? 0);
+                    $opOtrActual = (int)($dc['oper_otros_bcp']    ?? 0);
+                    ?>
                     <hr class="sec-divider" style="margin:.9rem 0 .6rem;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;">
-                        <span class="form-label" style="margin:0;">Operaciones BCP (agente)</span>
-                        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                    <div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem;">
+                            <span class="form-label" style="margin:0;">Operaciones BCP (agente)</span>
                             <span style="font-size:.8rem;color:#64748b;">
-                                Actual: <strong id="numBcpActual"><?= $numOpsBcp !== null ? (int)$numOpsBcp : '—' ?></strong>
+                                Total: <strong id="numBcpActual"><?= $numOpsBcp !== null ? (int)$numOpsBcp : '—' ?></strong>
                             </span>
-                            <input type="number" min="0" step="1" id="numBcpInput"
-                                   value="<?= $numOpsBcp !== null ? (int)$numOpsBcp : 0 ?>"
-                                   style="width:70px;padding:.25rem .4rem;border:1.5px solid #e2e8f0;border-radius:6px;font-size:.82rem;text-align:right;font-family:inherit;outline:none;">
+                        </div>
+                        <div style="display:flex;align-items:flex-end;gap:.5rem;flex-wrap:wrap;">
+                            <div style="display:flex;flex-direction:column;gap:.2rem;background:#d1fae5;border:1.5px solid #a7f3d0;border-radius:7px;padding:.35rem .5rem;">
+                                <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#059669;">Ingresos</label>
+                                <input type="number" min="0" step="1" id="bcpIngresosInput" value="<?= $opIngActual ?>"
+                                       style="width:60px;padding:.2rem .3rem;border:1px solid #a7f3d0;border-radius:5px;font-size:.85rem;font-weight:700;text-align:center;font-family:inherit;outline:none;background:#fff;">
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:.2rem;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:7px;padding:.35rem .5rem;">
+                                <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#2563eb;">Salida</label>
+                                <input type="number" min="0" step="1" id="bcpSalidaInput" value="<?= $opSalActual ?>"
+                                       style="width:60px;padding:.2rem .3rem;border:1px solid #bfdbfe;border-radius:5px;font-size:.85rem;font-weight:700;text-align:center;font-family:inherit;outline:none;background:#fff;">
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:.2rem;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:7px;padding:.35rem .5rem;">
+                                <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#64748b;">Otros</label>
+                                <input type="number" min="0" step="1" id="bcpOtrosInput" value="<?= $opOtrActual ?>"
+                                       style="width:60px;padding:.2rem .3rem;border:1px solid #e2e8f0;border-radius:5px;font-size:.85rem;font-weight:700;text-align:center;font-family:inherit;outline:none;background:#fff;">
+                            </div>
                             <button class="btn btn-primary btn-sm" onclick="guardarNumBcp()">Guardar</button>
                             <span id="bcpAlert" style="display:none;" class="alert"></span>
                         </div>
@@ -454,7 +473,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     <?php
                     $histBcp = array_values(array_filter(
                         $auditoriaCaja ?? [],
-                        fn($a) => $a['accion'] === 'CONTEO_MODIFICADO' && ($a['campo_modificado'] ?? '') === 'num_operaciones_bcp'
+                        fn($a) => $a['accion'] === 'CONTEO_MODIFICADO' && ($a['campo_modificado'] ?? '') === 'operaciones_bcp'
                     ));
                     if (!empty($histBcp)):
                     ?>
@@ -534,6 +553,77 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                         <button class="btn btn-primary btn-sm" onclick="guardarVenta()">Guardar venta</button>
                         <span id="ventaAlert" style="display:none;" class="alert"></span>
                     </div>
+                </div>
+            </div>
+
+            <!-- ── 2b. Egresos del turno ──────────────────────── -->
+            <div class="card card--amber">
+                <div class="card-head">
+                    <p class="card-title">Egresos del turno</p>
+                    <span style="font-size:.72rem;color:#94a3b8;">
+                        Total: <strong style="color:#dc2626;"><?= $f2($totalGastos) ?></strong>
+                    </span>
+                </div>
+                <div class="card-body">
+                    <?php if (empty($gastos)): ?>
+                    <p style="font-size:.82rem;color:#94a3b8;">Sin egresos registrados en este turno.</p>
+                    <?php else: ?>
+                    <?php $tipoPagoLabelG = ['MES_ACTUAL' => 'Pago Mes Actual', 'MES_PASADO' => 'Pago Mes Pasado', 'PAGO_EXTRA' => 'Pago Extra']; ?>
+                    <ul class="item-list">
+                        <?php foreach ($gastos as $g):
+                            $modoRef = $g['modo_ref'] ?? '';
+                            switch ($modoRef) {
+                                case 'PERSONAL':
+                                    $detGasto = htmlspecialchars($g['descripcion']) . ' · <em>' . ($tipoPagoLabelG[$g['tipo_pago'] ?? ''] ?? '') . '</em>';
+                                    $gTexto = null; $gTextoLabel = null;
+                                    break;
+                                case 'LOCAL':
+                                    $detGasto = htmlspecialchars($g['descripcion']);
+                                    if (!empty($g['concepto_desc'])) $detGasto .= ' · ' . htmlspecialchars($g['concepto_desc']);
+                                    $gTexto = $g['comprobante'] ?? ''; $gTextoLabel = 'N° operación';
+                                    break;
+                                case 'FACTURA':
+                                    $detGasto = htmlspecialchars($g['tipo_documento'] ?? $g['descripcion'] ?? '');
+                                    $gTexto = $g['comprobante'] ?? ''; $gTextoLabel = 'N° comprobante';
+                                    break;
+                                case 'DEPOSITO':
+                                    $detGasto = 'Depósito a KGyR';
+                                    $gTexto = $g['comprobante'] ?? ''; $gTextoLabel = 'N° comprobante';
+                                    break;
+                                default:
+                                    $detGasto = htmlspecialchars($g['descripcion'] ?? '');
+                                    $gTexto = $g['descripcion'] ?? ''; $gTextoLabel = 'Descripción';
+                            }
+                        ?>
+                        <li id="gasto-<?= htmlspecialchars($modoRef) ?>-<?= (int)$g['id'] ?>">
+                            <span class="item-desc">
+                                <span class="badge" style="background:#fee2e2;color:#991b1b;font-size:.65rem;margin-right:.3rem;"><?= htmlspecialchars($g['etiqueta'] ?? '') ?></span>
+                                <?= $detGasto ?>
+                                <?php if (!empty($g['comprobante']) && $modoRef !== 'PERSONAL'): ?>
+                                <span style="font-family:monospace;font-size:.72rem;color:#94a3b8;margin-left:.3rem;"><?= htmlspecialchars($g['comprobante']) ?></span>
+                                <?php endif; ?>
+                            </span>
+                            <span class="item-amount" style="color:#dc2626;">−<?= $f2($g['monto']) ?></span>
+                            <?php if ($esAdmin):
+                                $onclickEdit = htmlspecialchars(sprintf(
+                                    'editarGastoInline(%s, %d, %s, %s, %s, this)',
+                                    json_encode($modoRef), (int)$g['id'], json_encode((float)$g['monto']),
+                                    json_encode($gTexto), json_encode($gTextoLabel)
+                                ));
+                                $onclickDel = htmlspecialchars(sprintf(
+                                    'eliminarGasto(%s, %d, this)',
+                                    json_encode($modoRef), (int)$g['id']
+                                ));
+                            ?>
+                            <button class="item-rm edit" title="Editar" style="margin-right:.2rem;"
+                                onclick="<?= $onclickEdit ?>">✎</button>
+                            <button class="item-rm" title="Eliminar"
+                                onclick="<?= $onclickDel ?>">✕</button>
+                            <?php endif; ?>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -1792,12 +1882,19 @@ async function guardarConteo() {
 
 // ── Guardar operaciones BCP ─────────────────────────────
 async function guardarNumBcp() {
-    const val = parseInt(document.getElementById('numBcpInput').value, 10);
-    if (isNaN(val) || val < 0) { mostrarAlerta('bcpAlert', 'Valor inválido', 'err'); return; }
+    const ingresos = parseInt(document.getElementById('bcpIngresosInput').value, 10);
+    const salida   = parseInt(document.getElementById('bcpSalidaInput').value, 10);
+    const otros    = parseInt(document.getElementById('bcpOtrosInput').value, 10);
+    if ([ingresos, salida, otros].some(v => isNaN(v) || v < 0)) {
+        mostrarAlerta('bcpAlert', 'Valor inválido', 'err');
+        return;
+    }
     try {
-        await apiPost(`${BASE}/caja/api/sesion/${SESION_ID}/num-ops-bcp`, { num_operaciones_bcp: val });
+        await apiPost(`${BASE}/caja/api/sesion/${SESION_ID}/num-ops-bcp`, {
+            oper_ingresos_bcp: ingresos, oper_salida_bcp: salida, oper_otros_bcp: otros,
+        });
         mostrarAlerta('bcpAlert', '✓ Actualizado', 'ok');
-        document.getElementById('numBcpActual').textContent = val;
+        document.getElementById('numBcpActual').textContent = ingresos + salida;
         setTimeout(() => location.reload(), 900);
     } catch(e) {
         mostrarAlerta('bcpAlert', e.message, 'err');
@@ -1959,6 +2056,66 @@ async function eliminarAjuste(ajId, btn) {
     try {
         await apiPost(`${BASE}/caja/api/ajuste-esperado/${ajId}/eliminar`, { password });
         btn.closest('li').remove();
+    } catch(e) { alert(e.message); }
+}
+
+// ── Egresos del turno ────────────────────────────────────
+function editarGastoInline(modo, id, montoActual, textoActual, textoLabel, btn) {
+    const li = btn.closest('li');
+    if (li.querySelector('.gasto-edit-form')) return;
+    const form = document.createElement('div');
+    form.className = 'gasto-edit-form';
+    form.style.cssText = 'display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.4rem;width:100%;';
+
+    const inMonto = document.createElement('input');
+    inMonto.type = 'number'; inMonto.step = '0.01'; inMonto.min = '0.01';
+    inMonto.value = montoActual; inMonto.className = 'form-input';
+    inMonto.style.width = '90px'; inMonto.placeholder = 'Monto';
+    form.appendChild(inMonto);
+
+    let inTexto = null;
+    if (textoLabel) {
+        inTexto = document.createElement('input');
+        inTexto.type = 'text'; inTexto.value = textoActual || '';
+        inTexto.className = 'form-input'; inTexto.style.cssText = 'flex:1;min-width:120px;';
+        inTexto.placeholder = textoLabel;
+        form.appendChild(inTexto);
+    }
+
+    const btnGuardar = document.createElement('button');
+    btnGuardar.className = 'btn btn-primary btn-sm';
+    btnGuardar.style.cssText = 'padding:.2rem .55rem;font-size:.75rem;';
+    btnGuardar.textContent = 'Guardar';
+    const btnCancelar = document.createElement('button');
+    btnCancelar.className = 'btn btn-secondary btn-sm';
+    btnCancelar.style.cssText = 'padding:.2rem .55rem;font-size:.75rem;';
+    btnCancelar.textContent = 'Cancelar';
+    form.appendChild(btnGuardar);
+    form.appendChild(btnCancelar);
+
+    btnCancelar.onclick = () => form.remove();
+    btnGuardar.onclick = async () => {
+        const monto = parseFloat(inMonto.value);
+        if (!monto || monto <= 0) { alert('Monto inválido'); return; }
+        const password = prompt('Contraseña admin:');
+        if (!password) return;
+        try {
+            await apiPost(`${BASE}/caja/api/gasto/${modo}/${id}/editar`, {
+                monto, texto: inTexto ? inTexto.value.trim() : null, password
+            });
+            setTimeout(() => location.reload(), 400);
+        } catch(e) { alert(e.message); }
+    };
+    li.appendChild(form);
+}
+
+async function eliminarGasto(modo, id, btn) {
+    if (!confirm('¿Eliminar este egreso? Se recalculará el cuadre.')) return;
+    const password = prompt('Contraseña admin:');
+    if (!password) return;
+    try {
+        await apiPost(`${BASE}/caja/api/gasto/${modo}/${id}/eliminar`, { password });
+        setTimeout(() => location.reload(), 400);
     } catch(e) { alert(e.message); }
 }
 

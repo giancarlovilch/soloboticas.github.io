@@ -1,5 +1,9 @@
 <?php
 $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+
+// Fijo a la URL pública real (no la de desarrollo local), para que el QR/enlace
+// compartido siempre apunte al sitio en producción sin importar dónde se vea esta página.
+$shareUrl = 'https://www.soloboticas.com/public/postulacion/acceso';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -36,66 +40,13 @@ $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
     </section>
 
     <main class="acceso-main">
-        <section class="contenedor acceso-layout">
 
-            <div class="vacantes-panel">
-                <div class="section-heading acceso-heading">
-                    <p class="section-kicker">Posiciones disponibles</p>
-                    <h2>Oportunidades que podrías encontrar en Solo Boticas</h2>
-                    <p>
-                        Estas posiciones son referenciales y te muestran el tipo de perfiles que valoramos
-                        dentro de nuestra organización.
-                    </p>
-                </div>
-
-                <div class="vacantes-grid">
-                    <article class="vacante-card">
-                        <span class="vacante-tag">Salud y Bienestar</span>
-                        <h3>Especialista en Atención Farmacéutica</h3>
-                        <p>
-                            Brinda orientación experta en salud, gestión de dispensación y cuidado directo al paciente
-                            con los más altos estándares éticos.
-                        </p>
-                    </article>
-
-                    <article class="vacante-card">
-                        <span class="vacante-tag">Servicios Financieros</span>
-                        <h3>Anfitrión(a) de Caja y Agente BCP</h3>
-                        <p>
-                            Gestión eficiente de transacciones, recaudación y atención personalizada de servicios
-                            bancarios integrados en nuestra sede.
-                        </p>
-                    </article>
-
-                    <article class="vacante-card">
-                        <span class="vacante-tag">Administración</span>
-                        <h3>Coordinador(a) de Gestión Operativa</h3>
-                        <p>
-                            Soporte estratégico en procesos administrativos, documentación y flujo de información
-                            para asegurar la excelencia del local.
-                        </p>
-                    </article>
-
-                    <article class="vacante-card">
-                        <span class="vacante-tag">Logística</span>
-                        <h3>Gestor(a) de Inventario y Almacén</h3>
-                        <p>
-                            Control riguroso de stock, recepción de productos de salud y optimización de la
-                            cadena de suministro interna.
-                        </p>
-                    </article>
-                </div>
-            </div>
-
-            <aside class="acceso-sidebar">
+        <section class="contenedor acceso-access-section">
+            <div class="acceso-access-grid">
                 <div class="acceso-card acceso-card-form">
                     <div class="acceso-card-header">
                         <p class="section-kicker">Acceso a postulación</p>
                         <h2>Ingresa tus datos</h2>
-                        <p>
-                            Ingresa tu DNI y resuelve la verificación para continuar. Si ya existe una solicitud
-                            enviada, validaremos tu fecha de nacimiento para mostrar tu información.
-                        </p>
                     </div>
 
                     <form id="accessForm" class="access-form" novalidate>
@@ -152,10 +103,103 @@ $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
                         <li>Si ya enviaste tu solicitud, el sistema la mostrará en modo lectura.</li>
                     </ul>
                 </div>
-            </aside>
-
+            </div>
         </section>
+
+        <section class="contenedor vacantes-panel">
+            <div class="section-heading acceso-heading">
+                <p class="section-kicker">Posiciones disponibles</p>
+                <h2>Oportunidades que podrías encontrar en Solo Boticas</h2>
+                <p>
+                    Estas posiciones son referenciales y te muestran el tipo de perfiles que valoramos
+                    dentro de nuestra organización.
+                </p>
+            </div>
+
+            <div class="vacantes-grid">
+                <article class="vacante-card">
+                    <span class="vacante-tag">Salud y Bienestar</span>
+                    <h3>Especialista en Atención Farmacéutica</h3>
+                    <p>
+                        Brinda orientación experta en salud, gestión de dispensación y cuidado directo al paciente
+                        con los más altos estándares éticos.
+                    </p>
+                </article>
+
+                <article class="vacante-card">
+                    <span class="vacante-tag">Servicios Financieros</span>
+                    <h3>Anfitrión(a) de Caja y Agente BCP</h3>
+                    <p>
+                        Gestión eficiente de transacciones, recaudación y atención personalizada de servicios
+                        bancarios integrados en nuestra sede.
+                    </p>
+                </article>
+
+                <article class="vacante-card">
+                    <span class="vacante-tag">Administración</span>
+                    <h3>Coordinador(a) de Gestión Operativa</h3>
+                    <p>
+                        Soporte estratégico en procesos administrativos, documentación y flujo de información
+                        para asegurar la excelencia del local.
+                    </p>
+                </article>
+
+                <article class="vacante-card">
+                    <span class="vacante-tag">Logística</span>
+                    <h3>Gestor(a) de Inventario y Almacén</h3>
+                    <p>
+                        Control riguroso de stock, recepción de productos de salud y optimización de la
+                        cadena de suministro interna.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section class="contenedor acceso-share-section">
+            <div class="acceso-share-card">
+                <div class="acceso-share-text">
+                    <p class="section-kicker">Comparte esta postulación</p>
+                    <h2>¿Conoces a alguien que busque trabajo?</h2>
+                    <p>
+                        Comparte este enlace o el código QR para que cualquier persona pueda entrar
+                        directamente a postular, desde su celular o computadora.
+                    </p>
+                    <a
+                        class="boton-acceso acceso-share-btn"
+                        id="shareWhatsappBtn"
+                        href="https://wa.me/?text=<?= urlencode('¡Postula con nosotros en Solo Boticas! Ingresa tu DNI aquí: ' . $shareUrl) ?>"
+                        target="_blank"
+                        rel="noopener noreferrer">
+                        Compartir por WhatsApp
+                    </a>
+                </div>
+
+                <div class="acceso-share-qr">
+                    <img
+                        src="<?= htmlspecialchars('https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=' . urlencode($shareUrl), ENT_QUOTES, 'UTF-8') ?>"
+                        alt="Código QR para postular en Solo Boticas"
+                        width="240" height="240" loading="lazy">
+                    <p class="acceso-share-url"><?= htmlspecialchars($shareUrl, ENT_QUOTES, 'UTF-8') ?></p>
+                </div>
+            </div>
+        </section>
+
     </main>
+
+    <!-- Aviso rápido: cómo postular -->
+    <div id="tipModal" class="tip-modal" hidden>
+        <div class="tip-modal-backdrop" id="tipModalBackdrop"></div>
+        <div class="tip-modal-box" role="dialog" aria-modal="true" aria-labelledby="tipModalTitle">
+            <button type="button" class="tip-modal-close" id="tipModalClose" aria-label="Cerrar">✕</button>
+            <p class="tip-modal-emoji">👋</p>
+            <h3 id="tipModalTitle">¿Quieres postular con nosotros?</h3>
+            <p>
+                Ingresa tu <strong>DNI</strong> en el cuadro <strong>“Acceso a postulación”</strong> y sigue
+                los pasos para completar tu solicitud.
+            </p>
+            <button type="button" class="boton-acceso tip-modal-btn" id="tipModalOk">Entendido</button>
+        </div>
+    </div>
 
     <?php require_once __DIR__ . '/../partials/footer.php'; ?>
 

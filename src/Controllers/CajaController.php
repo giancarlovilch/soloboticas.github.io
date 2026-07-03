@@ -45,6 +45,25 @@ class CajaController extends Controller
         return (int)$_SESSION['user_id'];
     }
 
+    /**
+     * Estos endpoints solo se usan desde la pantalla de incidencias para corregir una
+     * sesión ya cerrada. Mientras el caso siga abierto (ABIERTO/PARCIAL), cualquier staff
+     * puede corregir; una vez que el admin CIERRA el caso, solo el admin puede seguir editando.
+     */
+    private function requireEditableSesion(int $sesionId): int
+    {
+        $postulanteId = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            foreach ($this->incRepo->getBySesion($sesionId) as $inc) {
+                if ($inc['estado'] === 'CERRADO') {
+                    $this->error('Este caso ya fue cerrado. Solo el administrador puede modificarlo.', 403);
+                    exit;
+                }
+            }
+        }
+        return $postulanteId;
+    }
+
     // ── GET /caja ──────────────────────────────────────────
     public function index(): void
     {
@@ -468,7 +487,7 @@ class CajaController extends Controller
     // ── POST /caja/api/sesion/{id}/corregir-venta ─────────
     public function corregirVenta(int $id): void
     {
-        $postulanteId = $this->requireAuth();
+        $postulanteId = $this->requireEditableSesion($id);
         $data         = $this->getAllInput();
         $montoNuevo   = round((float)($data['monto_nuevo'] ?? -1), 2);
         $motivo       = trim($data['motivo'] ?? '');
@@ -485,7 +504,7 @@ class CajaController extends Controller
     // ── POST /caja/api/reporte/{id}/rectificar ─────────────
     public function rectificar(int $id): void
     {
-        $postulanteId = $this->requireAuth();
+        $postulanteId = $this->requireEditableSesion($id);
         $data        = $this->getAllInput();
         $monto       = round(abs((float)($data['monto'] ?? 0)), 2);
         $desc        = trim($data['descripcion'] ?? '');
@@ -696,7 +715,7 @@ class CajaController extends Controller
     // ── POST /caja/api/sesion/{id}/ajuste-esperado ────────
     public function addAjusteEsperado(int $id): void
     {
-        $postulanteId = $this->requireAuth();
+        $postulanteId = $this->requireEditableSesion($id);
         $data  = $this->getAllInput();
         $tipo  = $data['tipo']   ?? 'COBRO';
         $accion = $data['accion'] ?? '';
@@ -737,6 +756,37 @@ class CajaController extends Controller
 
         $result = $this->repo->deleteAjusteEsperado($ajusteId, $postulanteId, $password);
         if ($result === true) $this->success('Ajuste eliminado.');
+        else $this->error($result, 401);
+    }
+
+    // ── POST /caja/api/gasto/{modo}/{id}/editar ────────────
+    public function editarGasto(string $modo, int $id): void
+    {
+        $postulanteId = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') $this->error('Solo administradores', 403);
+
+        $data     = $this->getAllInput();
+        $monto    = round((float)($data['monto'] ?? 0), 2);
+        $texto    = isset($data['texto']) ? trim((string)$data['texto']) : null;
+        $password = trim($data['password'] ?? '');
+        if (empty($password)) $this->error('La contraseña es requerida', 400);
+
+        $result = $this->repo->editarGasto($modo, $id, $monto, $texto ?: null, $postulanteId, $password);
+        if ($result === true) $this->success('Egreso actualizado.');
+        else $this->error($result, 401);
+    }
+
+    // ── POST /caja/api/gasto/{modo}/{id}/eliminar ──────────
+    public function eliminarGasto(string $modo, int $id): void
+    {
+        $postulanteId = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') $this->error('Solo administradores', 403);
+
+        $password = trim($this->getAllInput()['password'] ?? '');
+        if (empty($password)) $this->error('La contraseña es requerida', 400);
+
+        $result = $this->repo->eliminarGasto($modo, $id, $postulanteId, $password);
+        if ($result === true) $this->success('Egreso eliminado.');
         else $this->error($result, 401);
     }
 
@@ -807,7 +857,7 @@ class CajaController extends Controller
     // ── POST /caja/api/sesion/{id}/conteo ─────────────────
     public function apiConteo(int $id): void
     {
-        $postulanteId = $this->requireAuth();
+        $postulanteId = $this->requireEditableSesion($id);
         $data = $this->getAllInput();
 
         $exterior      = round((float)($data['exterior']       ?? 0), 2);
@@ -838,9 +888,11 @@ class CajaController extends Controller
             return;
         }
 
-        $data = $this->getAllInput();
-        $numOps = (int)($data['num_operaciones_bcp'] ?? -1);
-        if ($numOps < 0) {
+        $data       = $this->getAllInput();
+        $opIngresos = (int)($data['oper_ingresos_bcp'] ?? -1);
+        $opSalida   = (int)($data['oper_salida_bcp']   ?? -1);
+        $opOtros    = (int)($data['oper_otros_bcp']    ?? -1);
+        if ($opIngresos < 0 || $opSalida < 0 || $opOtros < 0) {
             $this->error('Valor inválido', 422);
             return;
         }
@@ -848,8 +900,13 @@ class CajaController extends Controller
         $sesion = $this->repo->getSesionById($id);
         if (!$sesion) { $this->error('Sesión no encontrada', 404); return; }
 
-        $this->repo->updateNumOperacionesBcp($id, $numOps, $postulanteId);
-        $this->success('Operaciones BCP actualizadas', ['num_operaciones_bcp' => $numOps]);
+        $this->repo->updateNumOperacionesBcp($id, $opIngresos, $opSalida, $opOtros, $postulanteId);
+        $this->success('Operaciones BCP actualizadas', [
+            'num_operaciones_bcp' => $opIngresos + $opSalida,
+            'oper_ingresos_bcp'   => $opIngresos,
+            'oper_salida_bcp'     => $opSalida,
+            'oper_otros_bcp'      => $opOtros,
+        ]);
     }
 
     // ── Helper: transacción ────────────────────────────────
@@ -871,6 +928,10 @@ class CajaController extends Controller
     public function transferirIndex(): void
     {
         $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            header('Location: ' . APP_BASE_PATH . '/caja');
+            exit;
+        }
         $basePath       = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
         $saldos         = $this->repo->getSaldosBaseCajas();
         $transferencias = $this->repo->getTransferencias();
@@ -880,6 +941,10 @@ class CajaController extends Controller
     public function solicitarTransferencia(): void
     {
         $userId  = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Solo administradores pueden solicitar transferencias de saldo', 403);
+            return;
+        }
         $data    = $this->getAllInput();
         $origen  = (int)($data['caja_origen_id']  ?? 0);
         $destino = (int)($data['caja_destino_id'] ?? 0);
@@ -896,6 +961,10 @@ class CajaController extends Controller
     public function confirmarTransferenciaAction(int $id): void
     {
         $userId      = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Solo administradores pueden confirmar transferencias de saldo', 403);
+            return;
+        }
         $data        = $this->getAllInput();
         $password    = trim($data['password'] ?? '');
         $comprobante = trim($data['numero_comprobante'] ?? '');

@@ -37,6 +37,32 @@ class IncidenciaContableController extends Controller
         return $id;
     }
 
+    /**
+     * Mientras el caso siga abierto (ABIERTO/PARCIAL), cualquier staff logueado puede
+     * verlo y trabajarlo. Una vez que el admin lo CIERRA, solo el admin puede volver a
+     * entrar (staff se queda con la vista de solo lectura del reporte de caja).
+     */
+    private function requireEditableIncidenciaPage(array $incidencia): int
+    {
+        $id = $this->requireAuth();
+        if ($incidencia['estado'] === 'CERRADO' && ($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            header('Location: ' . APP_BASE_PATH . '/caja');
+            exit;
+        }
+        return $id;
+    }
+
+    /** Igual que requireEditableIncidenciaPage() pero para endpoints API (responde JSON). */
+    private function requireEditableIncidencia(array $incidencia): int
+    {
+        $id = $this->requireAuth();
+        if ($incidencia['estado'] === 'CERRADO' && ($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Este caso ya fue cerrado. Solo el administrador puede modificarlo.', 403);
+            exit;
+        }
+        return $id;
+    }
+
     // ── GET /incidencias ──────────────────────────────────
 
     public function index(): void
@@ -101,7 +127,7 @@ class IncidenciaContableController extends Controller
 
     public function detalle(int $id): void
     {
-        $postulanteId = $this->requireAuth();
+        $this->requireAuth();
         $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
         $userName     = $_SESSION['user_name'] ?? 'Usuario';
         $userRol      = $_SESSION['user_rol']  ?? 'STAFF';
@@ -111,7 +137,8 @@ class IncidenciaContableController extends Controller
             header('Location: ' . APP_BASE_PATH . '/incidencias');
             exit;
         }
-        $movimientos = $this->repo->getMovimientos($id);
+        $postulanteId = $this->requireEditableIncidenciaPage($incidencia);
+        $movimientos  = $this->repo->getMovimientos($id);
 
         $cajaRepo      = new CajaRepository();
         $sbRepo        = new SoloBankRepository();
@@ -237,12 +264,13 @@ class IncidenciaContableController extends Controller
 
     public function apiDescripcion(int $id): void
     {
-        $postulanteId = $this->requireAuth();
+        $this->requireAuth();
         $data = $this->getAllInput();
         $desc = trim($data['descripcion'] ?? '');
 
         $incidencia = $this->repo->getById($id);
         if (!$incidencia) { $this->notFound(); return; }
+        $this->requireEditableIncidencia($incidencia);
 
         $this->repo->actualizarDescripcion($id, $desc);
         $this->success('Descripción actualizada');
@@ -295,6 +323,7 @@ class IncidenciaContableController extends Controller
 
         $inc = $this->repo->getById($id);
         if (!$inc) { $this->notFound('Incidencia no encontrada'); return; }
+        $this->requireEditableIncidencia($inc);
 
         try {
             $this->repo->usarVale($valeId, $id, $postulanteId);
@@ -411,6 +440,7 @@ class IncidenciaContableController extends Controller
 
         $inc = $this->repo->getById($id);
         if (!$inc) { $this->notFound('Incidencia no encontrada'); return; }
+        $this->requireEditableIncidencia($inc);
 
         $sesionId = (int)$inc['sesion_origen_id'];
         $movId = $this->cajaRepo()->addPagoDigital($sesionId, $postulanteId, $modo, $monto, $num);

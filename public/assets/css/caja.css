@@ -169,6 +169,36 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--cj-bg)
 
 .caja-subheader { font-size: 0.78rem; font-weight: 700; color: var(--cj-muted); text-transform: uppercase; letter-spacing: .06em; margin: .5rem 0 .75rem; }
 
+/* ── OPERACIONES BCP (ingresos / salida / otros) ─────── */
+.bcp-ops-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; max-width: 34rem; }
+.bcp-ops-box {
+    display: flex; flex-direction: column; gap: .3rem;
+    padding: .55rem .65rem; border-radius: 8px; border: 1.5px solid;
+}
+.bcp-ops-box label { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.bcp-ops-box .caja-input { padding: .35rem .5rem; font-size: 0.95rem; font-weight: 700; text-align: center; background: #fff; }
+
+.bcp-ops-box--ingresos { background: var(--cj-ok-bg);  border-color: #a7f3d0; }
+.bcp-ops-box--ingresos label { color: var(--cj-ok); }
+
+.bcp-ops-box--salida { background: var(--cj-blue-bg); border-color: #bfdbfe; }
+.bcp-ops-box--salida label { color: var(--cj-blue); }
+
+.bcp-ops-box--otros { background: #f1f5f9; border-color: var(--cj-border); }
+.bcp-ops-box--otros label { color: var(--cj-muted); }
+
+.bcp-ops-warning {
+    margin-top: .6rem; padding: .5rem .7rem;
+    background: var(--cj-warn-bg); border: 1px solid #fde68a; border-radius: 7px;
+    font-size: 0.76rem; font-weight: 600; color: var(--cj-warn);
+}
+
+@media (max-width: 480px) {
+    .bcp-ops-grid { max-width: none; }
+    .bcp-ops-box { padding: .45rem .5rem; }
+    .bcp-ops-box label { font-size: 0.6rem; }
+}
+
 /* ── EGRESOS ─────────────────────────────────────────── */
 .caja-gastos-list { display: flex; flex-direction: column; gap: .6rem; margin-bottom: .85rem; }
 .caja-gasto-row {

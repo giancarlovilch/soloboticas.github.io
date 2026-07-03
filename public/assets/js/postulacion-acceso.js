@@ -133,3 +133,26 @@ function setLoading(on) {
         submitBtnText.textContent = on ? 'Validando...' : (requiresBirthValidation ? 'Verificar identidad' : 'Continuar');
     }
 }
+
+// ── Aviso rápido: cómo postular ─────────────────────────────
+(function initTipModal() {
+    const modal = document.getElementById('tipModal');
+    if (!modal) return;
+
+    const STORAGE_KEY = 'sb_postulacion_tip_dismissed';
+    if (sessionStorage.getItem(STORAGE_KEY)) return;
+
+    modal.hidden = false;
+
+    const close = () => {
+        modal.hidden = true;
+        sessionStorage.setItem(STORAGE_KEY, '1');
+    };
+
+    document.getElementById('tipModalClose')?.addEventListener('click', close);
+    document.getElementById('tipModalOk')?.addEventListener('click', close);
+    document.getElementById('tipModalBackdrop')?.addEventListener('click', close);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.hidden) close();
+    });
+})();

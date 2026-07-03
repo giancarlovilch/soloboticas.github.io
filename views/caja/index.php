@@ -127,10 +127,12 @@ $estadoLabel = [
                 <h2>Apertura de turno de caja</h2>
             </div>
             <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <?php if (($userRol ?? '') === 'ADMIN'): ?>
                 <a href="<?= $basePath ?>/caja/transferir" class="caja-btn caja-btn--outline"
                    style="border-color:#f59e0b;color:#92400e;background:#fffbeb;">
                     💸 Pásame saldo
                 </a>
+                <?php endif; ?>
                 <a href="<?= $basePath ?>/caja/sesion/nueva" class="caja-btn caja-btn--primary">
                     + Abrir turno
                 </a>
@@ -223,6 +225,7 @@ $estadoLabel = [
                                 <?php
                                 if (!empty($s['inc_id'])):
                                     $incHref = $basePath.'/incidencias/'.(int)$s['inc_id'];
+                                    $incClickable = $s['inc_estado'] !== 'CERRADO' || ($userRol ?? '') === 'ADMIN';
                                     if ($s['inc_estado'] === 'CERRADO'):
                                         $ibg = '#d1fae5'; $icol = '#065f46'; $itxt = '✓ Arqueo cerrado';
                                     elseif ($s['inc_tipo'] === 'SOBRANTE' || (float)$s['inc_pendiente'] <= 10):
@@ -232,13 +235,20 @@ $estadoLabel = [
                                     endif;
                                 else:
                                     $incHref = $basePath.'/incidencias/sesion/'.(int)$s['id_sesion'];
+                                    $incClickable = ($userRol ?? '') === 'ADMIN';
                                     $ibg = '#d1fae5'; $icol = '#065f46'; $itxt = '✓ Arqueo cerrado';
                                 endif;
                                 ?>
+                                <?php if ($incClickable): ?>
                                 <a href="<?= htmlspecialchars($incHref) ?>"
                                    style="display:inline-block;font-size:0.7rem;font-weight:700;padding:3px 8px;border-radius:4px;text-decoration:none;background:<?= $ibg ?>;color:<?= $icol ?>;">
                                     <?= $itxt ?>
                                 </a>
+                                <?php else: ?>
+                                <span style="display:inline-block;font-size:0.7rem;font-weight:700;padding:3px 8px;border-radius:4px;background:<?= $ibg ?>;color:<?= $icol ?>;">
+                                    <?= $itxt ?>
+                                </span>
+                                <?php endif; ?>
                             <?php else: ?>
                                 <span class="caja-estado <?= $e['cls'] ?>"><?= $e['label'] ?></span>
                             <?php endif; ?>

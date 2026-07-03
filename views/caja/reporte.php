@@ -169,6 +169,7 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
             }
         ?>
         <div style="margin-top:1rem;">
+            <?php if ($esAdmin || $icEst !== 'CERRADO'): ?>
             <a href="<?= $basePath ?>/incidencias/<?= $incidenciaContable['id_incidencia'] ?>"
                style="display:inline-flex;align-items:center;gap:.6rem;
                       padding:.75rem 1.6rem;background:<?= $icBg ?>;color:<?= $icColor ?>;
@@ -181,6 +182,15 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
                 <?php endif; ?>
                 <span style="opacity:.5;font-size:.8rem;">→</span>
             </a>
+            <?php else: ?>
+            <span style="display:inline-flex;align-items:center;gap:.6rem;
+                      padding:.75rem 1.6rem;background:<?= $icBg ?>;color:<?= $icColor ?>;
+                      border:2px solid <?= $icColor ?>;border-radius:10px;
+                      font-size:.95rem;font-weight:700;letter-spacing:.01em;">
+                <span style="font-size:1.1rem;"><?= $icIcon ?></span>
+                <?= $icLabel ?>
+            </span>
+            <?php endif; ?>
         </div>
         <?php endif; ?>
     </section>

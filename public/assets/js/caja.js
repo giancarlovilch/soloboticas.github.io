@@ -569,9 +569,11 @@ async function guardarSesion(cerrar = false) {
 
     if (!sesionId) { showAlert(msg, 'No hay sesión activa.'); return; }
 
-    const opsEl = $('act_num_ops_bcp');
-    if (opsEl && opsEl.value === '') {
-        mostrarToastCaja('Ingresa el N° de operaciones BCP\n(escribe 0 si no hubo ninguna)');
+    const opIngresosEl = $('act_oper_ingresos_bcp');
+    const opSalidaEl    = $('act_oper_salida_bcp');
+    const opOtrosEl      = $('act_oper_otros_bcp');
+    if (opIngresosEl && (opIngresosEl.value === '' || opSalidaEl.value === '' || opOtrosEl.value === '')) {
+        mostrarToastCaja('Ingresa las operaciones BCP (ingresos, salida y otros)\n(escribe 0 si no hubo ninguna)');
         return;
     }
 
@@ -583,12 +585,14 @@ async function guardarSesion(cerrar = false) {
         sesion_id: sesionId,
         cerrar:    cerrar,
         activos: {
-            caja_exterior:       parseS('act_caja_exterior'),
-            monedas:             parseS('act_monedas'),
-            billetes:            parseS('act_billetes'),
-            caja_fuerte:         parseS('act_caja_fuerte'),
-            agente_bcp:          parseS('act_agente_bcp'),
-            num_operaciones_bcp: parseInt(opsEl?.value ?? '0'),
+            caja_exterior:     parseS('act_caja_exterior'),
+            monedas:           parseS('act_monedas'),
+            billetes:          parseS('act_billetes'),
+            caja_fuerte:       parseS('act_caja_fuerte'),
+            agente_bcp:        parseS('act_agente_bcp'),
+            oper_ingresos_bcp: parseInt(opIngresosEl?.value ?? '0'),
+            oper_salida_bcp:   parseInt(opSalidaEl?.value ?? '0'),
+            oper_otros_bcp:    parseInt(opOtrosEl?.value ?? '0'),
         },
         gastos: collectGastos(),
     };

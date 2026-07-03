@@ -322,13 +322,27 @@ $act = [
             <p style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:.5rem;">
                 Rendimiento Agente BCP
             </p>
-            <div style="display:flex;align-items:center;gap:.75rem;">
-                <label style="font-size:0.82rem;color:#334155;font-weight:500;white-space:nowrap;">N° de operaciones realizadas</label>
-                <input type="number" id="act_num_ops_bcp" class="caja-input caja-input--money"
-                       min="0" step="1" placeholder="Ej: 5" required
-                       value="<?= isset($detalle['num_operaciones_bcp']) ? (int)$detalle['num_operaciones_bcp'] : '' ?>"
-                       style="max-width:100px;">
+            <div class="bcp-ops-grid">
+                <div class="bcp-ops-box bcp-ops-box--ingresos">
+                    <label for="act_oper_ingresos_bcp">Oper. Ingresos</label>
+                    <input type="number" id="act_oper_ingresos_bcp" class="caja-input"
+                           min="0" step="1" placeholder="0" required
+                           value="<?= isset($detalle['oper_ingresos_bcp']) ? (int)$detalle['oper_ingresos_bcp'] : '' ?>">
+                </div>
+                <div class="bcp-ops-box bcp-ops-box--salida">
+                    <label for="act_oper_salida_bcp">Oper. Salida</label>
+                    <input type="number" id="act_oper_salida_bcp" class="caja-input"
+                           min="0" step="1" placeholder="0" required
+                           value="<?= isset($detalle['oper_salida_bcp']) ? (int)$detalle['oper_salida_bcp'] : '' ?>">
+                </div>
+                <div class="bcp-ops-box bcp-ops-box--otros">
+                    <label for="act_oper_otros_bcp">Otros</label>
+                    <input type="number" id="act_oper_otros_bcp" class="caja-input"
+                           min="0" step="1" placeholder="0" required
+                           value="<?= isset($detalle['oper_otros_bcp']) ? (int)$detalle['oper_otros_bcp'] : '' ?>">
+                </div>
             </div>
+            <p class="bcp-ops-warning">⚠ Queda estrictamente prohibido el fraccionamiento de operaciones, a menos que el cliente lo solicite.</p>
         </div>
     </section>
 

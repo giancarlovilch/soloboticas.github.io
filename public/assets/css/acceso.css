@@ -41,14 +41,21 @@
 }
 
 .acceso-main {
-    padding: 5rem 0 6rem;
+    padding: 3.6rem 0 6rem;
 }
 
-.acceso-layout {
+/* ── Acceso a postulación: primero, prominente, arriba del fold ── */
+.acceso-access-section {
+    margin-bottom: 5rem;
+}
+
+.acceso-access-grid {
     display: grid;
-    grid-template-columns: 1.2fr 0.8fr;
+    grid-template-columns: 1.3fr 0.7fr;
     gap: 2.4rem;
     align-items: start;
+    max-width: 92rem;
+    margin: 0 auto;
 }
 
 .acceso-heading {
@@ -57,8 +64,11 @@
     margin-bottom: 2.4rem;
 }
 
+/* ── Posiciones disponibles: información secundaria, debajo ── */
 .vacantes-panel {
     background: transparent;
+    padding-top: 4rem;
+    border-top: 1px solid #e7edf2;
 }
 
 .vacantes-grid {
@@ -98,13 +108,6 @@
     margin-bottom: 1rem;
     color: var(--secundario);
     font-size: 2.2rem;
-}
-
-.acceso-sidebar {
-    display: grid;
-    gap: 2rem;
-    position: sticky;
-    top: 14rem;
 }
 
 .acceso-card {
@@ -253,18 +256,23 @@
 }
 
 @media (max-width: 991px) {
-    .acceso-layout {
+    .acceso-access-grid {
         grid-template-columns: 1fr;
-    }
-
-    .acceso-sidebar {
-        position: static;
+        max-width: 60rem;
     }
 }
 
 @media (max-width: 767px) {
     .acceso-main {
-        padding: 4rem 0 5rem;
+        padding: 2.4rem 0 5rem;
+    }
+
+    .acceso-access-section {
+        margin-bottom: 3.6rem;
+    }
+
+    .vacantes-panel {
+        padding-top: 3rem;
     }
 
     .vacantes-grid {
@@ -295,3 +303,165 @@
 .message-error   { background: rgba(169,50,38,0.1);  color: #7b1d13; border: 1px solid rgba(169,50,38,0.22); }
 .message-success { background: rgba(0,151,167,0.1);  color: #00636f; border: 1px solid rgba(0,151,167,0.2); }
 .message-info    { background: rgba(0,152,218,0.08); color: #0a5a7c; border: 1px solid rgba(0,152,218,0.18); }
+
+/* ── Aviso rápido: cómo postular ─────────────────────────── */
+.tip-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.tip-modal[hidden] {
+    display: none;
+}
+
+.tip-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 26, 41, 0.55);
+    backdrop-filter: blur(2px);
+}
+
+.tip-modal-box {
+    position: relative;
+    background: var(--blanco);
+    border-radius: 1.6rem;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.28);
+    padding: 3.2rem 2.8rem 2.8rem;
+    max-width: 42rem;
+    width: 100%;
+    text-align: center;
+    animation: tipPop 0.25s ease;
+}
+
+.tip-modal-close {
+    position: absolute;
+    top: 1.2rem;
+    right: 1.2rem;
+    width: 3.4rem;
+    height: 3.4rem;
+    border: none;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+}
+
+.tip-modal-close:hover {
+    background: #e2e8f0;
+}
+
+.tip-modal-emoji {
+    font-size: 3.2rem;
+    margin: 0 0 0.6rem;
+}
+
+.tip-modal-box h3 {
+    color: var(--secundario);
+    font-size: 2.2rem;
+    margin-bottom: 1rem;
+}
+
+.tip-modal-box p {
+    color: var(--oscuro);
+    font-size: 1.5rem;
+    line-height: 1.5;
+    margin-bottom: 2.2rem;
+}
+
+.tip-modal-btn {
+    width: 100%;
+}
+
+@keyframes tipPop {
+    from { opacity: 0; transform: scale(0.94) translateY(8px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@media (max-width: 480px) {
+    .tip-modal-box {
+        padding: 2.8rem 2rem 2.4rem;
+    }
+}
+
+/* ── Comparte esta postulación (QR + WhatsApp) ───────────── */
+.acceso-share-section {
+    margin-top: 5rem;
+}
+
+.acceso-share-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 3rem;
+    background: var(--blanco);
+    border-radius: 2rem;
+    box-shadow: var(--sombra);
+    border: 1px solid #e8eef3;
+    padding: 3rem 3.4rem;
+}
+
+.acceso-share-text {
+    flex: 1 1 32rem;
+}
+
+.acceso-share-text p:not(.section-kicker) {
+    color: var(--gris);
+    margin-bottom: 1.8rem;
+}
+
+.acceso-share-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    padding: 0 2.2rem;
+    text-decoration: none;
+    background: linear-gradient(135deg, #25d366, #128c7e);
+    box-shadow: 0 10px 24px rgba(18, 140, 126, 0.24);
+}
+
+.acceso-share-qr {
+    flex: 0 0 auto;
+    text-align: center;
+}
+
+.acceso-share-qr img {
+    display: block;
+    width: 16rem;
+    height: 16rem;
+    padding: 1rem;
+    background: var(--blanco);
+    border: 1px solid #e8eef3;
+    border-radius: 1.2rem;
+}
+
+.acceso-share-url {
+    margin: 0.8rem 0 0;
+    font-size: 1.2rem;
+    color: var(--gris);
+    word-break: break-all;
+    max-width: 16rem;
+}
+
+@media (max-width: 767px) {
+    .acceso-share-card {
+        flex-direction: column;
+        text-align: center;
+        padding: 2.4rem 2rem;
+    }
+
+    .acceso-share-btn {
+        width: 100%;
+    }
+}
