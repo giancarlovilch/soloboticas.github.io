@@ -290,6 +290,11 @@
     .acceso-hero-content {
         text-align: center;
     }
+
+    /* En móvil quitamos la barra superior de anuncio para reducir contaminación visual */
+    .topbar {
+        display: none;
+    }
 }
 /* ── Mensajes de feedback ────────────────────────────────── */
 .message-box {
