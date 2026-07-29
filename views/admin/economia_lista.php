@@ -277,7 +277,7 @@ foreach ($ecoPagos as $p) {
                 <tr>
                     <th>Fecha</th>
                     <?php if (!$ecoPid): ?><th>Beneficiario</th><?php endif; ?>
-                    <th>Turno · Local</th>
+                    <th>Turno · Caja</th>
                     <th>Tipo</th>
                     <th class="text-center">Estado</th>
                     <th>Registrado por</th>
@@ -310,7 +310,7 @@ foreach ($ecoPagos as $p) {
                 <?php endif; ?>
                 <td>
                     <span style="font-size:.8rem;"><?= $turnoLabel[$p['turno_id']] ?? '—' ?></span>
-                    <span class="eco-sub"><?= htmlspecialchars($p['local_desc']) ?></span>
+                    <span class="eco-sub"><?= htmlspecialchars($p['caja_desc'] ?? $p['local_desc']) ?></span>
                 </td>
                 <?php if (!$esAjuste): ?>
                 <td><span class="eco-badge" style="background:<?= $tInfo['bg'] ?>;color:<?= $tInfo['color'] ?>"><?= $tInfo['label'] ?></span></td>
@@ -347,7 +347,7 @@ foreach ($ecoPagos as $p) {
                 <tr>
                     <th>Fecha</th>
                     <?php if (!$ecoPid): ?><th>Trabajador</th><?php endif; ?>
-                    <th>Turno · Local</th>
+                    <th>Turno · Caja</th>
                     <th>Rol</th>
                     <th class="text-right">Base</th>
                     <th class="text-right">Bono ventas</th>
@@ -371,7 +371,7 @@ foreach ($ecoPagos as $p) {
                 <?php endif; ?>
                 <td>
                     <span style="font-size:.8rem;"><?= $turnoLabel[$ing['turno_id']] ?? '—' ?></span>
-                    <span class="eco-sub"><?= htmlspecialchars($ing['local_desc']) ?></span>
+                    <span class="eco-sub"><?= htmlspecialchars($ing['caja_desc'] ?? $ing['local_desc']) ?></span>
                 </td>
                 <td style="font-size:.78rem;font-weight:600;color:#475569;"><?= htmlspecialchars($ing['rol_desc']) ?></td>
                 <td class="text-right"><span class="eco-base"><?= $f2($ing['base']) ?></span></td>

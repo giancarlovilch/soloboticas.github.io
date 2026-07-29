@@ -320,6 +320,31 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                 <span style="font-size:.72rem;color:#94a3b8;">
                     <?= date('d/m/Y', strtotime($incidencia['fecha_apertura'])) ?>
                 </span>
+                <span style="color:#475569;font-size:.6rem;">·</span>
+                <span id="cuadreFechaTurnoView" style="font-size:.72rem;color:#94a3b8;">
+                    Cuadre: <?= htmlspecialchars($sesion['turno_desc'] ?? '—') ?>
+                    · <?= date('d/m/Y', strtotime($sesion['fecha_operacion'])) ?>
+                </span>
+                <?php if ($esAdmin): ?>
+                <button type="button" id="btnEditarFechaTurno" title="Editar fecha/turno del cuadre (solo admin)"
+                    style="background:none;border:none;cursor:pointer;color:#60a5fa;font-size:.7rem;padding:1px 4px;">
+                    ✎
+                </button>
+                <span id="cuadreFechaTurnoEdit" style="display:none;align-items:center;gap:.3rem;">
+                    <input type="date" id="cuadreFechaInput" value="<?= date('Y-m-d', strtotime($sesion['fecha_operacion'])) ?>"
+                        style="font-size:.7rem;padding:2px 4px;border-radius:4px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+                    <select id="cuadreTurnoInput"
+                        style="font-size:.7rem;padding:2px 4px;border-radius:4px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+                        <?php foreach ($turnos as $t): ?>
+                        <option value="<?= $t['id'] ?>" <?= (int)$t['id'] === (int)$sesion['turno_id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($t['descripcion']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="button" id="btnGuardarFechaTurno" class="btn btn-success" style="font-size:.65rem;padding:2px 8px;">Guardar</button>
+                    <button type="button" id="btnCancelarFechaTurno" class="btn btn-secondary" style="font-size:.65rem;padding:2px 8px;">Cancelar</button>
+                </span>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -2231,6 +2256,35 @@ function bindReabrir(el) {
 }
 bindReabrir(document.getElementById('btnReabrir'));
 bindReabrir(document.getElementById('btnReabrir2'));
+
+// ── Editar fecha/turno del cuadre (solo admin) ──────────
+document.getElementById('btnEditarFechaTurno')?.addEventListener('click', () => {
+    document.getElementById('cuadreFechaTurnoView').style.display = 'none';
+    document.getElementById('btnEditarFechaTurno').style.display  = 'none';
+    document.getElementById('cuadreFechaTurnoEdit').style.display = 'inline-flex';
+});
+document.getElementById('btnCancelarFechaTurno')?.addEventListener('click', () => {
+    document.getElementById('cuadreFechaTurnoEdit').style.display = 'none';
+    document.getElementById('cuadreFechaTurnoView').style.display = 'inline';
+    document.getElementById('btnEditarFechaTurno').style.display  = 'inline';
+});
+document.getElementById('btnGuardarFechaTurno')?.addEventListener('click', async () => {
+    const fecha = document.getElementById('cuadreFechaInput').value;
+    const turno = document.getElementById('cuadreTurnoInput').value;
+    if (!fecha || !turno) return;
+    if (!confirm('¿Cambiar la fecha/turno de este cuadre? Esto puede afectar reportes y saldos calculados por fecha.')) return;
+    const btn = document.getElementById('btnGuardarFechaTurno');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try {
+        await apiPost(`${BASE}/caja/api/sesion/${<?= (int)$sesionId ?>}/editar-fecha-turno`, {
+            fecha_operacion: fecha, turno_id: parseInt(turno),
+        });
+        location.reload();
+    } catch (e) {
+        alert(e.message || 'Error al guardar');
+        btn.disabled = false; btn.textContent = 'Guardar';
+    }
+});
 
 // Mostrar bloque PERSONAL por defecto al cargar
 ajTipoChange();

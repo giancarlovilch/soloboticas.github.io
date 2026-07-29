@@ -161,6 +161,9 @@ class IncidenciaContableController extends Controller
         $transferencias   = $cajaRepo->getTransferenciasAplicadas($sesionId);
         $retirosAplicados = $cajaRepo->getRetirosAplicados($sesionId);
 
+        // Turnos disponibles, para que el admin pueda corregir fecha/turno del cuadre
+        $turnos = $cajaRepo->getTurnos();
+
         require_once __DIR__ . '/../../views/incidencias/detalle.php';
     }
 

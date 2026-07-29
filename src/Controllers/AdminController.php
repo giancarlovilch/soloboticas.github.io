@@ -116,6 +116,7 @@ class AdminController extends Controller
                         pp.fecha_pago, pp.numero_operacion,
                         sc.fecha_operacion, sc.turno_id,
                         l.descripcion  AS local_desc,
+                        ca.descripcion AS caja_desc,
                         pb.nombres     AS beneficiario_nombre,
                         pe.nombres     AS emisor_nombre
                  FROM pago_personal pp
@@ -147,6 +148,7 @@ class AdminController extends Controller
                         ae.descripcion                  AS numero_operacion,
                         sc.fecha_operacion, sc.turno_id,
                         l.descripcion  AS local_desc,
+                        ca.descripcion AS caja_desc,
                         pb.nombres     AS beneficiario_nombre,
                         pe.nombres     AS emisor_nombre
                  FROM ajuste_esperado ae
@@ -235,6 +237,7 @@ class AdminController extends Controller
             $getSesionParticipante = function(int $pid, string $rolPart, int $localId, int $turnoId, string $fecha) use ($db): ?array {
                 $s = $db->prepare(
                     "SELECT sc.id_sesion, dc.num_operaciones_bcp,
+                            ca.descripcion AS caja_desc,
                             COALESCE(rv.monto, 0) + COALESCE((
                                 SELECT SUM(cv.monto_nuevo - cv.monto_anterior)
                                 FROM correccion_venta cv WHERE cv.sesion_id = sc.id_sesion
@@ -348,14 +351,16 @@ class AdminController extends Controller
             $ecoTotalBonos    = 0.0;
 
             foreach ($ecoSlots as $slot) {
-                $rol   = $slot['rol_codigo'];
-                $fecha = $slot['fecha_dia'];
-                $base  = $getBase($rol, $fecha);
-                $bonoV = 0.0; $bonoO = 0.0;
+                $rol     = $slot['rol_codigo'];
+                $fecha   = $slot['fecha_dia'];
+                $base    = $getBase($rol, $fecha);
+                $bonoV   = 0.0; $bonoO = 0.0;
+                $cajaDesc = null;
 
                 if (in_array($rol, ['CAJERA','VENDEDORA'])) {
                     $sesion = $getSesionParticipante($slot['postulante_id'], $rol, $slot['local_id'], $slot['turno_id'], $fecha);
                     if ($sesion) {
+                        $cajaDesc = $sesion['caja_desc'] ?? null;
                         if ($rol === 'CAJERA') {
                             $ops   = (float)($sesion['num_operaciones_bcp'] ?? 0);
                             $bonoO = $getBono('OPERACIONES_BCP', $ops, $fecha);
@@ -370,7 +375,7 @@ class AdminController extends Controller
                 $total = $base + $bonoV + $bonoO + $bonoE + $bonoS;
                 $ecoTotalIngresos += $total;
                 $ecoTotalBonos    += $bonoV + $bonoO + $bonoE + $bonoS;
-                $ecoIngresos[] = array_merge($slot, ['base'=>$base,'bono_v'=>$bonoV,'bono_o'=>$bonoO,'bono_e'=>$bonoE,'bono_s'=>$bonoS,'total'=>$total]);
+                $ecoIngresos[] = array_merge($slot, ['base'=>$base,'bono_v'=>$bonoV,'bono_o'=>$bonoO,'bono_e'=>$bonoE,'bono_s'=>$bonoS,'total'=>$total,'caja_desc'=>$cajaDesc]);
             }
 
             // ── Tarifas y bonos vigentes (sección informativa) ──

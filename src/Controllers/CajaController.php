@@ -618,6 +618,31 @@ class CajaController extends Controller
         $this->success('Base del siguiente turno actualizada a S/ ' . number_format($saldo, 2));
     }
 
+    // ── POST /caja/api/sesion/{id}/editar-fecha-turno ──────
+    // Solo ADMIN: corrige la fecha de operación y/o el turno de un cuadre ya
+    // creado (por ejemplo, al reabrir al día siguiente un cuadre que se eliminó
+    // por error y que debía quedar registrado en el día original).
+    public function editarFechaTurno(int $id): void
+    {
+        $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Solo administradores', 403);
+            return;
+        }
+        $data   = $this->getAllInput();
+        $fecha  = trim($data['fecha_operacion'] ?? '');
+        $turno  = (int)($data['turno_id'] ?? 0);
+
+        if (!$fecha || !$turno) {
+            $this->error('Fecha y turno son requeridos', 422);
+            return;
+        }
+
+        $result = $this->repo->editarFechaTurno($id, $fecha, $turno);
+        if ($result === true) $this->success('Cuadre actualizado');
+        else $this->error($result, 422);
+    }
+
     // ── Pagos digitales (cajera) ───────────────────────────
     // POST /caja/api/sesion/{id}/pago-digital
     public function addPagoDigital(int $sesionId): void
@@ -990,5 +1015,19 @@ class CajaController extends Controller
         $result = $this->repo->anularTransferencia($id, $userId, $password);
         if ($result === true) $this->success('Transferencia anulada');
         else $this->error($result, 401);
+    }
+
+    // Detecta (y opcionalmente repara) transferencias CONFIRMADAS que quedaron
+    // apuntando a un cuadre que fue eliminado (sesion_aplicada_*_id huérfano).
+    public function auditarTransferenciasAction(): void
+    {
+        $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Solo administradores', 403);
+            return;
+        }
+        $fix       = !empty($this->getAllInput()['fix']);
+        $resultado = $this->repo->auditarTransferenciasHuerfanas($fix);
+        $this->success('Verificación completada', $resultado + ['fix' => $fix]);
     }
 }

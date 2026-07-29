@@ -25,10 +25,16 @@ try {
 <div style="padding:1.5rem;">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem;">
         <h2 style="margin:0;">Logs de consistencia de cuadres</h2>
-        <button type="button" id="btnAuditarLogs" class="caja-btn caja-btn--outline"
-                style="border-color:#7c3aed;color:#7c3aed;font-size:.8rem;padding:6px 12px;border-radius:6px;background:#fff;cursor:pointer;">
-            🔍 Ejecutar verificación ahora
-        </button>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button type="button" id="btnAuditarLogs" class="caja-btn caja-btn--outline"
+                    style="border-color:#7c3aed;color:#7c3aed;font-size:.8rem;padding:6px 12px;border-radius:6px;background:#fff;cursor:pointer;">
+                🔍 Ejecutar verificación ahora
+            </button>
+            <button type="button" id="btnSolucionarLogs" class="caja-btn caja-btn--outline"
+                    style="border-color:#059669;color:#059669;font-size:.8rem;padding:6px 12px;border-radius:6px;background:#fff;cursor:pointer;">
+                🛠 Solucionar automáticamente
+            </button>
+        </div>
     </div>
 
     <p style="font-size:.85rem;color:#64748b;max-width:60ch;">
@@ -125,6 +131,41 @@ document.getElementById('btnAuditarLogs')?.addEventListener('click', async funct
     } finally {
         btn.disabled    = false;
         btn.textContent = '🔍 Ejecutar verificación ahora';
+    }
+});
+
+document.getElementById('btnSolucionarLogs')?.addEventListener('click', async function () {
+    if (!confirm('Esto recalculará y corregirá la diferencia de todas las sesiones desincronizadas. ¿Continuar?')) return;
+
+    const btn   = this;
+    const panel = document.getElementById('auditoriaResultadoLogs');
+    btn.disabled = true;
+    btn.textContent = 'Solucionando...';
+    try {
+        const r = await fetch('<?= $base ?>/caja/api/auditar-consistencia', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ fix: true })
+        });
+        const res = await r.json();
+        if (!res.success) throw new Error(res.message || 'Error al solucionar');
+
+        const d = res.data;
+        panel.style.display = 'block';
+        panel.style.background = '#d1fae5';
+        panel.style.color      = '#065f46';
+        panel.innerHTML = `✓ ${d.fallidas.length} de ${d.revisadas} sesiones corregidas. Recargando...`;
+        setTimeout(() => location.reload(), 1200);
+    } catch (e) {
+        panel.style.display    = 'block';
+        panel.style.background = '#fee2e2';
+        panel.style.color      = '#991b1b';
+        panel.innerHTML        = '✗ ' + e.message;
+        btn.disabled    = false;
+        btn.textContent = '🛠 Solucionar automáticamente';
     }
 });
 </script>

@@ -179,6 +179,45 @@ class CajaRepository
         return $stmt->fetch() ?: null;
     }
 
+    /**
+     * Corrige manualmente la fecha de operación y/o el turno de un cuadre ya creado.
+     * Solo para ADMIN: sirve para regularizar cuadres que se reabrieron un día distinto
+     * al que realmente corresponden (siempre se crean con fecha de hoy). Bloquea el
+     * cambio si ya existe otra sesión para la misma caja+fecha+turno, para no chocar
+     * con un cuadre real de ese día.
+     */
+    public function editarFechaTurno(int $sesionId, string $fecha, int $turnoId): bool|string
+    {
+        $sesion = $this->getSesionById($sesionId);
+        if (!$sesion) return 'Sesión no encontrada';
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) || !strtotime($fecha)) {
+            return 'Fecha inválida';
+        }
+
+        $turnoStmt = $this->db->prepare("SELECT 1 FROM turno WHERE id_turno = :tid AND activo = 1");
+        $turnoStmt->execute(['tid' => $turnoId]);
+        if (!$turnoStmt->fetchColumn()) return 'Turno inválido';
+
+        $dupStmt = $this->db->prepare(
+            "SELECT id_sesion FROM sesion_caja
+              WHERE caja_id = :cid AND fecha_operacion = :fecha AND turno_id = :tid
+                AND id_sesion != :sid"
+        );
+        $dupStmt->execute([
+            'cid' => $sesion['caja_id'], 'fecha' => $fecha, 'tid' => $turnoId, 'sid' => $sesionId,
+        ]);
+        if ($dupStmt->fetchColumn()) {
+            return 'Ya existe otro cuadre de esta caja para esa fecha y turno';
+        }
+
+        $this->db->prepare(
+            "UPDATE sesion_caja SET fecha_operacion = :fecha, turno_id = :tid WHERE id_sesion = :sid"
+        )->execute(['fecha' => $fecha, 'tid' => $turnoId, 'sid' => $sesionId]);
+
+        return true;
+    }
+
     /** Lista de sesiones con filtro de estado */
     public function getSesionesByEstado(string $estado): array
     {
@@ -736,7 +775,14 @@ class CajaRepository
                             diferencia_guardada = :dg, diferencia_calculada = :dl, delta = :delta,
                             detectado_en = NOW(), resuelto = :res, resuelto_en = :resen
                          WHERE id = :id"
-                    )->execute($params + ['id' => $pendId]);
+                    )->execute([
+                        'dg'    => $params['dg'],
+                        'dl'    => $params['dl'],
+                        'delta' => $params['delta'],
+                        'res'   => $params['res'],
+                        'resen' => $params['resen'],
+                        'id'    => $pendId,
+                    ]);
                 } else {
                     $this->db->prepare(
                         "INSERT INTO log_consistencia_cuadre
@@ -1278,6 +1324,24 @@ class CajaRepository
             "UPDATE solobank_vales
                 SET estado = 'DISPONIBLE', sesion_id = NULL, movimiento_id = NULL
               WHERE sesion_id = :sid"
+        )->execute(['sid' => $sesionId]);
+
+        // Liberar transferencias/retiros/ingresos KGyR que ya habían quedado aplicados
+        // a esta sesión: el dinero ya se movió físicamente aunque este cuadre esté mal
+        // y se borre, así que deben volver a quedar pendientes para aplicarse en el
+        // siguiente cuadre real de la caja, en vez de perderse apuntando a una sesión
+        // que ya no existe.
+        $this->db->prepare(
+            "UPDATE transferencia_saldo SET sesion_aplicada_origen_id = NULL WHERE sesion_aplicada_origen_id = :sid"
+        )->execute(['sid' => $sesionId]);
+        $this->db->prepare(
+            "UPDATE transferencia_saldo SET sesion_aplicada_destino_id = NULL WHERE sesion_aplicada_destino_id = :sid"
+        )->execute(['sid' => $sesionId]);
+        $this->db->prepare(
+            "UPDATE retiro_kgyr SET sesion_aplicada_id = NULL WHERE sesion_aplicada_id = :sid"
+        )->execute(['sid' => $sesionId]);
+        $this->db->prepare(
+            "UPDATE ingreso_kgyr SET sesion_aplicada_id = NULL WHERE sesion_aplicada_id = :sid"
         )->execute(['sid' => $sesionId]);
 
         // Orden de borrado respetando FKs
@@ -1981,7 +2045,11 @@ class CajaRepository
                     CONCAT(cd.descripcion, ' · ', ld.descripcion) AS caja_destino_desc,
                     ps.nombres AS solicitante_nombre,
                     pc.nombres AS confirmador_nombre,
-                    pa.nombres AS anulador_nombre
+                    pa.nombres AS anulador_nombre,
+                    sco.id_sesion     AS origen_sesion_existe,
+                    sco.fecha_operacion AS origen_sesion_fecha,
+                    scd.id_sesion     AS destino_sesion_existe,
+                    scd.fecha_operacion AS destino_sesion_fecha
              FROM transferencia_saldo t
              INNER JOIN caja co ON co.id_caja  = t.caja_origen_id
              INNER JOIN caja cd ON cd.id_caja  = t.caja_destino_id
@@ -1990,6 +2058,8 @@ class CajaRepository
              INNER JOIN postulante ps ON ps.id_postulante = t.solicitante_id
              LEFT JOIN postulante pc  ON pc.id_postulante = t.confirmador_id
              LEFT JOIN postulante pa  ON pa.id_postulante = t.anulador_id
+             LEFT JOIN sesion_caja sco ON sco.id_sesion = t.sesion_aplicada_origen_id
+             LEFT JOIN sesion_caja scd ON scd.id_sesion = t.sesion_aplicada_destino_id
              ORDER BY t.created_at DESC LIMIT 100"
         )->fetchAll();
     }
@@ -2016,6 +2086,76 @@ class CajaRepository
         );
         $stmt->execute(['sid' => $sesionId, 'sid2' => $sesionId]);
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Detecta transferencias CONFIRMADAS cuyo sesion_aplicada_origen_id/destino_id
+     * apunta a una sesión que ya no existe (el cuadre fue eliminado después de que
+     * la transferencia quedó aplicada a él).
+     *
+     * Se distinguen dos casos:
+     *  - 'riesgo': SOLO un lado quedó huérfano (el otro sigue existiendo). Aquí el
+     *    efecto SÍ quedó desbalanceado en los libros actuales (dinero que salió de
+     *    un lado sin haber llegado a ningún lado, o que llegó a un lado sin haber
+     *    salido de ninguno) — requiere reparación.
+     *  - 'sin_efecto': AMBOS lados quedaron huérfanos. Como ninguna sesión viva
+     *    refleja la transferencia, no hay ningún número actual desbalanceado por
+     *    su causa; es solo informativo y no se repara automáticamente.
+     *
+     * Si $fix=true, solo repara los casos de 'riesgo': libera el lado huérfano
+     * (lo pone en NULL) para que vuelva a contarse como pendiente y se aplique
+     * automáticamente en el siguiente cierre real de esa caja. Los casos
+     * 'sin_efecto' nunca se tocan aquí porque podrían ya estar compensados
+     * manualmente (ajustes hechos a mano) y repararlos duplicaría el monto.
+     */
+    public function auditarTransferenciasHuerfanas(bool $fix = false): array
+    {
+        $rows = $this->db->query(
+            "SELECT t.id, t.caja_origen_id, t.caja_destino_id, t.monto,
+                    t.sesion_aplicada_origen_id, t.sesion_aplicada_destino_id,
+                    CONCAT(co.descripcion, ' · ', lo.descripcion) AS caja_origen_desc,
+                    CONCAT(cd.descripcion, ' · ', ld.descripcion) AS caja_destino_desc,
+                    (t.sesion_aplicada_origen_id  IS NOT NULL AND sco.id_sesion IS NULL) AS origen_huerfana,
+                    (t.sesion_aplicada_destino_id IS NOT NULL AND scd.id_sesion IS NULL) AS destino_huerfana
+             FROM transferencia_saldo t
+             INNER JOIN caja co ON co.id_caja = t.caja_origen_id
+             INNER JOIN caja cd ON cd.id_caja = t.caja_destino_id
+             INNER JOIN local lo ON lo.id_local = co.local_id
+             INNER JOIN local ld ON ld.id_local = cd.local_id
+             LEFT JOIN sesion_caja sco ON sco.id_sesion = t.sesion_aplicada_origen_id
+             LEFT JOIN sesion_caja scd ON scd.id_sesion = t.sesion_aplicada_destino_id
+             WHERE t.estado = 'CONFIRMADA'
+               AND (t.sesion_aplicada_origen_id IS NOT NULL OR t.sesion_aplicada_destino_id IS NOT NULL)
+            HAVING origen_huerfana = 1 OR destino_huerfana = 1"
+        )->fetchAll();
+
+        $riesgo    = [];
+        $sinEfecto = [];
+        foreach ($rows as $r) {
+            $ambos = $r['origen_huerfana'] && $r['destino_huerfana'];
+            if ($ambos) {
+                $sinEfecto[] = $r;
+            } else {
+                $riesgo[] = $r;
+            }
+        }
+
+        if ($fix) {
+            foreach ($riesgo as $r) {
+                if ($r['origen_huerfana']) {
+                    $this->db->prepare(
+                        "UPDATE transferencia_saldo SET sesion_aplicada_origen_id = NULL WHERE id = :id"
+                    )->execute(['id' => $r['id']]);
+                }
+                if ($r['destino_huerfana']) {
+                    $this->db->prepare(
+                        "UPDATE transferencia_saldo SET sesion_aplicada_destino_id = NULL WHERE id = :id"
+                    )->execute(['id' => $r['id']]);
+                }
+            }
+        }
+
+        return ['riesgo' => $riesgo, 'sin_efecto' => $sinEfecto];
     }
 
     // ── Retiros de caja para depósito a Grupo KGyR ─────────

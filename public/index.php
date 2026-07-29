@@ -130,6 +130,7 @@ $router->post('/caja/api/sesion/{id}/comentario',            [CajaController::cl
 $router->post('/caja/api/sesion/{id}/respuesta',       [CajaController::class, 'guardarRespuesta']);
 $router->post('/caja/api/sesion/{id}/eliminar',        [CajaController::class, 'eliminarSesion']);
 $router->post('/caja/api/sesion/{id}/sincronizar-base', [CajaController::class, 'sincronizarBase']);
+$router->post('/caja/api/sesion/{id}/editar-fecha-turno', [CajaController::class, 'editarFechaTurno']);
 $router->post('/caja/api/auditar-consistencia',        [CajaController::class, 'auditarConsistencia']);
 $router->get('/caja/pagos-digitales',                    [CajaController::class, 'pagosDigitalesView']);
 $router->get('/caja/api/sesion/{id}/pagos-digitales',    [CajaController::class, 'getPagosDigitales']);
@@ -145,6 +146,7 @@ $router->get('/caja/transferir',                              [CajaController::c
 $router->post('/caja/api/transferir/solicitar',               [CajaController::class, 'solicitarTransferencia']);
 $router->post('/caja/api/transferir/{id}/confirmar',          [CajaController::class, 'confirmarTransferenciaAction']);
 $router->post('/caja/api/transferir/{id}/anular',             [CajaController::class, 'anularTransferenciaAction']);
+$router->post('/caja/api/transferir/auditar',                 [CajaController::class, 'auditarTransferenciasAction']);
 
 // --- INCIDENCIAS CONTABLES (staff + admin) ---
 // Rutas estáticas ANTES de las dinámicas para evitar que {id} capture 'api'

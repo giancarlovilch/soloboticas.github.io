@@ -265,14 +265,49 @@ $estadoAplicacion = function (array $t): array {
     <!-- Historial reciente -->
     <?php if (!empty($historial)): ?>
     <section class="caja-card">
-        <h2 class="caja-card__title">Historial reciente</h2>
-        <div class="caja-table-wrap">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">
+            <h2 class="caja-card__title" style="margin:0;">Historial reciente</h2>
+            <?php if ($isAdmin): ?>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button type="button" id="btnVerificarTransf" class="caja-btn caja-btn--outline"
+                        style="border-color:#7c3aed;color:#7c3aed;font-size:.75rem;padding:5px 10px;border-radius:6px;background:#fff;cursor:pointer;">
+                    🔍 Verificar transferencias
+                </button>
+                <button type="button" id="btnRepararTransf" class="caja-btn caja-btn--outline"
+                        style="border-color:#059669;color:#059669;font-size:.75rem;padding:5px 10px;border-radius:6px;background:#fff;cursor:pointer;">
+                    🛠 Reparar huérfanas
+                </button>
+            </div>
+            <?php endif; ?>
+        </div>
+        <p style="font-size:.78rem;color:#64748b;max-width:65ch;margin:.4rem 0 0;">
+            Si una transferencia ya se aplicó a un cuadre que luego fue eliminado, el vínculo queda roto
+            y el dinero deja de sumarse en cualquier cuadre. "Verificar" detecta esos casos; "Reparar"
+            los vuelve a marcar pendientes para que se apliquen solos en el próximo cierre real de esa caja.
+        </p>
+        <div id="verifTransfResultado" style="display:none;margin:.75rem 0;padding:.65rem .9rem;border-radius:8px;font-size:.82rem;"></div>
+        <div class="caja-table-wrap" style="margin-top:.75rem;">
             <table class="tr-saldo-table">
                 <thead>
-                    <tr><th>Transferencia</th><th>Monto</th><th>Comprobante</th><th>Estado</th><th>Procesado por</th><th>Fecha</th><th></th></tr>
+                    <tr><th>Transferencia</th><th>Monto</th><th>Comprobante</th><th>Estado</th>
+                        <th>Cuadre origen</th><th>Cuadre destino</th><th>Procesado por</th><th>Fecha</th><th></th></tr>
                 </thead>
                 <tbody>
                 <?php foreach ($historial as $t): ?>
+                <?php
+                    $cuadreCelda = function (string $prefix) use ($t, $basePath) {
+                        $sid    = $t["sesion_aplicada_{$prefix}_id"];
+                        $existe = $t["{$prefix}_sesion_existe"];
+                        $fecha  = $t["{$prefix}_sesion_fecha"];
+                        if ($sid === null) {
+                            return '<span style="color:#94a3b8;font-size:.75rem;">—</span>';
+                        }
+                        if ($existe === null) {
+                            return '<span style="background:#fee2e2;color:#991b1b;font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:5px;" title="Sesion #' . (int)$sid . ' ya no existe">⚠ cuadre eliminado</span>';
+                        }
+                        return '<a href="' . $basePath . '/caja/reporte/' . (int)$sid . '" style="font-size:.75rem;">#' . (int)$sid . ' · ' . date('d/m/Y', strtotime($fecha)) . '</a>';
+                    };
+                ?>
                 <tr>
                     <td>
                         <span style="font-size:.78rem;">
@@ -289,6 +324,8 @@ $estadoAplicacion = function (array $t): array {
                             <?= $estApl['label'] ?>
                         </span>
                     </td>
+                    <td><?= $cuadreCelda('origen') ?></td>
+                    <td><?= $cuadreCelda('destino') ?></td>
                     <td style="font-size:.75rem;">
                         <?= htmlspecialchars($t['estado']==='CONFIRMADA' ? ($t['confirmador_nombre'] ?? '—') : ($t['anulador_nombre'] ?? '—')) ?>
                     </td>
@@ -393,6 +430,75 @@ async function enviarAnular() {
     if (res.success) { cerrarAnular(); location.reload(); }
     else { err.textContent = res.message || 'Error.'; err.style.display='block'; }
 }
+
+// ── Verificar / reparar transferencias huérfanas ──
+async function auditarTransferencias(fix) {
+    const btn   = fix ? document.getElementById('btnRepararTransf') : document.getElementById('btnVerificarTransf');
+    const panel = document.getElementById('verifTransfResultado');
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = fix ? 'Reparando...' : 'Verificando...';
+    try {
+        const r = await fetch(`${BASE}/caja/api/transferir/auditar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fix: !!fix }),
+        });
+        const res = await r.json();
+        if (!res.success) throw new Error(res.message || 'Error al verificar');
+
+        const riesgo    = res.data.riesgo || [];
+        const sinEfecto = res.data.sin_efecto || [];
+        panel.style.display = 'block';
+
+        const fmt = (arr) => arr.map(h =>
+            `#${h.id} ${h.caja_origen_desc} → ${h.caja_destino_desc} · S/ ${parseFloat(h.monto).toFixed(2)}`
+        ).join('<br>');
+
+        if (riesgo.length === 0 && sinEfecto.length === 0) {
+            panel.style.background = '#d1fae5';
+            panel.style.color      = '#065f46';
+            panel.innerHTML = '✓ No hay transferencias huérfanas. Todo está correctamente aplicado.';
+        } else if (fix) {
+            panel.style.background = '#d1fae5';
+            panel.style.color      = '#065f46';
+            let msg = riesgo.length
+                ? `✓ ${riesgo.length} transferencia(s) reparada(s). Quedaron pendientes y se aplicarán en el próximo cierre de cada caja. Recargando...`
+                : '✓ No había transferencias de riesgo por reparar.';
+            if (sinEfecto.length) {
+                msg += `<br><br>ℹ ${sinEfecto.length} transferencia(s) con ambos lados eliminados (sin efecto en los libros actuales, no se tocaron):<br>${fmt(sinEfecto)}`;
+            }
+            panel.innerHTML = msg;
+            if (riesgo.length) setTimeout(() => location.reload(), 1200);
+        } else {
+            panel.style.background = riesgo.length ? '#fee2e2' : '#fef9c3';
+            panel.style.color      = riesgo.length ? '#991b1b' : '#92400e';
+            let msg = '';
+            if (riesgo.length) {
+                msg += `⚠ ${riesgo.length} transferencia(s) de RIESGO real (un lado existe, el otro se eliminó — el dinero quedó descuadrado):<br>${fmt(riesgo)}<br><br>Usa "Reparar huérfanas" para corregirlas.`;
+            }
+            if (sinEfecto.length) {
+                msg += (riesgo.length ? '<br><br>' : '') +
+                    `ℹ ${sinEfecto.length} transferencia(s) con AMBOS lados eliminados (sin efecto en los libros actuales, no requieren acción):<br>${fmt(sinEfecto)}`;
+            }
+            panel.innerHTML = msg;
+        }
+    } catch (e) {
+        panel.style.display    = 'block';
+        panel.style.background = '#fee2e2';
+        panel.style.color      = '#991b1b';
+        panel.innerHTML        = '✗ ' + e.message;
+    } finally {
+        btn.disabled    = false;
+        btn.textContent = original;
+    }
+}
+document.getElementById('btnVerificarTransf')?.addEventListener('click', () => auditarTransferencias(false));
+document.getElementById('btnRepararTransf')?.addEventListener('click', () => {
+    if (confirm('Esto liberará el lado roto SOLO de las transferencias de riesgo real (un lado existe, el otro no), para que se apliquen en el próximo cierre real de esa caja. Las que tienen ambos lados eliminados no se tocan. ¿Continuar?')) {
+        auditarTransferencias(true);
+    }
+});
 </script>
 </body>
 </html>
