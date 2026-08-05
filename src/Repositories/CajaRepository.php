@@ -297,7 +297,29 @@ class CajaRepository
                        ic.id_incidencia   AS inc_id,
                        ic.tipo            AS inc_tipo,
                        ic.estado          AS inc_estado,
-                       ic.monto_pendiente AS inc_pendiente
+                       ic.monto_pendiente AS inc_pendiente,
+                       (
+                           (SELECT COUNT(*) FROM movimiento_sesion m1
+                             INNER JOIN modo mo ON mo.id_modo = m1.modo_id
+                             WHERE m1.sesion_id = sc.id_sesion AND m1.tipo_movimiento_id = 1 AND mo.descripcion != 'SoloBank')
+                         + (SELECT COUNT(*) FROM movimiento_sesion m2
+                             WHERE m2.sesion_id = sc.id_sesion AND m2.tipo_movimiento_id = 2 AND m2.modo_id = 1)
+                         + (SELECT COUNT(*) FROM pago_personal  WHERE sesion_id = sc.id_sesion)
+                         + (SELECT COUNT(*) FROM pago_local     WHERE sesion_id = sc.id_sesion)
+                         + (SELECT COUNT(*) FROM pago_factura   WHERE sesion_id = sc.id_sesion)
+                         + (SELECT COUNT(*) FROM pago_deposito  WHERE sesion_id = sc.id_sesion)
+                       ) AS aud_total,
+                       (
+                           (SELECT COUNT(*) FROM movimiento_sesion m1
+                             INNER JOIN modo mo ON mo.id_modo = m1.modo_id
+                             WHERE m1.sesion_id = sc.id_sesion AND m1.tipo_movimiento_id = 1 AND mo.descripcion != 'SoloBank' AND m1.fecha_revision IS NOT NULL)
+                         + (SELECT COUNT(*) FROM movimiento_sesion m2
+                             WHERE m2.sesion_id = sc.id_sesion AND m2.tipo_movimiento_id = 2 AND m2.modo_id = 1 AND m2.fecha_revision IS NOT NULL)
+                         + (SELECT COUNT(*) FROM pago_personal  WHERE sesion_id = sc.id_sesion AND fecha_revision IS NOT NULL)
+                         + (SELECT COUNT(*) FROM pago_local     WHERE sesion_id = sc.id_sesion AND fecha_revision IS NOT NULL)
+                         + (SELECT COUNT(*) FROM pago_factura   WHERE sesion_id = sc.id_sesion AND fecha_revision IS NOT NULL)
+                         + (SELECT COUNT(*) FROM pago_deposito  WHERE sesion_id = sc.id_sesion AND fecha_revision IS NOT NULL)
+                       ) AS aud_revisado
                 FROM sesion_caja sc
                 INNER JOIN caja c ON sc.caja_id = c.id_caja
                 INNER JOIN local l ON c.local_id = l.id_local
@@ -493,21 +515,40 @@ class CajaRepository
     }
 
     /** Todos los pagos digitales para la vista del supervisor */
-    public function getAllPagosDigitales(string $estado = '', int $localId = 0, int $cajaId = 0): array
-    {
-        $where  = "ms.tipo_movimiento_id = 1";
+    public function getAllPagosDigitales(
+        string $estado    = '',
+        int    $cajaId    = 0,
+        int    $cajeraId  = 0,
+        string $modo      = '',
+        string $mes       = ''
+    ): array {
+        // SoloBank ya se verifica por su propio cruce de vales (código único
+        // disponible/usado); no necesita pasar por esta cola de aprobación.
+        $where  = "ms.tipo_movimiento_id = 1 AND m.descripcion != 'SoloBank'";
         $params = [];
         if ($estado) {
             $where .= " AND ms.estado = :est";
             $params['est'] = $estado;
         }
-        if ($localId > 0) {
-            $where .= " AND l.id_local = :lid";
-            $params['lid'] = $localId;
-        }
         if ($cajaId > 0) {
             $where .= " AND sc.caja_id = :cid";
             $params['cid'] = $cajaId;
+        }
+        if ($cajeraId > 0) {
+            $where .= " AND sc.postulante_apertura_id = :cajera";
+            $params['cajera'] = $cajeraId;
+        }
+        if ($modo) {
+            $where .= " AND m.descripcion = :modo";
+            $params['modo'] = $modo;
+        }
+        if ($mes) {
+            [$anio, $nmes] = explode('-', $mes);
+            $desdeFecha = "{$anio}-{$nmes}-01";
+            $hastaFecha = date('Y-m-t', strtotime($desdeFecha));
+            $where .= " AND sc.fecha_operacion BETWEEN :desde AND :hasta";
+            $params['desde'] = $desdeFecha;
+            $params['hasta'] = $hastaFecha;
         }
         $sql = "SELECT ms.id_movimiento, ms.monto, ms.numero_operacion, ms.estado,
                        ms.fecha_movimiento, m.descripcion AS modo_desc,
@@ -530,6 +571,187 @@ class CajaRepository
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
+    }
+
+    /** Tabla, columna de id y columna de revisor por categoría de auditoría. */
+    private const AUDITORIA_TABLAS = [
+        'COBROS'   => ['movimiento_sesion', 'id_movimiento',     'postulante_revision_id'],
+        'OTROS'    => ['movimiento_sesion', 'id_movimiento',     'postulante_revision_id'],
+        'PERSONAL' => ['pago_personal',     'id_pago_personal',  'postulante_revisor_id'],
+        'LOCAL'    => ['pago_local',        'id_pago_local',     'revisado_por_id'],
+        'COMPRAS'  => ['pago_factura',      'id_pago_factura',   'revisado_por_id'],
+        'DEPOSITO' => ['pago_deposito',     'id_pago_deposito',  'revisado_por_id'],
+    ];
+
+    /**
+     * Auditoría unificada: junta cobros electrónicos (Yape/Plin, Visa/POS),
+     * otros pagos, pago de personal, pago de local, compras y depósitos a KGyR
+     * en un solo listado normalizado, con "revisado" como bandera independiente
+     * de estado (fecha_revision IS NOT NULL) para no afectar reportes ni totales
+     * que ya dependen del estado de cada tabla.
+     */
+    public function getAuditoriaMovimientos(
+        string $categoria = '',
+        int    $cajaId    = 0,
+        int    $cajeraId  = 0,
+        string $revisado  = '',
+        string $mes       = ''
+    ): array {
+        $params = [];
+        $desdeFecha = $hastaFecha = null;
+        if ($mes) {
+            [$anio, $nmes] = explode('-', $mes);
+            $desdeFecha = "{$anio}-{$nmes}-01";
+            $hastaFecha = date('Y-m-t', strtotime($desdeFecha));
+        }
+
+        $sql = "
+            SELECT * FROM (
+                SELECT ms.id_movimiento AS id, 'COBROS' AS categoria,
+                       ms.monto, CONCAT(m.descripcion, ' — ', COALESCE(ms.numero_operacion,'—')) AS referencia,
+                       ms.estado, (ms.fecha_revision IS NOT NULL) AS revisado,
+                       ms.fecha_movimiento AS fecha_mov,
+                       sc.id_sesion, sc.fecha_operacion,
+                       c.id_caja, c.descripcion AS caja_desc, l.descripcion AS local_desc,
+                       p.id_postulante AS cajera_id, p.nombres AS cajera_nombre
+                FROM movimiento_sesion ms
+                INNER JOIN modo m ON m.id_modo = ms.modo_id
+                INNER JOIN sesion_caja sc ON sc.id_sesion = ms.sesion_id
+                INNER JOIN caja c ON c.id_caja = sc.caja_id
+                INNER JOIN local l ON l.id_local = c.local_id
+                INNER JOIN postulante p ON p.id_postulante = sc.postulante_apertura_id
+                WHERE ms.tipo_movimiento_id = 1 AND m.descripcion != 'SoloBank'
+
+                UNION ALL
+
+                SELECT ms.id_movimiento, 'OTROS',
+                       ms.monto, COALESCE(ms.descripcion,'—'),
+                       ms.estado, (ms.fecha_revision IS NOT NULL),
+                       ms.fecha_movimiento,
+                       sc.id_sesion, sc.fecha_operacion,
+                       c.id_caja, c.descripcion, l.descripcion,
+                       p.id_postulante, p.nombres
+                FROM movimiento_sesion ms
+                INNER JOIN sesion_caja sc ON sc.id_sesion = ms.sesion_id
+                INNER JOIN caja c ON c.id_caja = sc.caja_id
+                INNER JOIN local l ON l.id_local = c.local_id
+                INNER JOIN postulante p ON p.id_postulante = sc.postulante_apertura_id
+                WHERE ms.tipo_movimiento_id = 2 AND ms.modo_id = 1
+
+                UNION ALL
+
+                SELECT pp.id_pago_personal, 'PERSONAL',
+                       pp.monto, pb.nombres,
+                       pp.estado, (pp.fecha_revision IS NOT NULL),
+                       pp.fecha_pago,
+                       sc.id_sesion, sc.fecha_operacion,
+                       c.id_caja, c.descripcion, l.descripcion,
+                       p.id_postulante, p.nombres
+                FROM pago_personal pp
+                INNER JOIN sesion_caja sc ON sc.id_sesion = pp.sesion_id
+                INNER JOIN caja c ON c.id_caja = sc.caja_id
+                INNER JOIN local l ON l.id_local = c.local_id
+                INNER JOIN postulante p ON p.id_postulante = sc.postulante_apertura_id
+                INNER JOIN postulante pb ON pb.id_postulante = pp.postulante_beneficiario_id
+
+                UNION ALL
+
+                SELECT pl.id_pago_local, 'LOCAL',
+                       pl.monto, COALESCE(cg.descripcion, pl.numero_operacion, '—'),
+                       pl.estado, (pl.fecha_revision IS NOT NULL),
+                       pl.fecha_pago,
+                       sc.id_sesion, sc.fecha_operacion,
+                       c.id_caja, c.descripcion, l.descripcion,
+                       p.id_postulante, p.nombres
+                FROM pago_local pl
+                INNER JOIN sesion_caja sc ON sc.id_sesion = pl.sesion_id
+                INNER JOIN caja c ON c.id_caja = sc.caja_id
+                INNER JOIN local l ON l.id_local = c.local_id
+                INNER JOIN postulante p ON p.id_postulante = sc.postulante_apertura_id
+                LEFT JOIN concepto_gastos_local cg ON cg.id_concepto = pl.concepto_id
+
+                UNION ALL
+
+                SELECT pf.id_pago_factura, 'COMPRAS',
+                       pf.monto, COALESCE(pf.numero_comprobante, pf.tipo_documento, '—'),
+                       pf.estado, (pf.fecha_revision IS NOT NULL),
+                       pf.fecha_registro,
+                       sc.id_sesion, sc.fecha_operacion,
+                       c.id_caja, c.descripcion, l.descripcion,
+                       p.id_postulante, p.nombres
+                FROM pago_factura pf
+                INNER JOIN sesion_caja sc ON sc.id_sesion = pf.sesion_id
+                INNER JOIN caja c ON c.id_caja = sc.caja_id
+                INNER JOIN local l ON l.id_local = c.local_id
+                INNER JOIN postulante p ON p.id_postulante = sc.postulante_apertura_id
+
+                UNION ALL
+
+                SELECT pd.id_pago_deposito, 'DEPOSITO',
+                       pd.monto, COALESCE(pd.numero_comprobante, '—'),
+                       pd.estado, (pd.fecha_revision IS NOT NULL),
+                       pd.fecha_registro,
+                       sc.id_sesion, sc.fecha_operacion,
+                       c.id_caja, c.descripcion, l.descripcion,
+                       p.id_postulante, p.nombres
+                FROM pago_deposito pd
+                INNER JOIN sesion_caja sc ON sc.id_sesion = pd.sesion_id
+                INNER JOIN caja c ON c.id_caja = sc.caja_id
+                INNER JOIN local l ON l.id_local = c.local_id
+                INNER JOIN postulante p ON p.id_postulante = sc.postulante_apertura_id
+            ) aud
+            WHERE 1=1";
+
+        if ($categoria) {
+            $sql .= " AND aud.categoria = :cat";
+            $params['cat'] = $categoria;
+        }
+        if ($cajaId > 0) {
+            $sql .= " AND aud.id_caja = :cid";
+            $params['cid'] = $cajaId;
+        }
+        if ($cajeraId > 0) {
+            $sql .= " AND aud.cajera_id = :cajera";
+            $params['cajera'] = $cajeraId;
+        }
+        if ($revisado === 'SI') {
+            $sql .= " AND aud.revisado = 1";
+        } elseif ($revisado === 'NO') {
+            $sql .= " AND aud.revisado = 0";
+        }
+        if ($desdeFecha) {
+            $sql .= " AND aud.fecha_operacion BETWEEN :desde AND :hasta";
+            $params['desde'] = $desdeFecha;
+            $params['hasta'] = $hastaFecha;
+        }
+        $sql .= " ORDER BY aud.fecha_mov DESC LIMIT 500";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    /** Marca o desmarca como revisado un registro de auditoría, sin tocar su `estado`. */
+    public function marcarRevisado(string $categoria, int $id, int $revisorId, bool $revisado): bool
+    {
+        if (!isset(self::AUDITORIA_TABLAS[$categoria])) return false;
+        [$tabla, $pk, $col] = self::AUDITORIA_TABLAS[$categoria];
+
+        $where = "{$pk} = :id";
+        if ($tabla === 'movimiento_sesion') {
+            $where .= $categoria === 'COBROS'
+                ? " AND tipo_movimiento_id = 1"
+                : " AND tipo_movimiento_id = 2";
+        }
+
+        $sql = "UPDATE {$tabla} SET {$col} = :rev, fecha_revision = :fr WHERE {$where}";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            'rev' => $revisado ? $revisorId : null,
+            'fr'  => $revisado ? date('Y-m-d H:i:s') : null,
+            'id'  => $id,
+        ]);
+        return $stmt->rowCount() > 0;
     }
 
     /** Total de pagos digitales aprobados para la sesión (se usa en el cuadre) */

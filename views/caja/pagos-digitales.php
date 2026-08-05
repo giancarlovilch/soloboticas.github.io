@@ -1,5 +1,5 @@
 <?php
-/** @var array $pagos */ /** @var array $locales */ /** @var int $filtroLocal */
+/** @var array $pagos */ /** @var array $cajas */ /** @var array $cajeras */
 $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
 $userName = $userName ?? $_SESSION['user_name'] ?? 'Usuario';
 $userRol  = $userRol  ?? $_SESSION['user_rol']  ?? 'STAFF';
@@ -13,10 +13,12 @@ $estadoClase = [
 ];
 
 $filtroActual = $_GET['estado'] ?? '';
-$filtroLocal  = isset($_GET['local']) ? (int)$_GET['local'] : 0;
-$filtroCaja   = isset($_GET['caja'])  ? (int)$_GET['caja']  : 0;
-$locales      = $locales ?? [];
+$filtroCaja   = isset($_GET['caja'])   ? (int)$_GET['caja']   : 0;
+$filtroCajera = isset($_GET['cajera']) ? (int)$_GET['cajera'] : 0;
+$filtroModo   = $_GET['modo'] ?? '';
+$filtroMes    = $_GET['mes'] ?? date('Y-m');
 $cajas        = $cajas   ?? [];
+$cajeras      = $cajeras ?? [];
 
 // Totales
 $totPendiente = array_sum(array_column(array_filter($pagos, fn($p) => $p['estado'] === 'PENDIENTE'), 'monto'));
@@ -72,7 +74,7 @@ $totAprobado  = array_sum(array_column(array_filter($pagos, fn($p) => $p['estado
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem;">
             <span style="font-size:0.8rem;color:#64748b;font-weight:600;">Estado:</span>
             <?php foreach ([''=>'Todos','PENDIENTE'=>'Pendientes','APROBADO'=>'Aprobados','RECHAZADO'=>'Rechazados'] as $val => $lbl): ?>
-                <a href="?estado=<?= $val ?>&local=<?= $filtroLocal ?>&caja=<?= $filtroCaja ?>"
+                <a href="?estado=<?= $val ?>&caja=<?= $filtroCaja ?>&cajera=<?= $filtroCajera ?>&modo=<?= urlencode($filtroModo) ?>&mes=<?= htmlspecialchars($filtroMes) ?>"
                    class="caja-btn <?= $filtroActual === $val ? 'caja-btn--primary' : 'caja-btn--outline' ?>"
                    style="padding:4px 12px;font-size:0.78rem;">
                     <?= $lbl ?>
@@ -81,28 +83,31 @@ $totAprobado  = array_sum(array_column(array_filter($pagos, fn($p) => $p['estado
         </div>
         <form method="GET" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
             <input type="hidden" name="estado" value="<?= htmlspecialchars($filtroActual) ?>">
-            <select name="local" class="caja-input" style="max-width:170px;" onchange="this.form.submit()">
-                <option value="0">— Todos los locales —</option>
-                <?php foreach ($locales as $l): ?>
-                    <option value="<?= $l['id'] ?>" <?= $filtroLocal == $l['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($l['descripcion']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <?php if ($filtroLocal > 0): ?>
-            <select name="caja" class="caja-input" style="max-width:170px;" onchange="this.form.submit()">
+            <select name="caja" class="caja-input" style="max-width:190px;" onchange="this.form.submit()">
                 <option value="0">— Todas las cajas —</option>
                 <?php foreach ($cajas as $c): ?>
                     <option value="<?= $c['id'] ?>" <?= $filtroCaja == $c['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($c['descripcion']) ?>
+                        <?= htmlspecialchars($c['descripcion']) ?> (<?= htmlspecialchars($c['local_desc']) ?>)
                     </option>
                 <?php endforeach; ?>
             </select>
-            <?php else: ?>
-            <span style="font-size:0.78rem;color:#94a3b8;">Selecciona un local para filtrar por caja</span>
-            <?php endif; ?>
-            <?php if ($filtroLocal || $filtroCaja): ?>
-            <a href="?estado=<?= htmlspecialchars($filtroActual) ?>" class="caja-btn caja-btn--outline"
+            <select name="cajera" class="caja-input" style="max-width:170px;" onchange="this.form.submit()">
+                <option value="0">— Todas las cajeras —</option>
+                <?php foreach ($cajeras as $cj): ?>
+                    <option value="<?= $cj['id'] ?>" <?= $filtroCajera == $cj['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($cj['nombres']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <select name="modo" class="caja-input" style="max-width:150px;" onchange="this.form.submit()">
+                <option value="">— Todos los modos —</option>
+                <option value="Visa/POS"  <?= $filtroModo === 'Visa/POS'  ? 'selected' : '' ?>>Visa/POS</option>
+                <option value="Yape/Plin" <?= $filtroModo === 'Yape/Plin' ? 'selected' : '' ?>>Yape/Plin</option>
+            </select>
+            <input type="month" name="mes" class="caja-input" style="max-width:140px;"
+                   value="<?= htmlspecialchars($filtroMes) ?>" onchange="this.form.submit()">
+            <?php if ($filtroCaja || $filtroCajera || $filtroModo): ?>
+            <a href="?estado=<?= htmlspecialchars($filtroActual) ?>&mes=<?= htmlspecialchars($filtroMes) ?>" class="caja-btn caja-btn--outline"
                style="padding:4px 10px;font-size:0.78rem;">✕ Limpiar</a>
             <?php endif; ?>
         </form>

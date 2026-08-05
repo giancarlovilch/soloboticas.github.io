@@ -45,6 +45,16 @@ class CajaController extends Controller
         return (int)$_SESSION['user_id'];
     }
 
+    private function requireAdmin(): int
+    {
+        $id = $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Solo el administrador puede acceder a Auditoría', 403);
+            exit;
+        }
+        return $id;
+    }
+
     /**
      * Estos endpoints solo se usan desde la pantalla de incidencias para corregir una
      * sesión ya cerrada. Mientras el caso siga abierto (ABIERTO/PARCIAL), cualquier staff
@@ -54,9 +64,20 @@ class CajaController extends Controller
     {
         $postulanteId = $this->requireAuth();
         if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
-            foreach ($this->incRepo->getBySesion($sesionId) as $inc) {
+            $incidencias = $this->incRepo->getBySesion($sesionId);
+            foreach ($incidencias as $inc) {
                 if ($inc['estado'] === 'CERRADO') {
                     $this->error('Este caso ya fue cerrado. Solo el administrador puede modificarlo.', 403);
+                    exit;
+                }
+            }
+            // Arqueo limpio (sin incidencia): editable solo el mismo día; al día siguiente
+            // se sella solo y solo el administrador puede reabrirlo.
+            if (empty($incidencias)) {
+                $sesion = $this->repo->getSesionById($sesionId);
+                $esHoy  = $sesion && substr((string)$sesion['fecha_operacion'], 0, 10) === date('Y-m-d');
+                if (!$esHoy) {
+                    $this->error('El arqueo ya quedó cerrado. Solo el administrador puede reabrirlo.', 403);
                     exit;
                 }
             }
@@ -682,17 +703,20 @@ class CajaController extends Controller
     // GET /caja/pagos-digitales
     public function pagosDigitalesView(): void
     {
-        $postulanteId = $this->requireAuth();
+        $postulanteId = $this->requireAdmin();
         $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
         $userName     = $_SESSION['user_name'] ?? 'Usuario';
         $userRol      = $_SESSION['user_rol']  ?? 'STAFF';
 
         $filtroEstado = $_GET['estado'] ?? '';
-        $filtroLocal  = isset($_GET['local']) ? (int)$_GET['local'] : 0;
-        $filtroCaja   = isset($_GET['caja'])  ? (int)$_GET['caja']  : 0;
-        $pagos        = $this->repo->getAllPagosDigitales($filtroEstado, $filtroLocal, $filtroCaja);
-        $locales      = $this->repo->getLocales();
-        $cajas        = $filtroLocal > 0 ? $this->repo->getCajasByLocal($filtroLocal) : [];
+        $filtroCaja   = isset($_GET['caja'])   ? (int)$_GET['caja']   : 0;
+        $filtroCajera = isset($_GET['cajera']) ? (int)$_GET['cajera'] : 0;
+        $filtroModo   = $_GET['modo'] ?? '';
+        $filtroMes    = $_GET['mes'] ?? date('Y-m');
+
+        $pagos   = $this->repo->getAllPagosDigitales($filtroEstado, $filtroCaja, $filtroCajera, $filtroModo, $filtroMes);
+        $cajas   = $this->repo->getCajasActivas();
+        $cajeras = $this->repo->getCajerasActivas();
 
         require_once __DIR__ . '/../../views/caja/pagos-digitales.php';
     }
@@ -700,7 +724,7 @@ class CajaController extends Controller
     // POST /caja/api/pago-digital/{id}/confirmar
     public function confirmarPago(int $movId): void
     {
-        $postulanteId = $this->requireAuth();
+        $postulanteId = $this->requireAdmin();
         $data   = $this->getAllInput();
         $estado = strtoupper(trim($data['estado'] ?? 'APROBADO'));
 
@@ -710,6 +734,41 @@ class CajaController extends Controller
 
         $this->repo->confirmarPagoDigital($movId, $postulanteId, $estado);
         $this->success("Pago marcado como {$estado}");
+    }
+
+    // ── Vista: AUDITORÍA unificada (solo admin) ────────────
+    // GET /caja/auditoria
+    public function auditoriaView(): void
+    {
+        $postulanteId = $this->requireAdmin();
+        $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $userName     = $_SESSION['user_name'] ?? 'Usuario';
+        $userRol      = $_SESSION['user_rol']  ?? 'STAFF';
+
+        $filtroCategoria = $_GET['categoria'] ?? '';
+        $filtroCaja      = isset($_GET['caja'])   ? (int)$_GET['caja']   : 0;
+        $filtroCajera    = isset($_GET['cajera']) ? (int)$_GET['cajera'] : 0;
+        $filtroRevisado  = $_GET['revisado'] ?? '';
+        $filtroMes       = $_GET['mes'] ?? date('Y-m');
+
+        $items   = $this->repo->getAuditoriaMovimientos($filtroCategoria, $filtroCaja, $filtroCajera, $filtroRevisado, $filtroMes);
+        $cajas   = $this->repo->getCajasActivas();
+        $cajeras = $this->repo->getCajerasActivas();
+
+        require_once __DIR__ . '/../../views/caja/auditoria.php';
+    }
+
+    // POST /caja/api/auditoria/{categoria}/{id}/revisar
+    public function apiMarcarRevisado(string $categoria, int $id): void
+    {
+        $postulanteId = $this->requireAdmin();
+        $data     = $this->getAllInput();
+        $revisado = !empty($data['revisado']);
+
+        $ok = $this->repo->marcarRevisado(strtoupper($categoria), $id, $postulanteId, $revisado);
+        if (!$ok) { $this->error('Registro no encontrado', 404); return; }
+
+        $this->success($revisado ? 'Marcado como revisado' : 'Marca de revisado quitada');
     }
 
     // ── API: catálogos ─────────────────────────────────────

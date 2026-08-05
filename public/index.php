@@ -133,6 +133,8 @@ $router->post('/caja/api/sesion/{id}/sincronizar-base', [CajaController::class, 
 $router->post('/caja/api/sesion/{id}/editar-fecha-turno', [CajaController::class, 'editarFechaTurno']);
 $router->post('/caja/api/auditar-consistencia',        [CajaController::class, 'auditarConsistencia']);
 $router->get('/caja/pagos-digitales',                    [CajaController::class, 'pagosDigitalesView']);
+$router->get('/caja/auditoria',                          [CajaController::class, 'auditoriaView']);
+$router->post('/caja/api/auditoria/{categoria}/{id}/revisar', [CajaController::class, 'apiMarcarRevisado']);
 $router->get('/caja/api/sesion/{id}/pagos-digitales',    [CajaController::class, 'getPagosDigitales']);
 $router->post('/caja/api/sesion/{id}/pago-digital',      [CajaController::class, 'addPagoDigital']);
 $router->post('/caja/api/pago-digital/{id}/confirmar',   [CajaController::class, 'confirmarPago']);

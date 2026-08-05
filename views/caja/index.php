@@ -46,8 +46,8 @@ $estadoLabel = [
     <div class="caja-header__right">
         <span class="caja-header__user"><?= htmlspecialchars($userName) ?></span>
         <?php if (($userRol ?? '') === 'ADMIN'): ?>
-        <a href="<?= $basePath ?>/caja/pagos-digitales" class="caja-btn-back" style="border-color:#fbbf24;color:#fbbf24;">
-            Cobros Electrónicos
+        <a href="<?= $basePath ?>/caja/auditoria" class="caja-btn-back" style="border-color:#fbbf24;color:#fbbf24;">
+            🔍 Auditoría
         </a>
         <?php endif; ?>
         <a href="<?= $basePath ?>/<?= ($userRol ?? '') === 'ADMIN' ? 'admin/dashboard' : 'staff' ?>" class="caja-btn-back">← Dashboard</a>
@@ -180,6 +180,9 @@ $estadoLabel = [
                         <th class="text-center" style="width:52px;">Ops.<br><span style="font-weight:400;opacity:.7;">BCP</span></th>
                         <th style="width:52px;">Ant.</th>
                         <th class="text-center" style="width:100px;">Estado</th>
+                        <?php if (($userRol ?? '') === 'ADMIN'): ?>
+                        <th class="text-center" style="width:80px;">Confiabilidad</th>
+                        <?php endif; ?>
                         <th class="text-right" style="width:80px;">Resultado</th>
                         <th class="text-center" style="width:60px;">Acción</th>
                     </tr>
@@ -234,9 +237,17 @@ $estadoLabel = [
                                         $ibg = '#fee2e2'; $icol = '#991b1b'; $itxt = '! Revisar caso';
                                     endif;
                                 else:
+                                    $esHoy = substr((string)$s['fecha_operacion'], 0, 10) === date('Y-m-d');
                                     $incHref = $basePath.'/incidencias/sesion/'.(int)$s['id_sesion'];
-                                    $incClickable = ($userRol ?? '') === 'ADMIN';
-                                    $ibg = '#d1fae5'; $icol = '#065f46'; $itxt = '✓ Arqueo cerrado';
+                                    if ($esHoy):
+                                        // Mismo día: aún se puede agregar efectivo encontrado antes de sellar el arqueo.
+                                        $incClickable = true;
+                                        $ibg = '#dbeafe'; $icol = '#1e40af'; $itxt = '◎ Por cerrar!';
+                                    else:
+                                        // Ya pasó el día: se sella solo; solo el admin puede reabrirlo.
+                                        $incClickable = ($userRol ?? '') === 'ADMIN';
+                                        $ibg = '#d1fae5'; $icol = '#065f46'; $itxt = '✓ Arqueo cerrado';
+                                    endif;
                                 endif;
                                 ?>
                                 <?php if ($incClickable): ?>
@@ -253,6 +264,19 @@ $estadoLabel = [
                                 <span class="caja-estado <?= $e['cls'] ?>"><?= $e['label'] ?></span>
                             <?php endif; ?>
                         </td>
+                        <?php if (($userRol ?? '') === 'ADMIN'): ?>
+                        <td class="text-center">
+                            <?php
+                            $audTotal    = (int)($s['aud_total'] ?? 0);
+                            $audRevisado = (int)($s['aud_revisado'] ?? 0);
+                            $estrellas   = $audTotal === 0 ? 5 : 1 + (int)round(($audRevisado / $audTotal) * 4);
+                            ?>
+                            <span title="<?= $audTotal === 0 ? 'Nada que verificar' : "{$audRevisado} de {$audTotal} movimientos revisados" ?>"
+                                  style="font-size:0.85rem;letter-spacing:1px;color:#f59e0b;white-space:nowrap;">
+                                <?= str_repeat('★', $estrellas) . str_repeat('☆', 5 - $estrellas) ?>
+                            </span>
+                        </td>
+                        <?php endif; ?>
                         <td class="text-right" style="white-space:nowrap;">
                         <?php if ($tieneDetalle):
                             if (abs($difCorr) < 0.01):
@@ -281,7 +305,7 @@ $estadoLabel = [
                     </tr>
                 <?php endforeach; ?>
                 <?php if (empty($recientes)): ?>
-                    <tr><td colspan="11" class="caja-table__empty">No hay cuadres en este período.</td></tr>
+                    <tr><td colspan="<?= ($userRol ?? '') === 'ADMIN' ? 12 : 11 ?>" class="caja-table__empty">No hay cuadres en este período.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>

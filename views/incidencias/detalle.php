@@ -472,19 +472,14 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem;">
                             <span class="form-label" style="margin:0;">Operaciones BCP (agente)</span>
                             <span style="font-size:.8rem;color:#64748b;">
-                                Total: <strong id="numBcpActual"><?= $numOpsBcp !== null ? (int)$numOpsBcp : '—' ?></strong>
+                                Operaciones (bono): <strong id="numBcpActual"><?= $numOpsBcp !== null ? (int)$numOpsBcp : '—' ?></strong>
                             </span>
                         </div>
                         <div style="display:flex;align-items:flex-end;gap:.5rem;flex-wrap:wrap;">
                             <div style="display:flex;flex-direction:column;gap:.2rem;background:#d1fae5;border:1.5px solid #a7f3d0;border-radius:7px;padding:.35rem .5rem;">
-                                <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#059669;">Ingresos</label>
-                                <input type="number" min="0" step="1" id="bcpIngresosInput" value="<?= $opIngActual ?>"
+                                <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#059669;">Total</label>
+                                <input type="number" min="0" step="1" id="bcpTotalInput" value="<?= $opIngActual + $opSalActual + $opOtrActual ?>"
                                        style="width:60px;padding:.2rem .3rem;border:1px solid #a7f3d0;border-radius:5px;font-size:.85rem;font-weight:700;text-align:center;font-family:inherit;outline:none;background:#fff;">
-                            </div>
-                            <div style="display:flex;flex-direction:column;gap:.2rem;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:7px;padding:.35rem .5rem;">
-                                <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#2563eb;">Salida</label>
-                                <input type="number" min="0" step="1" id="bcpSalidaInput" value="<?= $opSalActual ?>"
-                                       style="width:60px;padding:.2rem .3rem;border:1px solid #bfdbfe;border-radius:5px;font-size:.85rem;font-weight:700;text-align:center;font-family:inherit;outline:none;background:#fff;">
                             </div>
                             <div style="display:flex;flex-direction:column;gap:.2rem;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:7px;padding:.35rem .5rem;">
                                 <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#64748b;">Otros</label>
@@ -1907,19 +1902,19 @@ async function guardarConteo() {
 
 // ── Guardar operaciones BCP ─────────────────────────────
 async function guardarNumBcp() {
-    const ingresos = parseInt(document.getElementById('bcpIngresosInput').value, 10);
-    const salida   = parseInt(document.getElementById('bcpSalidaInput').value, 10);
-    const otros    = parseInt(document.getElementById('bcpOtrosInput').value, 10);
-    if ([ingresos, salida, otros].some(v => isNaN(v) || v < 0)) {
+    const total = parseInt(document.getElementById('bcpTotalInput').value, 10);
+    const otros = parseInt(document.getElementById('bcpOtrosInput').value, 10);
+    if ([total, otros].some(v => isNaN(v) || v < 0)) {
         mostrarAlerta('bcpAlert', 'Valor inválido', 'err');
         return;
     }
+    const monetario = Math.max(0, total - otros);
     try {
         await apiPost(`${BASE}/caja/api/sesion/${SESION_ID}/num-ops-bcp`, {
-            oper_ingresos_bcp: ingresos, oper_salida_bcp: salida, oper_otros_bcp: otros,
+            oper_ingresos_bcp: monetario, oper_salida_bcp: 0, oper_otros_bcp: otros,
         });
         mostrarAlerta('bcpAlert', '✓ Actualizado', 'ok');
-        document.getElementById('numBcpActual').textContent = ingresos + salida;
+        document.getElementById('numBcpActual').textContent = monetario;
         setTimeout(() => location.reload(), 900);
     } catch(e) {
         mostrarAlerta('bcpAlert', e.message, 'err');

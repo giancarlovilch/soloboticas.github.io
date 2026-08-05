@@ -98,8 +98,17 @@ class IncidenciaContableController extends Controller
             exit;
         }
 
+        // Arqueo limpio (sin incidencia): solo se puede reabrir el mismo día. Al día
+        // siguiente ya se selló y solo el administrador puede entrar.
+        $cajaRepo  = new CajaRepository();
+        $sesionChk = $cajaRepo->getSesionById($sesionId);
+        $esHoy     = $sesionChk && substr((string)$sesionChk['fecha_operacion'], 0, 10) === date('Y-m-d');
+        if (!$esHoy && ($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            header('Location: ' . APP_BASE_PATH . '/caja');
+            exit;
+        }
+
         // Crear una nueva a partir de los datos del arqueo
-        $cajaRepo = new CajaRepository();
         $reporte  = $cajaRepo->getReporte($sesionId);
         $dc       = $reporte['detalle'] ?? [];
         $sesion   = $reporte['sesion'] ?? [];

@@ -323,23 +323,18 @@ $act = [
                 Rendimiento Agente BCP
             </p>
             <div class="bcp-ops-grid">
-                <div class="bcp-ops-box bcp-ops-box--ingresos">
-                    <label for="act_oper_ingresos_bcp">Oper. Ingresos</label>
-                    <input type="number" id="act_oper_ingresos_bcp" class="caja-input"
+                <div class="bcp-ops-box bcp-ops-box--total">
+                    <label for="act_oper_total_bcp">Total de Operaciones</label>
+                    <input type="number" id="act_oper_total_bcp" class="caja-input"
                            min="0" step="1" placeholder="0" required
-                           value="<?= isset($detalle['oper_ingresos_bcp']) ? (int)$detalle['oper_ingresos_bcp'] : '' ?>">
-                </div>
-                <div class="bcp-ops-box bcp-ops-box--salida">
-                    <label for="act_oper_salida_bcp">Oper. Salida</label>
-                    <input type="number" id="act_oper_salida_bcp" class="caja-input"
-                           min="0" step="1" placeholder="0" required
-                           value="<?= isset($detalle['oper_salida_bcp']) ? (int)$detalle['oper_salida_bcp'] : '' ?>">
+                           value="<?= isset($detalle['num_operaciones_bcp']) ? (int)$detalle['num_operaciones_bcp'] + (int)($detalle['oper_otros_bcp'] ?? 0) : '' ?>">
                 </div>
                 <div class="bcp-ops-box bcp-ops-box--otros">
                     <label for="act_oper_otros_bcp">Otros</label>
                     <input type="number" id="act_oper_otros_bcp" class="caja-input"
                            min="0" step="1" placeholder="0" required
                            value="<?= isset($detalle['oper_otros_bcp']) ? (int)$detalle['oper_otros_bcp'] : '' ?>">
+                    <span class="bcp-ops-hint">Consulta de movimientos y saldo</span>
                 </div>
             </div>
             <p class="bcp-ops-warning">⚠ Queda estrictamente prohibido el fraccionamiento de operaciones, a menos que el cliente lo solicite.</p>

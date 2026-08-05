@@ -56,10 +56,10 @@ $nombreUsuario = $nombreUsuario ?? $_SESSION['user_name'] ?? 'Administrador';
             <div class="home-card__desc">Resultados de arqueo y más</div>
         </a>
 
-        <a href="<?= defined('APP_BASE_PATH') ? APP_BASE_PATH : '' ?>/admin/database" class="home-card">
-            <div class="home-card__icon">🗄️</div>
-            <div class="home-card__label">Base de Datos</div>
-            <div class="home-card__desc">Backup, restore y gestión de BD</div>
+        <a href="<?= defined('APP_BASE_PATH') ? APP_BASE_PATH : '' ?>/caja/auditoria" class="home-card">
+            <div class="home-card__icon">🔍</div>
+            <div class="home-card__label">Auditoría</div>
+            <div class="home-card__desc">Verificar cobros y pagos del cuadre</div>
         </a>
 
         <a href="<?= defined('APP_BASE_PATH') ? APP_BASE_PATH : '' ?>/staff/info" target="_blank" class="home-card">
