@@ -605,6 +605,80 @@ class HorarioRepository
         return $stmt->fetchAll();
     }
 
+    /**
+     * Búsqueda avanzada de slots para el panel admin de Gestión de Turnos:
+     * combina rango de fechas + local + turno + rol + estado + trabajador.
+     * Incluye si el ocupante ya fue encuestado ese turno y si su cuadre
+     * de caja ya quedó CERRADA, para que el admin sepa el impacto antes de tocar nada.
+     */
+    public function buscarSlots(array $f): array
+    {
+        $desde = $f['fecha_desde'] ?? date('Y-m-d');
+        $hasta = $f['fecha_hasta'] ?? $desde;
+
+        $where  = ['hs.fecha_dia BETWEEN :desde AND :hasta'];
+        $params = ['desde' => $desde, 'hasta' => $hasta];
+
+        if (!empty($f['local_id']))       { $where[] = 'hs.local_id = :lid';       $params['lid'] = (int)$f['local_id']; }
+        if (!empty($f['turno_id']))       { $where[] = 'hs.turno_id = :tid';       $params['tid'] = (int)$f['turno_id']; }
+        if (!empty($f['rol_horario_id'])) { $where[] = 'hs.rol_horario_id = :rid'; $params['rid'] = (int)$f['rol_horario_id']; }
+        if (!empty($f['postulante_id']))  { $where[] = 'hs.postulante_id = :pid';  $params['pid'] = (int)$f['postulante_id']; }
+        if (($f['estado'] ?? '') === 'OCUPADO') $where[] = 'hs.postulante_id IS NOT NULL';
+        if (($f['estado'] ?? '') === 'LIBRE')   $where[] = 'hs.postulante_id IS NULL';
+
+        $whereStr = implode(' AND ', $where);
+        $limit    = max(1, min(1000, (int)($f['limit'] ?? 500)));
+
+        $stmt = $this->db->prepare(
+            "SELECT hs.*,
+                    rh.codigo      AS rol_puesto,
+                    rh.es_opcional,
+                    p.nombres      AS trabajador_nombre,
+                    l.descripcion  AS local_desc,
+                    t.descripcion  AS turno_desc,
+                    IF(EXISTS(
+                        SELECT 1 FROM asistencia a
+                        WHERE a.postulante_id = hs.postulante_id
+                          AND a.fecha         = hs.fecha_dia
+                          AND a.turno_id      = hs.turno_id
+                    ), 1, 0) AS encuestado,
+                    IF(EXISTS(
+                        SELECT 1 FROM sesion_caja sc
+                        INNER JOIN caja c ON c.id_caja = sc.caja_id
+                        WHERE c.local_id          = hs.local_id
+                          AND sc.turno_id         = hs.turno_id
+                          AND sc.fecha_operacion  = hs.fecha_dia
+                          AND sc.estado           = 'CERRADA'
+                    ), 1, 0) AS cuadre_cerrado
+             FROM horario_slot hs
+             INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+             INNER JOIN local  l ON hs.local_id  = l.id_local
+             INNER JOIN turno  t ON hs.turno_id  = t.id_turno
+             LEFT  JOIN postulante p ON hs.postulante_id = p.id_postulante
+             WHERE {$whereStr}
+             ORDER BY hs.fecha_dia DESC, hs.local_id, hs.turno_id, rh.id_rol_horario, hs.slot_num
+             LIMIT {$limit}"
+        );
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    /** Catálogo de locales activos, para filtros */
+    public function getLocalesActivos(): array
+    {
+        return $this->db->query(
+            "SELECT id_local AS id, descripcion FROM local WHERE activo = 1 ORDER BY descripcion"
+        )->fetchAll();
+    }
+
+    /** Catálogo de roles de horario (CAJERA, VENDEDORA, etc.), para filtros */
+    public function getRolesHorario(): array
+    {
+        return $this->db->query(
+            "SELECT id_rol_horario AS id, codigo, descripcion FROM rol_horario ORDER BY orden"
+        )->fetchAll();
+    }
+
     /** Registra la cobertura: sustituye el slot y guarda en solicitud_cambio */
     public function cubrirSlot(int $slotId, int $solicitanteId, ?string $comentario = null): string
     {
@@ -941,6 +1015,113 @@ class HorarioRepository
         }
 
         return 'ok';
+    }
+
+    /**
+     * Reasigna un slot YA ocupado a otro trabajador, incluso si ya fue encuestado
+     * o si ya generó registros de caja para ese turno. A diferencia de liberarSlotAdmin
+     * (que bloquea si hay encuesta), esta operación hace el cambio completo en una sola
+     * transacción:
+     *   1) Anula la encuesta de asistencia del trabajador saliente para ese turno (si existe)
+     *   2) Reasigna el slot del horario
+     *   3) Migra su fila en sesion_participante (si la sesión de caja ya existe)
+     *   4) Si el rol es CAJERA, migra postulante_apertura_id/postulante_cierre_id de esa sesión
+     *   5) Migra el rendimiento ya registrado (ventas/operaciones BCP) para que el bono
+     *      quede a nombre del nuevo trabajador
+     *   6) Deja un registro en solicitud_cambio para trazabilidad
+     * No toca montos, diferencias ni ningún dato de dinero del cuadre.
+     */
+    public function reasignarSlotAdmin(int $slotId, int $nuevoPostulanteId, int $adminId, string $password): string
+    {
+        $stmt = $this->db->prepare("SELECT password FROM usuario WHERE postulante_id = :pid LIMIT 1");
+        $stmt->execute(['pid' => $adminId]);
+        $hash = $stmt->fetchColumn();
+        if (!$hash || !password_verify($password, $hash)) return 'Contraseña incorrecta';
+
+        $slot = $this->getSlotById($slotId);
+        if (!$slot) return 'Slot no encontrado';
+
+        if ($this->esEspejo((int)$slot['semana_id'])) {
+            return 'La semana espejo se actualiza automáticamente; no puede editarse directamente';
+        }
+
+        $viejoId = $slot['postulante_id'] ? (int)$slot['postulante_id'] : null;
+        if (!$viejoId) return 'El slot está libre; usa "Asignar" en vez de "Reasignar"';
+        if ($viejoId === $nuevoPostulanteId) return 'Selecciona un trabajador distinto al actual';
+
+        // El nuevo trabajador no debe tener ya otro slot ese mismo turno+día
+        $conflicto = $this->db->prepare(
+            "SELECT id_slot FROM horario_slot
+             WHERE semana_id = :sid AND postulante_id = :pid
+               AND turno_id = :tid AND fecha_dia = :fdia AND id_slot != :slot"
+        );
+        $conflicto->execute([
+            'sid'  => $slot['semana_id'], 'pid' => $nuevoPostulanteId,
+            'tid'  => $slot['turno_id'],  'fdia' => $slot['fecha_dia'], 'slot' => $slotId,
+        ]);
+        if ($conflicto->fetch()) return 'Ese trabajador ya tiene un turno asignado ese día y turno';
+
+        $this->db->beginTransaction();
+        try {
+            // 1) Anular la encuesta del que sale (describe su propia asistencia, ya no aplica)
+            $this->db->prepare(
+                "DELETE FROM asistencia WHERE postulante_id = :pid AND fecha = :fecha AND turno_id = :tid"
+            )->execute(['pid' => $viejoId, 'fecha' => $slot['fecha_dia'], 'tid' => $slot['turno_id']]);
+
+            // 2) Reasignar el slot
+            $this->db->prepare(
+                "UPDATE horario_slot SET postulante_id = :pid, fecha_asignacion = NOW() WHERE id_slot = :id"
+            )->execute(['pid' => $nuevoPostulanteId, 'id' => $slotId]);
+
+            // 3) Migrar participación ya registrada en la sesión de caja de ese turno
+            $this->db->prepare(
+                "UPDATE sesion_participante sp
+                 INNER JOIN sesion_caja sc ON sc.id_sesion = sp.sesion_id
+                 INNER JOIN caja c ON c.id_caja = sc.caja_id
+                 SET sp.postulante_id = :nuevo
+                 WHERE sp.postulante_id = :viejo
+                   AND sp.rol_participacion = :rol
+                   AND c.local_id = :lid AND sc.turno_id = :tid AND sc.fecha_operacion = :fecha"
+            )->execute([
+                'nuevo' => $nuevoPostulanteId, 'viejo' => $viejoId, 'rol' => $slot['rol_puesto'],
+                'lid'   => $slot['local_id'],  'tid'   => $slot['turno_id'], 'fecha' => $slot['fecha_dia'],
+            ]);
+
+            // 4) Si es CAJERA, migrar apertura/cierre de esa sesión
+            if ($slot['rol_puesto'] === 'CAJERA') {
+                $this->db->prepare(
+                    "UPDATE sesion_caja sc
+                     INNER JOIN caja c ON c.id_caja = sc.caja_id
+                     SET sc.postulante_apertura_id = IF(sc.postulante_apertura_id = :viejo, :nuevo, sc.postulante_apertura_id),
+                         sc.postulante_cierre_id   = IF(sc.postulante_cierre_id   = :viejo, :nuevo, sc.postulante_cierre_id)
+                     WHERE c.local_id = :lid AND sc.turno_id = :tid AND sc.fecha_operacion = :fecha
+                       AND (sc.postulante_apertura_id = :viejo OR sc.postulante_cierre_id = :viejo)"
+                )->execute([
+                    'nuevo' => $nuevoPostulanteId, 'viejo' => $viejoId,
+                    'lid'   => $slot['local_id'],  'tid'   => $slot['turno_id'], 'fecha' => $slot['fecha_dia'],
+                ]);
+            }
+
+            // 5) Migrar el rendimiento/bono ya calculado para este slot
+            $this->db->prepare(
+                "UPDATE horario_rendimiento SET postulante_id = :nuevo WHERE horario_slot_id = :slot"
+            )->execute(['nuevo' => $nuevoPostulanteId, 'slot' => $slotId]);
+
+            // 6) Trazabilidad
+            $this->db->prepare(
+                "INSERT INTO solicitud_cambio (slot_id, semana_id, tipo, postulante_solicitante_id, postulante_original_id, notas)
+                 VALUES (:sid, :mid, 'CAMBIO', :nuevo, :viejo, 'Reasignación completa por administrador (cuadre, rendimiento y encuesta incluidos)')"
+            )->execute(['sid' => $slotId, 'mid' => $slot['semana_id'], 'nuevo' => $nuevoPostulanteId, 'viejo' => $viejoId]);
+
+            // 7) Propagar al espejo
+            $this->propagarEspejo($slotId, $nuevoPostulanteId);
+
+            $this->db->commit();
+            return 'ok';
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            return 'No se pudo reasignar: ' . $e->getMessage();
+        }
     }
 
     /** Revierte una cobertura: restaura el slot al trabajador original */

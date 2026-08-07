@@ -1651,6 +1651,7 @@ class CajaRepository
                      operaciones_bcp, oper_ingresos_bcp, oper_salida_bcp, oper_otros_bcp)
                  VALUES (:slot, :pid, :sid, :fecha, :lid, :tid, 'CAJERA', :ops, :ing, :sal, :otr)
                  ON DUPLICATE KEY UPDATE
+                    postulante_id      = VALUES(postulante_id),
                     operaciones_bcp    = VALUES(operaciones_bcp),
                     oper_ingresos_bcp  = VALUES(oper_ingresos_bcp),
                     oper_salida_bcp    = VALUES(oper_salida_bcp),
@@ -1716,7 +1717,10 @@ class CajaRepository
                 "INSERT INTO horario_rendimiento
                     (horario_slot_id, postulante_id, sesion_caja_id, fecha, local_id, turno_id, rol_codigo, ventas_monto)
                  VALUES (:slot, :pid, :sid, :fecha, :lid, :tid, 'VENDEDORA', :monto)
-                 ON DUPLICATE KEY UPDATE ventas_monto = VALUES(ventas_monto), sesion_caja_id = VALUES(sesion_caja_id)"
+                 ON DUPLICATE KEY UPDATE
+                    postulante_id  = VALUES(postulante_id),
+                    ventas_monto   = VALUES(ventas_monto),
+                    sesion_caja_id = VALUES(sesion_caja_id)"
             )->execute([
                 'slot'  => $slotId,
                 'pid'   => $s['vendedora_id'],

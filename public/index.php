@@ -94,6 +94,7 @@ $router->get('/horario/siguiente',              [HorarioController::class, 'sigu
 $router->get('/horario/historial',              [HorarioController::class, 'historial']);
 $router->get('/horario/solicitudes',            [HorarioController::class, 'solicitudes']);
 $router->post('/horario/api/slot/{id}/liberar-admin',   [HorarioController::class, 'liberarSlotAdmin']);
+$router->post('/horario/api/slot/{id}/reasignar',       [HorarioController::class, 'reasignarSlot']);
 $router->post('/horario/api/solicitud/cubrir',                  [HorarioController::class, 'cubrir']);
 $router->post('/horario/api/solicitud/{id}/anular',             [HorarioController::class, 'anularSolicitud']);
 $router->post('/horario/api/solicitud/{id}/revertir-propia',    [HorarioController::class, 'revertirCoberturaPropia']);

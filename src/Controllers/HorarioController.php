@@ -299,6 +299,26 @@ class HorarioController extends Controller
         else $this->error($result, 401);
     }
 
+    // ── POST /horario/api/slot/{id}/reasignar ─────────────
+    public function reasignarSlot(int $slotId): void
+    {
+        $postulanteId = $this->requireAuth();
+        if (!$this->isAdmin()) $this->error('Solo administradores', 403);
+
+        $data     = $this->getAllInput();
+        $nuevoId  = (int)($data['postulante_id'] ?? 0);
+        $password = trim($data['password'] ?? '');
+        if (!$nuevoId)  $this->error('Selecciona el nuevo trabajador', 400);
+        if (empty($password)) $this->error('La contraseña es requerida', 400);
+
+        $result = $this->repo->reasignarSlotAdmin($slotId, $nuevoId, $postulanteId, $password);
+        if ($result === 'ok') {
+            $this->success('Turno reasignado. Cuadre, rendimiento y bono actualizados.');
+        } else {
+            $this->error($result, $result === 'Contraseña incorrecta' ? 401 : 409);
+        }
+    }
+
     // ── POST /horario/api/solicitud/{id}/anular ───────────
     public function anularSolicitud(int $id): void
     {

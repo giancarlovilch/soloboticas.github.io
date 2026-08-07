@@ -435,12 +435,31 @@ class AdminController extends Controller
         if ($page === 'horario') {
             require_once __DIR__ . '/../Repositories/HorarioRepository.php';
             $horarioRepo  = new HorarioRepository();
-            $horarioFecha = $_GET['fecha'] ?? date('Y-m-d');
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $horarioFecha)) {
-                $horarioFecha = date('Y-m-d');
-            }
-            $horarioSlots     = $horarioRepo->getSlotsByFecha($horarioFecha);
-            $horarioHistorial = $horarioRepo->getSolicitudesRecientes(40);
+
+            $validaFecha = fn($v, $def) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$v) ? $v : $def;
+
+            $horarioFecha       = $validaFecha($_GET['fecha'] ?? date('Y-m-d'), date('Y-m-d'));
+            $horarioFechaDesde  = $validaFecha($_GET['fecha_desde'] ?? $horarioFecha, $horarioFecha);
+            $horarioFechaHasta  = $validaFecha($_GET['fecha_hasta'] ?? $horarioFecha, $horarioFecha);
+            $horarioFiltroLocal = isset($_GET['local'])       ? (int)$_GET['local']       : 0;
+            $horarioFiltroTurno = isset($_GET['turno'])       ? (int)$_GET['turno']       : 0;
+            $horarioFiltroRol   = isset($_GET['rol'])         ? (int)$_GET['rol']         : 0;
+            $horarioFiltroEst   = $_GET['estado']             ?? '';
+            $horarioFiltroPost  = isset($_GET['trabajador'])  ? (int)$_GET['trabajador']  : 0;
+
+            $horarioSlots = $horarioRepo->buscarSlots([
+                'fecha_desde'    => $horarioFechaDesde,
+                'fecha_hasta'    => $horarioFechaHasta,
+                'local_id'       => $horarioFiltroLocal,
+                'turno_id'       => $horarioFiltroTurno,
+                'rol_horario_id' => $horarioFiltroRol,
+                'estado'         => $horarioFiltroEst,
+                'postulante_id'  => $horarioFiltroPost,
+            ]);
+            $horarioHistorial   = $horarioRepo->getSolicitudesRecientes(40);
+            $horarioLocales     = $horarioRepo->getLocalesActivos();
+            $horarioRoles       = $horarioRepo->getRolesHorario();
+            $horarioTrabajadores = $horarioRepo->getTrabajadores();
         }
 
         // Datos para la página de bonos
