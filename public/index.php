@@ -42,6 +42,7 @@ require_once __DIR__ . '/../src/Controllers/StaffController.php';
 require_once __DIR__ . '/../src/Controllers/CajaController.php';
 require_once __DIR__ . '/../src/Controllers/HorarioController.php';
 require_once __DIR__ . '/../src/Controllers/IncidenciaContableController.php';
+require_once __DIR__ . '/../src/Controllers/TerminalPosController.php';
 
 /**
  * Lógica para detección de rutas y Base Path
@@ -136,6 +137,13 @@ $router->post('/caja/api/auditar-consistencia',        [CajaController::class, '
 $router->get('/caja/pagos-digitales',                    [CajaController::class, 'pagosDigitalesView']);
 $router->get('/caja/auditoria',                          [CajaController::class, 'auditoriaView']);
 $router->post('/caja/api/auditoria/{categoria}/{id}/revisar', [CajaController::class, 'apiMarcarRevisado']);
+
+// --- Conciliación de cobros por POS (terminales de tarjeta) ---
+$router->get('/caja/conciliacion',                              [TerminalPosController::class, 'vista']);
+$router->post('/caja/api/conciliacion/importar',                [TerminalPosController::class, 'importar']);
+$router->post('/caja/api/conciliacion/mapeo',                   [TerminalPosController::class, 'guardarMapeo']);
+$router->get('/caja/api/conciliacion/lote/{id}/transacciones',  [TerminalPosController::class, 'transaccionesDeLote']);
+$router->post('/caja/api/conciliacion/transaccion/{id}/incluir',[TerminalPosController::class, 'toggleIncluido']);
 $router->get('/caja/api/sesion/{id}/pagos-digitales',    [CajaController::class, 'getPagosDigitales']);
 $router->post('/caja/api/sesion/{id}/pago-digital',      [CajaController::class, 'addPagoDigital']);
 $router->post('/caja/api/pago-digital/{id}/confirmar',   [CajaController::class, 'confirmarPago']);
@@ -168,6 +176,8 @@ $router->post('/incidencias/api/{id}/eliminar-movimiento', [IncidenciaContableCo
 $router->post('/incidencias/api/{id}/editar-movimiento',   [IncidenciaContableController::class, 'apiEditarMovimiento']);
 $router->post('/incidencias/api/{id}/cobro-electronico',[IncidenciaContableController::class, 'apiAddCobro']);
 $router->get('/incidencias/api/vales-disponibles',     [IncidenciaContableController::class, 'apiValesDisponibles']);
+$router->post('/incidencias/api/{id}/asignar-lote-visa', [IncidenciaContableController::class, 'apiAsignarLoteVisa']);
+$router->post('/incidencias/api/lote-visa/{loteId}/quitar', [IncidenciaContableController::class, 'apiQuitarLoteVisa']);
 $router->get('/incidencias/sesion/{id}',               [IncidenciaContableController::class, 'porSesion']);
 $router->get('/incidencias/{id}',                      [IncidenciaContableController::class, 'detalle']);
 

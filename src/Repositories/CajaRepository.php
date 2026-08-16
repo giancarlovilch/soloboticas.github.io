@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../Core/Database.php';
+require_once __DIR__ . '/TerminalPosRepository.php';
 
 class CajaRepository
 {
@@ -1478,6 +1479,12 @@ class CajaRepository
         $digitales        = $this->getPagosDigitalesBySesion($sesionId);
         $digital_aprobado = $this->sumDigitalDeclarado($sesionId);
 
+        // Cobros por POS (Culqi) asignados a este cuadre como sustento — detalle transacción
+        // por transacción (incluye banco) y también agregado por lote (para el badge de conformidad)
+        $tpRepo             = new TerminalPosRepository();
+        $lotesVisa          = $tpRepo->getLotesAsignados($sesionId);
+        $transaccionesVisa  = $tpRepo->getTransaccionesAsignadasBySesion($sesionId);
+
         // Vendedor (si existe)
         $vStmt = $this->db->prepare(
             "SELECT pv.nombres AS vendedor_nombre
@@ -1501,7 +1508,7 @@ class CajaRepository
             $correccionesVenta
         ));
 
-        return compact('sesion', 'detalle', 'venta', 'gastos', 'rectifs', 'tiposRect', 'digitales', 'digital_aprobado', 'vendedor', 'ajustesEsperado', 'modos', 'staff', 'locales', 'conceptos', 'correccionesVenta', 'sumCorrDelta');
+        return compact('sesion', 'detalle', 'venta', 'gastos', 'rectifs', 'tiposRect', 'digitales', 'digital_aprobado', 'lotesVisa', 'transaccionesVisa', 'vendedor', 'ajustesEsperado', 'modos', 'staff', 'locales', 'conceptos', 'correccionesVenta', 'sumCorrDelta');
     }
 
     // ── Eliminar sesión y todos sus hijos ──────────────────

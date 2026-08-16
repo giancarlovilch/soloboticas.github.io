@@ -156,6 +156,7 @@ $totPendiente = count($items) - $totRevisado;
                         <span style="font-size:0.72rem;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">
                             <?= htmlspecialchars($it['local_desc']) ?>
                         </span>
+                        <a href="<?= $basePath ?>/caja/reporte/<?= $it['id_sesion'] ?>" target="_blank" style="font-size:0.7rem;color:#0e7490;display:block;">Ver cuadre →</a>
                     </td>
                     <td>
                         <span style="font-size:0.8rem;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
@@ -182,7 +183,8 @@ $totPendiente = count($items) - $totRevisado;
                                 <button class="btn-danger" style="font-size:0.68rem;padding:3px 6px;display:block;width:100%;"
                                         onclick="confirmarCobro(<?= $it['id'] ?>,'RECHAZADO')">✗ Rechazar</button>
                             <?php else: ?>
-                                <span style="color:#94a3b8;font-size:0.72rem;">— (usa Cobros Electrónicos) —</span>
+                                <button class="btn-edit" style="font-size:0.68rem;padding:3px 6px;background:#64748b;display:block;width:100%;"
+                                        onclick="confirmarCobro(<?= $it['id'] ?>,'PENDIENTE')">↺ Volver a pendiente</button>
                             <?php endif; ?>
                         <?php else: ?>
                             <button class="btn-edit" style="font-size:0.68rem;padding:3px 8px;width:100%;background:<?= $it['revisado'] ? '#94a3b8' : '#059669' ?>;"

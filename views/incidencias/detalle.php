@@ -730,6 +730,75 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                 </div>
             </div>
 
+            <!-- ── 3b. Cobros POS (Culqi) — sustento de Visa/POS ─── -->
+            <?php if ($esAdmin): ?>
+            <?php
+            $visaDeclarado = array_sum(array_map(
+                fn($d) => (float)$d['monto'],
+                array_filter($digitales ?? [], fn($d) => trim($d['modo_desc'] ?? '') === 'Visa/POS')
+            ));
+            $visaImportado = array_sum(array_map(fn($l) => (float)$l['monto_total'], $lotesVisaAsignados));
+            $visaDiff      = round($visaImportado - $visaDeclarado, 2);
+            ?>
+            <div class="card card--amber">
+                <div class="card-head">
+                    <p class="card-title">Cobros POS (Culqi)</p>
+                    <?php if (!empty($lotesVisaAsignados)): ?>
+                        <?php if (abs($visaDiff) < 0.01): ?>
+                            <span class="badge" style="background:#d1fae5;color:#065f46;font-size:.65rem;">✓ Conforme con lo declarado — se aprobó automáticamente</span>
+                        <?php else: ?>
+                            <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.65rem;">⚠ Diferencia vs. declarado: <?= $visaDiff > 0 ? '+' : '' ?><?= $f2($visaDiff) ?></span>
+                        <?php endif; ?>
+                    <?php else: ?>
+                    <span style="font-size:.7rem;color:#94a3b8;">Solo administrador · control interno</span>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($lotesVisaAsignados)): ?>
+                    <ul class="item-list" style="margin-bottom:.85rem;">
+                        <?php foreach ($lotesVisaAsignados as $lv): ?>
+                        <li>
+                            <span class="item-desc">
+                                <span style="font-family:monospace;font-size:.78rem;color:#475569;">Lote <?= htmlspecialchars($lv['numero_lote']) ?></span>
+                                <span style="color:#94a3b8;font-size:.72rem;margin-left:.3rem;"><?= date('d/m/Y', strtotime($lv['fecha'])) ?> · <?= (int)$lv['cantidad_transacciones'] ?> txn</span>
+                            </span>
+                            <span class="item-amount" style="color:#5b21b6;">S/ <?= number_format($lv['monto_total'], 2) ?></span>
+                            <button class="item-rm" onclick="quitarLoteVisa(<?= $lv['id'] ?>, this)" title="Quitar lote">✕</button>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php else: ?>
+                    <p style="font-size:.82rem;color:#94a3b8;margin-bottom:.85rem;">Sin lotes asignados.</p>
+                    <?php endif; ?>
+
+                    <?php if (!empty($lotesVisaDisponibles)): ?>
+                    <p class="form-label" style="margin-bottom:.5rem;">Asignar lote disponible</p>
+                    <div class="form-row cols-2">
+                        <div>
+                            <label class="form-label">Lote</label>
+                            <select class="form-input" id="visa_lote_id">
+                                <option value="">— seleccionar —</option>
+                                <?php foreach ($lotesVisaDisponibles as $ld):
+                                    $sugerido = ['1' => 'Mañana', '2' => 'Tarde'][(string)$ld['orden_dia']] ?? 'Último cuadre';
+                                ?>
+                                <option value="<?= $ld['id'] ?>">
+                                    <?= htmlspecialchars($ld['terminal_id']) ?> — S/ <?= number_format($ld['monto_total'], 2) ?> · <?= date('d/m', strtotime($ld['fecha'])) ?> (Lote <?= htmlspecialchars($ld['numero_lote']) ?>, sugerido: <?= $sugerido ?>)
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div style="display:flex;align-items:flex-end;">
+                            <button class="btn btn-primary btn-sm" onclick="asignarLoteVisa()" style="width:100%">Asignar</button>
+                        </div>
+                    </div>
+                    <span id="visaAlert" style="display:none;margin-top:.4rem;" class="alert"></span>
+                    <?php else: ?>
+                    <p style="font-size:.78rem;color:#94a3b8;">No hay lotes disponibles para la caja de este cuadre.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <?php if (!empty($transferenciasPendientes)): ?>
             <!-- ── Transferencias de saldo por aplicar ───────────── -->
             <div class="card card--amber">
@@ -2156,6 +2225,27 @@ async function quitarVale(movId, btn) {
     if (!confirm('¿Quitar este vale?')) return;
     try {
         await apiPost(`${BASE}/caja/api/solobank-mov/${movId}/quitar`, {});
+        btn.closest('li').remove();
+    } catch(e) { alert(e.message); }
+}
+
+// ── Cobros POS (Culqi) ───────────────────────────────────
+async function asignarLoteVisa() {
+    const loteId = document.getElementById('visa_lote_id').value;
+    if (!loteId) { mostrarAlerta('visaAlert', 'Selecciona un lote', 'err'); return; }
+    try {
+        await apiPost(`${BASE}/incidencias/api/${INC_ID}/asignar-lote-visa`, { lote_id: loteId });
+        mostrarAlerta('visaAlert', '✓ Lote asignado', 'ok');
+        setTimeout(() => location.reload(), 900);
+    } catch(e) {
+        mostrarAlerta('visaAlert', e.message, 'err');
+    }
+}
+
+async function quitarLoteVisa(loteId, btn) {
+    if (!confirm('¿Quitar este lote del cuadre?')) return;
+    try {
+        await apiPost(`${BASE}/incidencias/api/lote-visa/${loteId}/quitar`, {});
         btn.closest('li').remove();
     } catch(e) { alert(e.message); }
 }

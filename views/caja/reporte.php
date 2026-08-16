@@ -9,6 +9,15 @@ $userRol   = $userRol  ?? $_SESSION['user_rol']  ?? 'STAFF';
 $esAdmin   = $userRol === 'ADMIN';
 $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
 
+// Conciliación de cobros POS (Culqi) — lotes asignados a este cuadre como sustento
+$lotesVisa     = $lotesVisa ?? [];
+$visaDeclarado = array_sum(array_map(
+    fn($d) => (float)$d['monto'],
+    array_filter($digitales ?? [], fn($d) => trim($d['modo_desc'] ?? '') === 'Visa/POS')
+));
+$visaImportado = array_sum(array_map(fn($l) => (float)$l['monto_total'], $lotesVisa));
+$visaDiff      = round($visaImportado - $visaDeclarado, 2);
+
 $loQueEsFisico = (float)($detalle['monto_caja_exterior']        ?? 0)
                + (float)($detalle['monto_monedas']              ?? 0)
                + (float)($detalle['monto_billetes_caja']        ?? 0)
@@ -366,6 +375,15 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
         <h2 class="caja-card__title">
             Cobros electrónicos
             <span style="font-size:.72rem;font-weight:500;color:#94a3b8;margin-left:.4rem;"><?= count($digitales ?? []) ?> registro<?= count($digitales ?? []) !== 1 ? 's' : '' ?></span>
+            <?php if (!empty($lotesVisa)): ?>
+                <?php if (abs($visaDiff) < 0.01): ?>
+                    <span style="font-size:.7rem;font-weight:700;background:#d1fae5;color:#065f46;padding:2px 9px;border-radius:5px;margin-left:.5rem;">✓ Visa/POS conforme con lo importado</span>
+                <?php else: ?>
+                    <span style="font-size:.7rem;font-weight:700;background:#fef3c7;color:#92400e;padding:2px 9px;border-radius:5px;margin-left:.5rem;">
+                        ⚠ Diferencia vs. importado: <?= $visaDiff > 0 ? '+' : '' ?><?= $f2($visaDiff) ?>
+                    </span>
+                <?php endif; ?>
+            <?php endif; ?>
         </h2>
         <?php if (empty($digitales)): ?>
             <p class="caja-empty">Sin cobros electrónicos registrados.</p>
@@ -482,6 +500,83 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
             </tr>
             <?php endforeach; ?>
             </tbody>
+        </table>
+    </section>
+    <?php endif; ?>
+
+    <!-- ── Cobros POS — sustento (conciliación con el proveedor) ── -->
+    <?php $transaccionesVisa = $transaccionesVisa ?? []; ?>
+    <?php if (!empty($transaccionesVisa)): ?>
+    <section class="caja-card">
+        <h2 class="caja-card__title">
+            Cobros POS — sustento
+            <span style="font-size:.72rem;font-weight:500;color:#94a3b8;margin-left:.4rem;">
+                <?= count($transaccionesVisa) ?> transacción<?= count($transaccionesVisa) !== 1 ? 'es' : '' ?>
+            </span>
+        </h2>
+        <table class="caja-table">
+            <thead>
+                <tr>
+                    <th>Hora</th>
+                    <th>Marca</th>
+                    <th>Últ. 4</th>
+                    <th>Banco</th>
+                    <th class="text-right">Monto venta</th>
+                    <th class="text-right">Comisión</th>
+                    <th class="text-right">Monto abono</th>
+                    <th class="text-center">Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php
+            $sumMonto = $sumComision = $sumAbono = 0;
+            foreach ($transaccionesVisa as $tv):
+                $cuenta = (int)$tv['incluido'] === 1 && (int)$tv['devolucion'] === 0 && $tv['estado'] !== 'rechazada';
+                if ($cuenta) {
+                    $sumMonto    += (float)$tv['monto_venta'];
+                    $sumComision += (float)$tv['comision_total'];
+                    $sumAbono    += (float)$tv['monto_abono'];
+                }
+                $pctComision = (float)$tv['monto_venta'] > 0 ? ((float)$tv['comision_total'] / (float)$tv['monto_venta']) * 100 : 0;
+                $estCls = match(true) {
+                    $tv['estado'] === 'abonada'   => 'background:#d1fae5;color:#065f46;',
+                    $tv['estado'] === 'rechazada' => 'background:#fee2e2;color:#991b1b;',
+                    default                       => 'background:#fef3c7;color:#92400e;',
+                };
+                $estLbl = match(true) {
+                    $tv['estado'] === 'abonada'   => 'Conforme',
+                    $tv['estado'] === 'rechazada' => 'Rechazada',
+                    default                       => 'Pendiente de depósito',
+                };
+            ?>
+                <tr style="<?= $cuenta ? '' : 'opacity:.55;' ?>">
+                    <td style="font-size:.8rem;color:#64748b;"><?= htmlspecialchars($tv['hora_transaccion']) ?></td>
+                    <td><?= htmlspecialchars($tv['marca'] ?? '—') ?> <span style="color:#94a3b8;font-size:.72rem;"><?= htmlspecialchars($tv['tipo_pago'] ?? '') ?></span></td>
+                    <td style="font-family:monospace;"><?= htmlspecialchars($tv['ult4'] ?? '—') ?></td>
+                    <td style="font-size:.8rem;"><?= htmlspecialchars($tv['nombre_banco'] ?? '—') ?></td>
+                    <td class="text-right"><?= $f2($tv['monto_venta']) ?></td>
+                    <td class="text-right"><?= $f2($tv['comision_total']) ?> <span style="color:#94a3b8;">(<?= number_format($pctComision, 2) ?>%)</span></td>
+                    <td class="text-right"><?= $f2($tv['monto_abono']) ?></td>
+                    <td class="text-center">
+                        <span style="font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:5px;<?= $estCls ?>"><?= $estLbl ?></span>
+                        <?php if ((int)$tv['devolucion'] === 1): ?>
+                            <span style="font-size:.65rem;color:#94a3b8;display:block;">Devolución</span>
+                        <?php elseif ((int)$tv['incluido'] === 0): ?>
+                            <span style="font-size:.65rem;color:#94a3b8;display:block;">Excluida</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+                <tr style="font-weight:700;border-top:2px solid #e2e8f0;">
+                    <td colspan="4">Total</td>
+                    <td class="text-right"><?= $f2($sumMonto) ?></td>
+                    <td class="text-right"><?= $f2($sumComision) ?> <span style="color:#94a3b8;font-weight:500;">(<?= $sumMonto > 0 ? number_format(($sumComision / $sumMonto) * 100, 2) : '0.00' ?>%)</span></td>
+                    <td class="text-right"><?= $f2($sumAbono) ?></td>
+                    <td></td>
+                </tr>
+            </tfoot>
         </table>
     </section>
     <?php endif; ?>

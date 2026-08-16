@@ -4,6 +4,7 @@ require_once __DIR__ . '/../Core/Controller.php';
 require_once __DIR__ . '/../Repositories/IncidenciaContableRepository.php';
 require_once __DIR__ . '/../Repositories/CajaRepository.php';
 require_once __DIR__ . '/../Repositories/SoloBankRepository.php';
+require_once __DIR__ . '/../Repositories/TerminalPosRepository.php';
 
 class IncidenciaContableController extends Controller
 {
@@ -151,6 +152,7 @@ class IncidenciaContableController extends Controller
 
         $cajaRepo      = new CajaRepository();
         $sbRepo        = new SoloBankRepository();
+        $tpRepo        = new TerminalPosRepository();
         $sesionId      = (int)$incidencia['sesion_origen_id'];
         $reporte       = $cajaRepo->getReporte($sesionId);
         $auditoriaCaja = $cajaRepo->getAuditoria($sesionId);
@@ -159,6 +161,12 @@ class IncidenciaContableController extends Controller
         $valesRegPropios     = $this->repo->getValesByIncidencia($id);
 
         extract($reporte);
+
+        // Lotes de cobros por POS (Culqi) — asignación manual, solo admin (control interno)
+        // $lotesVisa ya viene de $reporte (extract arriba) vía CajaRepository::getReporte()
+        $esAdminDetalle       = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
+        $lotesVisaAsignados   = $lotesVisa ?? [];
+        $lotesVisaDisponibles = $esAdminDetalle ? $tpRepo->getLotesDisponibles((int)($sesion['caja_id'] ?? 0)) : [];
 
         // Transferencias de saldo confirmadas pendientes de aplicarse en la caja de esta sesión
         $transferenciasPendientes = $cajaRepo->getTransferenciasPendientesAplicar((int)$sesion['caja_id']);
@@ -347,6 +355,37 @@ class IncidenciaContableController extends Controller
         } catch (\RuntimeException $e) {
             $this->error($e->getMessage(), 409);
         }
+    }
+
+    // ── POST /incidencias/api/{id}/asignar-lote-visa ──────
+    // Asigna un lote de cobros POS (Culqi) importado como sustento de este cuadre.
+    // Solo admin: es control interno para verificar lo que declaró la cajera.
+
+    public function apiAsignarLoteVisa(int $id): void
+    {
+        $postulanteId = $this->requireAdmin();
+        $data   = $this->getAllInput();
+        $loteId = (int)($data['lote_id'] ?? 0);
+        if (!$loteId) { $this->error('Selecciona un lote', 422); return; }
+
+        $inc = $this->repo->getById($id);
+        if (!$inc) { $this->notFound('Incidencia no encontrada'); return; }
+
+        $tpRepo = new TerminalPosRepository();
+        $ok = $tpRepo->asignarLote($loteId, (int)$inc['sesion_origen_id'], $postulanteId);
+        if (!$ok) { $this->error('El lote ya no está disponible', 409); return; }
+        $this->success('Lote asignado');
+    }
+
+    // ── POST /incidencias/api/lote-visa/{loteId}/quitar ───
+
+    public function apiQuitarLoteVisa(int $loteId): void
+    {
+        $this->requireAdmin();
+        $tpRepo = new TerminalPosRepository();
+        $ok = $tpRepo->quitarAsignacionLote($loteId);
+        if (!$ok) { $this->error('El lote no estaba asignado', 409); return; }
+        $this->success('Asignación retirada');
     }
 
     // ── POST /incidencias/api/{id}/eliminar-movimiento ───
