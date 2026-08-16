@@ -180,9 +180,7 @@ $estadoLabel = [
                         <th class="text-center" style="width:52px;">Ops.<br><span style="font-weight:400;opacity:.7;">BCP</span></th>
                         <th style="width:52px;">Ant.</th>
                         <th class="text-center" style="width:100px;">Estado</th>
-                        <?php if (($userRol ?? '') === 'ADMIN'): ?>
                         <th class="text-center" style="width:80px;">Confiabilidad</th>
-                        <?php endif; ?>
                         <th class="text-right" style="width:80px;">Resultado</th>
                         <th class="text-center" style="width:60px;">Acción</th>
                     </tr>
@@ -264,7 +262,6 @@ $estadoLabel = [
                                 <span class="caja-estado <?= $e['cls'] ?>"><?= $e['label'] ?></span>
                             <?php endif; ?>
                         </td>
-                        <?php if (($userRol ?? '') === 'ADMIN'): ?>
                         <td class="text-center">
                             <?php
                             $audTotal    = (int)($s['aud_total'] ?? 0);
@@ -276,7 +273,6 @@ $estadoLabel = [
                                 <?= str_repeat('★', $estrellas) . str_repeat('☆', 5 - $estrellas) ?>
                             </span>
                         </td>
-                        <?php endif; ?>
                         <td class="text-right" style="white-space:nowrap;">
                         <?php if ($tieneDetalle):
                             if (abs($difCorr) < 0.01):
@@ -305,7 +301,7 @@ $estadoLabel = [
                     </tr>
                 <?php endforeach; ?>
                 <?php if (empty($recientes)): ?>
-                    <tr><td colspan="<?= ($userRol ?? '') === 'ADMIN' ? 12 : 11 ?>" class="caja-table__empty">No hay cuadres en este período.</td></tr>
+                    <tr><td colspan="12" class="caja-table__empty">No hay cuadres en este período.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
