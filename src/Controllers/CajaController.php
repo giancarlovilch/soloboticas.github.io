@@ -304,10 +304,15 @@ class CajaController extends Controller
             }
         }
 
-        // Cajera responsable: por defecto quien abre la sesión; el admin puede
-        // elegir a otra persona (por ejemplo, al registrar un cuadre de un día pasado).
+        // Cajera responsable: quien abre la sesión (self-service), o la persona que
+        // el admin elija explícitamente (por ejemplo, al registrar un cuadre de un
+        // día pasado). El admin SIEMPRE debe indicar cajera_id: nunca se asume que
+        // el admin es la cajera para evitar sesiones mal atribuidas.
         $cajeraId = $postulanteId;
-        if ($isAdminCrear && !empty($data['cajera_id'])) {
+        if ($isAdminCrear) {
+            if (empty($data['cajera_id'])) {
+                $this->error('Selecciona la cajera', 422);
+            }
             $cajeraId = (int)$data['cajera_id'];
             $chkCajeraSel = $db->prepare(
                 "SELECT hs.id_slot
@@ -708,6 +713,25 @@ class CajaController extends Controller
 
         $result = $this->repo->editarFechaTurno($id, $fecha, $turno);
         if ($result === true) $this->success('Cuadre actualizado');
+        else $this->error($result, 422);
+    }
+
+    // ── POST /caja/api/sesion/{id}/editar-cajera ───────────
+    // Solo ADMIN: corrige quién fue realmente la cajera de un cuadre ya creado
+    // (por ejemplo, cuando se registró a nombre de quien lo abrió por error).
+    public function editarCajeraSesion(int $id): void
+    {
+        $this->requireAuth();
+        if (($_SESSION['user_rol'] ?? '') !== 'ADMIN') {
+            $this->error('Solo administradores', 403);
+            return;
+        }
+        $data = $this->getAllInput();
+        $pid  = (int)($data['postulante_id'] ?? 0);
+        if (!$pid) { $this->error('Selecciona la cajera', 422); return; }
+
+        $result = $this->repo->editarCajera($id, $pid);
+        if ($result === true) $this->success('Cajera actualizada');
         else $this->error($result, 422);
     }
 

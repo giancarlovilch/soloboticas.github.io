@@ -295,10 +295,13 @@ class IncidenciaContableController extends Controller
         $inc = $this->repo->getById($id);
         if (!$inc) { $this->notFound('Incidencia no encontrada'); return; }
 
-        if (!$this->repo->actualizarResponsable($id, $pid)) {
-            $this->error('Trabajador no encontrado', 422);
-            return;
-        }
+        // Corrige la cajera en la sesión de origen (sesion_caja.postulante_apertura_id +
+        // sesion_participante), que es la fuente que usan /caja, reportes y rendimiento,
+        // y sincroniza el responsable del caso con la misma persona.
+        $result = $this->cajaRepo()->editarCajera((int)$inc['sesion_origen_id'], $pid);
+        if ($result !== true) { $this->error($result, 422); return; }
+
+        $this->repo->actualizarResponsable($id, $pid);
         $this->success('Cajera actualizada');
     }
 

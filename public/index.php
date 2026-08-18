@@ -133,6 +133,7 @@ $router->post('/caja/api/sesion/{id}/respuesta',       [CajaController::class, '
 $router->post('/caja/api/sesion/{id}/eliminar',        [CajaController::class, 'eliminarSesion']);
 $router->post('/caja/api/sesion/{id}/sincronizar-base', [CajaController::class, 'sincronizarBase']);
 $router->post('/caja/api/sesion/{id}/editar-fecha-turno', [CajaController::class, 'editarFechaTurno']);
+$router->post('/caja/api/sesion/{id}/editar-cajera',      [CajaController::class, 'editarCajeraSesion']);
 $router->post('/caja/api/auditar-consistencia',        [CajaController::class, 'auditarConsistencia']);
 $router->get('/caja/pagos-digitales',                    [CajaController::class, 'pagosDigitalesView']);
 $router->get('/caja/auditoria',                          [CajaController::class, 'auditoriaView']);

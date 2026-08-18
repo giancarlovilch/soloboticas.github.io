@@ -221,6 +221,40 @@ class CajaRepository
         return true;
     }
 
+    /**
+     * Corrige la cajera real de un cuadre ya creado (solo admin). Actualiza tanto
+     * sesion_caja.postulante_apertura_id (fuente usada en listados, reportes y
+     * rendimiento) como la fila CAJERA de sesion_participante, para que quede
+     * consistente en toda la app.
+     */
+    public function editarCajera(int $sesionId, int $postulanteId): bool|string
+    {
+        $sesion = $this->getSesionById($sesionId);
+        if (!$sesion) return 'Sesión no encontrada';
+
+        $chk = $this->db->prepare("SELECT 1 FROM postulante WHERE id_postulante = :pid");
+        $chk->execute(['pid' => $postulanteId]);
+        if (!$chk->fetchColumn()) return 'Trabajador no encontrado';
+
+        $this->db->prepare(
+            "UPDATE sesion_caja SET postulante_apertura_id = :pid WHERE id_sesion = :sid"
+        )->execute(['pid' => $postulanteId, 'sid' => $sesionId]);
+
+        $upd = $this->db->prepare(
+            "UPDATE sesion_participante SET postulante_id = :pid
+              WHERE sesion_id = :sid AND rol_participacion = 'CAJERA'"
+        );
+        $upd->execute(['pid' => $postulanteId, 'sid' => $sesionId]);
+        if ($upd->rowCount() === 0) {
+            $this->db->prepare(
+                "INSERT INTO sesion_participante (sesion_id, postulante_id, rol_participacion, responsable_faltante)
+                 VALUES (:sid, :pid, 'CAJERA', 1)"
+            )->execute(['sid' => $sesionId, 'pid' => $postulanteId]);
+        }
+
+        return true;
+    }
+
     /** Lista de sesiones con filtro de estado */
     public function getSesionesByEstado(string $estado): array
     {
