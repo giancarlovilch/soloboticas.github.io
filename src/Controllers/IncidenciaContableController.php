@@ -280,6 +280,48 @@ class IncidenciaContableController extends Controller
         $this->success('Incidencia reabierta');
     }
 
+    // ── POST /incidencias/api/{id}/editar-cajera ──────────
+    // Solo ADMIN: corrige la cajera responsable del caso (puede diferir de quien
+    // abrió la sesión, por ejemplo si el cuadre fue registrado a nombre de otra
+    // persona por error).
+
+    public function apiEditarCajera(int $id): void
+    {
+        $this->requireAdmin();
+        $data = $this->getAllInput();
+        $pid  = (int)($data['postulante_id'] ?? 0);
+        if (!$pid) { $this->error('Selecciona la cajera', 422); return; }
+
+        $inc = $this->repo->getById($id);
+        if (!$inc) { $this->notFound('Incidencia no encontrada'); return; }
+
+        if (!$this->repo->actualizarResponsable($id, $pid)) {
+            $this->error('Trabajador no encontrado', 422);
+            return;
+        }
+        $this->success('Cajera actualizada');
+    }
+
+    // ── POST /incidencias/api/{id}/editar-vendedora ───────
+    // Solo ADMIN: corrige la vendedora registrada en el cuadre asociado.
+
+    public function apiEditarVendedora(int $id): void
+    {
+        $this->requireAdmin();
+        $data = $this->getAllInput();
+        $pid  = (int)($data['postulante_id'] ?? 0);
+        if (!$pid) { $this->error('Selecciona la vendedora', 422); return; }
+
+        $inc = $this->repo->getById($id);
+        if (!$inc) { $this->notFound('Incidencia no encontrada'); return; }
+
+        if (!$this->repo->actualizarVendedora((int)$inc['sesion_origen_id'], $pid)) {
+            $this->error('Trabajador no encontrado', 422);
+            return;
+        }
+        $this->success('Vendedora actualizada');
+    }
+
     // ── POST /incidencias/api/{id}/descripcion ────────────
 
     public function apiDescripcion(int $id): void

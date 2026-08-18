@@ -274,7 +274,13 @@ class HorarioController extends Controller
         $localId = isset($_GET['local']) ? (int)$_GET['local'] : 0;
         $turnoId = isset($_GET['turno']) ? (int)$_GET['turno'] : 0;
         if (!$localId || !$turnoId) $this->error('local y turno requeridos', 400);
-        $this->success('OK', $this->repo->getStaffPorTurnoHoy($localId, $turnoId));
+
+        $fecha = null;
+        if (!empty($_GET['fecha']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['fecha']) && strtotime($_GET['fecha'])) {
+            $fecha = $_GET['fecha'];
+        }
+
+        $this->success('OK', $this->repo->getStaffPorTurnoHoy($localId, $turnoId, $fecha));
     }
 
     // ── GET /horario/api/trabajadores ─────────────────────

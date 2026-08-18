@@ -123,6 +123,43 @@ class IncidenciaContableRepository
         )->fetchColumn();
     }
 
+    // ── Corrección de cajera / vendedora (solo admin) ──────
+
+    /** Cambia la cajera responsable del caso (incidencia_contable.responsable_id). */
+    public function actualizarResponsable(int $id, int $postulanteId): bool
+    {
+        $chk = $this->db->prepare("SELECT 1 FROM postulante WHERE id_postulante = :pid");
+        $chk->execute(['pid' => $postulanteId]);
+        if (!$chk->fetchColumn()) return false;
+
+        $this->db->prepare(
+            "UPDATE incidencia_contable SET responsable_id = :pid WHERE id_incidencia = :id"
+        )->execute(['pid' => $postulanteId, 'id' => $id]);
+        return true;
+    }
+
+    /** Cambia (o crea) la vendedora del cuadre asociado (sesion_participante). */
+    public function actualizarVendedora(int $sesionId, int $postulanteId): bool
+    {
+        $chk = $this->db->prepare("SELECT 1 FROM postulante WHERE id_postulante = :pid");
+        $chk->execute(['pid' => $postulanteId]);
+        if (!$chk->fetchColumn()) return false;
+
+        $upd = $this->db->prepare(
+            "UPDATE sesion_participante SET postulante_id = :pid
+              WHERE sesion_id = :sid AND rol_participacion = 'VENDEDORA'"
+        );
+        $upd->execute(['pid' => $postulanteId, 'sid' => $sesionId]);
+
+        if ($upd->rowCount() === 0) {
+            $this->db->prepare(
+                "INSERT INTO sesion_participante (sesion_id, postulante_id, rol_participacion, responsable_faltante)
+                 VALUES (:sid, :pid, 'VENDEDORA', 0)"
+            )->execute(['sid' => $sesionId, 'pid' => $postulanteId]);
+        }
+        return true;
+    }
+
     // ── Movimientos ────────────────────────────────────────
 
     public function addMovimiento(

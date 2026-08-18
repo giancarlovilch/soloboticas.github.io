@@ -1745,14 +1745,56 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                         <div><span style="color:#94a3b8;font-size:.68rem;text-transform:uppercase;font-weight:700;">Sesión</span><br>
                             <a href="<?= $basePath ?>/caja/reporte/<?= $sesionId ?>" target="_blank" style="color:#3b82f6;font-weight:700;">#<?= $sesionId ?></a>
                         </div>
-                        <?php if ($cajera): ?>
-                        <div><span style="color:#94a3b8;font-size:.68rem;text-transform:uppercase;font-weight:700;">Cajera</span><br>
-                            <strong><?= $cajera ?></strong>
+                        <?php if ($cajera || $esAdmin): ?>
+                        <div>
+                            <span style="color:#94a3b8;font-size:.68rem;text-transform:uppercase;font-weight:700;">Cajera</span><br>
+                            <span id="cajeraView">
+                                <strong><?= $cajera ?: '—' ?></strong>
+                                <?php if ($esAdmin): ?>
+                                <button type="button" id="btnEditarCajera" title="Editar cajera (solo admin)"
+                                    style="background:none;border:none;cursor:pointer;color:#3b82f6;font-size:.7rem;padding:1px 4px;">✎</button>
+                                <?php endif; ?>
+                            </span>
+                            <?php if ($esAdmin): ?>
+                            <span id="cajeraEdit" style="display:none;align-items:center;gap:.3rem;margin-top:.3rem;">
+                                <select id="cajeraSelectInput" class="form-input" style="font-size:.78rem;padding:.25rem .4rem;">
+                                    <option value="">— seleccionar —</option>
+                                    <?php foreach ($staff ?? [] as $s): ?>
+                                    <option value="<?= $s['id'] ?>" <?= (int)$s['id'] === $cajeraId ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($s['nombre_completo']) ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button type="button" id="btnGuardarCajera" class="btn btn-success" style="font-size:.65rem;padding:2px 8px;">Guardar</button>
+                                <button type="button" id="btnCancelarCajera" class="btn btn-secondary" style="font-size:.65rem;padding:2px 8px;">Cancelar</button>
+                            </span>
+                            <?php endif; ?>
                         </div>
                         <?php endif; ?>
-                        <?php if ($vendedora): ?>
-                        <div><span style="color:#94a3b8;font-size:.68rem;text-transform:uppercase;font-weight:700;">Vendedora</span><br>
-                            <strong><?= $vendedora ?></strong>
+                        <?php if ($vendedora || $esAdmin): ?>
+                        <div>
+                            <span style="color:#94a3b8;font-size:.68rem;text-transform:uppercase;font-weight:700;">Vendedora</span><br>
+                            <span id="vendedoraView">
+                                <strong><?= $vendedora ?: '—' ?></strong>
+                                <?php if ($esAdmin): ?>
+                                <button type="button" id="btnEditarVendedora" title="Editar vendedora (solo admin)"
+                                    style="background:none;border:none;cursor:pointer;color:#3b82f6;font-size:.7rem;padding:1px 4px;">✎</button>
+                                <?php endif; ?>
+                            </span>
+                            <?php if ($esAdmin): ?>
+                            <span id="vendedoraEdit" style="display:none;align-items:center;gap:.3rem;margin-top:.3rem;">
+                                <select id="vendedoraSelectInput" class="form-input" style="font-size:.78rem;padding:.25rem .4rem;">
+                                    <option value="">— seleccionar —</option>
+                                    <?php foreach ($staff ?? [] as $s): ?>
+                                    <option value="<?= $s['id'] ?>" <?= (int)$s['id'] === $vendedoraId ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($s['nombre_completo']) ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button type="button" id="btnGuardarVendedora" class="btn btn-success" style="font-size:.65rem;padding:2px 8px;">Guardar</button>
+                                <button type="button" id="btnCancelarVendedora" class="btn btn-secondary" style="font-size:.65rem;padding:2px 8px;">Cancelar</button>
+                            </span>
+                            <?php endif; ?>
                         </div>
                         <?php endif; ?>
                         <div><span style="color:#94a3b8;font-size:.68rem;text-transform:uppercase;font-weight:700;">Apertura</span><br>
@@ -2370,6 +2412,39 @@ document.getElementById('btnGuardarFechaTurno')?.addEventListener('click', async
         btn.disabled = false; btn.textContent = 'Guardar';
     }
 });
+
+// ── Editar cajera / vendedora del caso (solo admin) ─────
+function bindEditorPersonal(prefix, url) {
+    const view   = document.getElementById(`${prefix}View`);
+    const edit   = document.getElementById(`${prefix}Edit`);
+    const btnEd  = document.getElementById(`btnEditar${prefix[0].toUpperCase()}${prefix.slice(1)}`);
+    const btnCan = document.getElementById(`btnCancelar${prefix[0].toUpperCase()}${prefix.slice(1)}`);
+    const btnSav = document.getElementById(`btnGuardar${prefix[0].toUpperCase()}${prefix.slice(1)}`);
+    const select = document.getElementById(`${prefix}SelectInput`);
+
+    btnEd?.addEventListener('click', () => {
+        view.style.display = 'none';
+        edit.style.display = 'inline-flex';
+    });
+    btnCan?.addEventListener('click', () => {
+        edit.style.display = 'none';
+        view.style.display = 'inline';
+    });
+    btnSav?.addEventListener('click', async () => {
+        const pid = select.value;
+        if (!pid) return;
+        btnSav.disabled = true; btnSav.textContent = 'Guardando...';
+        try {
+            await apiPost(url, { postulante_id: parseInt(pid) });
+            location.reload();
+        } catch (e) {
+            alert(e.message || 'Error al guardar');
+            btnSav.disabled = false; btnSav.textContent = 'Guardar';
+        }
+    });
+}
+bindEditorPersonal('cajera', `${BASE}/incidencias/api/${INC_ID}/editar-cajera`);
+bindEditorPersonal('vendedora', `${BASE}/incidencias/api/${INC_ID}/editar-vendedora`);
 
 // Mostrar bloque PERSONAL por defecto al cargar
 ajTipoChange();

@@ -130,17 +130,19 @@ class CajaRepository
     public function crearSesion(array $data): int
     {
         $saldo = $this->getSaldoBase((int)$data['caja_id']);
+        $fecha = $data['fecha_operacion'] ?? date('Y-m-d');
 
         $stmt = $this->db->prepare(
             "INSERT INTO sesion_caja
                 (caja_id, turno_id, postulante_apertura_id, estado, saldo_inicial, fecha_operacion)
-             VALUES (:caja, :turno, :apertura, 'ABIERTA', :saldo, CURDATE())"
+             VALUES (:caja, :turno, :apertura, 'ABIERTA', :saldo, :fecha)"
         );
         $stmt->execute([
             'caja'     => $data['caja_id'],
             'turno'    => $data['turno_id'],
             'apertura' => $data['postulante_id'],
             'saldo'    => $saldo,
+            'fecha'    => $fecha,
         ]);
         $id = (int)$this->db->lastInsertId();
 

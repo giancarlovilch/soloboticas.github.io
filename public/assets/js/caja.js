@@ -60,14 +60,19 @@ function recalcularGastos() {
 
 // ── Cargar cajas por local ────────────────────────────
 async function cargarCajas(localId) {
-    const sel     = $('cajaId');
-    const selVend = $('vendedorId');
+    const sel       = $('cajaId');
+    const selVend   = $('vendedorId');
+    const selCajera = $('cajeraId');
     if (!localId || !sel) return;
 
-    // Resetear vendedor al cambiar local
+    // Resetear vendedor/cajera al cambiar local
     if (selVend) {
         selVend.innerHTML = '<option value="">— Selecciona local y turno primero —</option>';
         selVend.disabled  = true;
+    }
+    if (selCajera) {
+        selCajera.innerHTML = '<option value="">— Selecciona local y turno primero —</option>';
+        selCajera.disabled  = true;
     }
 
     sel.innerHTML = '<option value="">Cargando...</option>';
@@ -112,53 +117,76 @@ function actualizarCampoVendedora(cajaSelect) {
     }
 }
 
-// ── Cargar personal desde horario (local + turno de hoy) ─
+// ── Cargar personal desde horario (local + turno + fecha) ─
 async function cargarStaffHorario() {
-    const localId = $('localId')?.value;
-    const turnoId = $('turnoId')?.value;
-    const sel     = $('vendedorId');
-    const hint    = $('horarioHint');
-    const msg     = $('sesionMsg');
+    const localId   = $('localId')?.value;
+    const turnoId   = $('turnoId')?.value;
+    const fecha     = $('fechaOperacion')?.value;
+    const sel       = $('vendedorId');
+    const selCajera = $('cajeraId');
+    const hint      = $('horarioHint');
+    const msg       = $('sesionMsg');
     if (!sel) return;
 
-    if (!localId || !turnoId) {
-        sel.innerHTML = '<option value="">— Selecciona local y turno primero —</option>';
+    const fillEmpty = (txt) => {
+        sel.innerHTML = `<option value="">${txt}</option>`;
         sel.disabled  = true;
+        if (selCajera) {
+            selCajera.innerHTML = `<option value="">${txt}</option>`;
+            selCajera.disabled  = true;
+        }
+    };
+
+    if (!localId || !turnoId) {
+        fillEmpty('— Selecciona local y turno primero —');
         return;
     }
 
-    sel.innerHTML = '<option>Consultando horario...</option>';
-    sel.disabled  = true;
+    fillEmpty('Consultando horario...');
     hideAlert(msg);
 
     try {
-        const r    = await fetch(`${BASE}/horario/api/staff-turno?local=${localId}&turno=${turnoId}`);
+        const q = new URLSearchParams({ local: localId, turno: turnoId });
+        if (fecha) q.set('fecha', fecha);
+        const r    = await fetch(`${BASE}/horario/api/staff-turno?${q.toString()}`);
         const res  = await r.json();
         const staff = res.data || [];
+        const vendedoras = staff.filter(s => s.rol === 'VENDEDORA');
+        const cajeras     = staff.filter(s => s.rol === 'CAJERA');
 
-        if (staff.length === 0) {
-            sel.innerHTML = '<option value="">⚠️ Sin personal en el horario hoy</option>';
-            sel.disabled  = true;
+        const fillSelect = (el, list, emptyTxt) => {
+            if (!el) return;
+            if (list.length === 0) {
+                el.innerHTML = `<option value="">${emptyTxt}</option>`;
+                el.disabled  = true;
+                return;
+            }
+            el.disabled  = false;
+            el.innerHTML = '<option value="">— Selecciona trabajador —</option>';
+            list.forEach(s => {
+                const o       = document.createElement('option');
+                o.value       = s.postulante_id;
+                o.textContent = s.nombre;
+                el.appendChild(o);
+            });
+        };
+
+        fillSelect(sel, vendedoras, '⚠️ Sin vendedora en el horario para esa fecha');
+        if (selCajera) fillSelect(selCajera, cajeras, '⚠️ Sin cajera en el horario para esa fecha');
+
+        if (vendedoras.length === 0 && !selCajera) {
             if (hint) hint.style.color = '#dc2626';
             showAlert(msg,
                 '⚠️ No hay personal asignado en el horario para este local y turno hoy. ' +
                 'Corrija el horario en /horario antes de abrir la sesión.', 'error');
             return;
         }
-
-        sel.disabled  = false;
-        sel.innerHTML = '<option value="">— Selecciona trabajador —</option>';
-        staff.forEach(s => {
-            const o       = document.createElement('option');
-            o.value       = s.postulante_id;
-            o.textContent = `${s.nombre}  (${s.rol_desc || s.rol})`;
-            sel.appendChild(o);
-        });
         if (hint) hint.style.color = '#059669';
         hideAlert(msg);
     } catch {
         sel.innerHTML = '<option value="">Error al consultar horario</option>';
         sel.disabled  = true;
+        if (selCajera) { selCajera.innerHTML = '<option value="">Error al consultar horario</option>'; selCajera.disabled = true; }
     }
 }
 
@@ -224,9 +252,21 @@ function mostrarEncuesta() {
     const cajaId   = $('cajaId')?.value;
     const turnoId  = $('turnoId')?.value;
     const vendId   = $('vendedorId')?.value;
+    const cajeraId = $('cajeraId')?.value;
     const msg      = $('sesionMsg');
     const cajaOpt  = $('cajaId')?.options[$('cajaId').selectedIndex];
     const sinVend  = cajaOpt?.dataset.requiereVendedora === '0';
+
+    // Flujo admin: crea la sesión directamente con la fecha, cajera y vendedora
+    // elegidas, sin pasar por la encuesta de apertura (no aplica para días pasados).
+    if ($('cajeraId')) {
+        if (!cajaId || !turnoId || !cajeraId || (!vendId && !sinVend)) {
+            showAlert(msg, `Selecciona local, caja, turno, cajera${sinVend ? '' : ' y vendedora'} antes de continuar.`);
+            return;
+        }
+        _doCrearSesionAdmin(cajaId, turnoId, cajeraId, sinVend ? null : vendId);
+        return;
+    }
 
     if (!cajaId || !turnoId || (!vendId && !sinVend)) {
         showAlert(msg, 'Selecciona local, caja, turno y personal del turno antes de continuar.');
@@ -270,6 +310,40 @@ async function _doCrearSesionSinVendedora(cajaId, turnoId) {
     } catch {
         showAlert(msg, 'Error de conexión.');
         btn.disabled = false; btn.textContent = 'Continuar →';
+    }
+}
+
+// Crear sesión como admin (fecha/cajera/vendedora elegidas, sin encuesta)
+async function _doCrearSesionAdmin(cajaId, turnoId, cajeraId, vendId) {
+    const msg = $('sesionMsg');
+    const btn = $('btnCrear');
+    btn.disabled = true; btn.textContent = 'Abriendo sesión...';
+    hideAlert(msg);
+
+    const payload = {
+        caja_id:   parseInt(cajaId),
+        turno_id:  parseInt(turnoId),
+        cajera_id: parseInt(cajeraId),
+    };
+    const fecha = $('fechaOperacion')?.value;
+    if (fecha) payload.fecha_operacion = fecha;
+    if (vendId) payload.vendedor_id = parseInt(vendId);
+
+    try {
+        const r   = await fetch(`${BASE}/caja/api/sesion/crear`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const res = await r.json();
+        if (res.success) {
+            window.location.href = `${BASE}/caja/sesion/${res.data.id_sesion}`;
+        } else {
+            showAlert(msg, res.message || 'Error al crear la sesión.');
+            btn.disabled = false; btn.textContent = 'Abrir sesión →';
+        }
+    } catch {
+        showAlert(msg, 'Error de conexión.');
+        btn.disabled = false; btn.textContent = 'Abrir sesión →';
     }
 }
 

@@ -202,9 +202,24 @@ class CajaController extends Controller
     {
         $postulanteId = $this->requireAuth();
         $data = $this->getAllInput();
+        $isAdminCrear = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
 
         if (empty($data['caja_id']) || empty($data['turno_id'])) {
             $this->error('Caja y turno son requeridos', 400);
+        }
+
+        // Fecha de operación: solo el admin puede elegir una fecha distinta a hoy
+        // (para registrar/corregir cuadres de días pasados).
+        $fecha = date('Y-m-d');
+        if ($isAdminCrear && !empty($data['fecha_operacion'])) {
+            $fechaReq = trim($data['fecha_operacion']);
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaReq) || !strtotime($fechaReq)) {
+                $this->error('Fecha inválida', 422);
+            }
+            if ($fechaReq > date('Y-m-d')) {
+                $this->error('No se puede abrir una sesión con fecha futura', 422);
+            }
+            $fecha = $fechaReq;
         }
 
         // Bloquear solo si ya hay una sesión ACTIVA (abierta o pendiente de venta).
@@ -213,11 +228,11 @@ class CajaController extends Controller
         $chk = $db->prepare(
             "SELECT id_sesion, estado FROM sesion_caja
              WHERE caja_id = :cid AND turno_id = :tid
-               AND fecha_operacion = CURDATE()
+               AND fecha_operacion = :fecha
                AND estado IN ('ABIERTA','PENDIENTE_VENTA')
              LIMIT 1"
         );
-        $chk->execute(['cid' => (int)$data['caja_id'], 'tid' => (int)$data['turno_id']]);
+        $chk->execute(['cid' => (int)$data['caja_id'], 'tid' => (int)$data['turno_id'], 'fecha' => $fecha]);
         $active = $chk->fetch();
         if ($active) {
             $label = $active['estado'] === 'ABIERTA' ? 'en progreso' : 'pendiente de venta';
@@ -234,7 +249,6 @@ class CajaController extends Controller
         $requiereVendedora = (bool)($stmtCaja->fetchColumn() ?? 1);
 
         // Validar que quien abre la sesión es CAJERA en horario de hoy (solo si no es admin)
-        $isAdminCrear = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
         if (!$isAdminCrear) {
             $chkCajera = $db->prepare(
                 "SELECT hs.id_slot
@@ -270,7 +284,7 @@ class CajaController extends Controller
                  INNER JOIN caja c ON c.local_id = hs.local_id AND c.id_caja = :caja_id
                  INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
                  WHERE hs.turno_id      = :tid
-                   AND hs.fecha_dia     = CURDATE()
+                   AND hs.fecha_dia     = :fecha
                    AND hs.postulante_id = :vid
                    AND rh.codigo        = 'VENDEDORA'
                  LIMIT 1"
@@ -279,18 +293,51 @@ class CajaController extends Controller
                 'caja_id' => (int)$data['caja_id'],
                 'tid'     => (int)$data['turno_id'],
                 'vid'     => $vendedorId,
+                'fecha'   => $fecha,
             ]);
             if (!$chkHorario->fetch()) {
                 $this->error(
-                    'Esta persona no está asignada en el horario para este local y turno hoy. '
+                    'Esta persona no está asignada en el horario para este local y turno en la fecha seleccionada. '
                     . 'Corrija el horario primero en /horario.',
                     409
                 );
             }
         }
 
-        $data['postulante_id'] = $postulanteId;
-        $data['vendedor_id']   = $vendedorId;
+        // Cajera responsable: por defecto quien abre la sesión; el admin puede
+        // elegir a otra persona (por ejemplo, al registrar un cuadre de un día pasado).
+        $cajeraId = $postulanteId;
+        if ($isAdminCrear && !empty($data['cajera_id'])) {
+            $cajeraId = (int)$data['cajera_id'];
+            $chkCajeraSel = $db->prepare(
+                "SELECT hs.id_slot
+                 FROM horario_slot hs
+                 INNER JOIN caja c ON c.local_id = hs.local_id AND c.id_caja = :caja_id
+                 INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+                 WHERE hs.turno_id      = :tid
+                   AND hs.fecha_dia     = :fecha
+                   AND hs.postulante_id = :pid
+                   AND rh.codigo        = 'CAJERA'
+                 LIMIT 1"
+            );
+            $chkCajeraSel->execute([
+                'caja_id' => (int)$data['caja_id'],
+                'tid'     => (int)$data['turno_id'],
+                'pid'     => $cajeraId,
+                'fecha'   => $fecha,
+            ]);
+            if (!$chkCajeraSel->fetch()) {
+                $this->error(
+                    'Esta persona no está asignada en el horario como cajera para este local, turno y fecha. '
+                    . 'Corrija el horario primero en /horario.',
+                    409
+                );
+            }
+        }
+
+        $data['postulante_id']   = $cajeraId;
+        $data['vendedor_id']     = $vendedorId;
+        $data['fecha_operacion'] = $fecha;
         $id = $this->repo->crearSesion($data);
         $this->success('Sesión creada', ['id_sesion' => $id]);
     }

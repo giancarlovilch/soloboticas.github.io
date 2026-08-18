@@ -1209,8 +1209,9 @@ class HorarioRepository
     }
 
     /** Personal asignado en horario para un local+turno en el día de hoy */
-    public function getStaffPorTurnoHoy(int $localId, int $turnoId): array
+    public function getStaffPorTurnoHoy(int $localId, int $turnoId, ?string $fecha = null): array
     {
+        $fecha = $fecha ?? date('Y-m-d');
         $stmt = $this->db->prepare(
             "SELECT hs.postulante_id, p.nombres AS nombre,
                     rh.codigo AS rol, rh.descripcion AS rol_desc
@@ -1219,12 +1220,12 @@ class HorarioRepository
              INNER JOIN postulante p   ON hs.postulante_id  = p.id_postulante
              WHERE hs.local_id       = :lid
                AND hs.turno_id       = :tid
-               AND hs.fecha_dia      = CURDATE()
+               AND hs.fecha_dia      = :fecha
                AND hs.postulante_id  IS NOT NULL
-               AND rh.codigo         = 'VENDEDORA'
+               AND rh.codigo         IN ('CAJERA', 'VENDEDORA')
              ORDER BY rh.orden, p.nombres"
         );
-        $stmt->execute(['lid' => $localId, 'tid' => $turnoId]);
+        $stmt->execute(['lid' => $localId, 'tid' => $turnoId, 'fecha' => $fecha]);
         return $stmt->fetchAll();
     }
 

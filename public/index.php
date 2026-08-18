@@ -167,6 +167,8 @@ $router->post('/incidencias/api/{id}/abonar',          [IncidenciaContableContro
 $router->post('/incidencias/api/{id}/cerrar',          [IncidenciaContableController::class, 'apiCerrar']);
 $router->post('/incidencias/api/{id}/reabrir',         [IncidenciaContableController::class, 'apiReabrir']);
 $router->post('/incidencias/api/{id}/descripcion',     [IncidenciaContableController::class, 'apiDescripcion']);
+$router->post('/incidencias/api/{id}/editar-cajera',   [IncidenciaContableController::class, 'apiEditarCajera']);
+$router->post('/incidencias/api/{id}/editar-vendedora',[IncidenciaContableController::class, 'apiEditarVendedora']);
 $router->post('/incidencias/api/{id}/generar-vale',    [IncidenciaContableController::class, 'apiGenerarVale']);
 $router->post('/incidencias/api/{id}/usar-vale',       [IncidenciaContableController::class, 'apiUsarVale']);
 $router->post('/incidencias/api/{id}/anular-vale',     [IncidenciaContableController::class, 'apiAnularVale']);

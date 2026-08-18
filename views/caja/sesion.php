@@ -92,6 +92,13 @@ $act = [
             </div>
             <?php else: ?>
 
+            <?php if ($esAdminCaja): ?>
+            <div class="caja-field">
+                <label>Fecha de operación <span class="req">*</span></label>
+                <input type="date" id="fechaOperacion" class="caja-input"
+                       value="<?= $hoy ?>" max="<?= $hoy ?>" onchange="cargarStaffHorario()">
+            </div>
+            <?php endif; ?>
             <div class="caja-field">
                 <label>Local <span class="req">*</span></label>
                 <select id="localId" class="caja-input" onchange="cargarCajas(this.value); filtrarTurnos(this.value);">
@@ -113,25 +120,35 @@ $act = [
                     <option value="">— Primero selecciona local —</option>
                 </select>
             </div>
+            <?php if ($esAdminCaja): ?>
+            <div class="caja-field">
+                <label>Cajera <span class="req">*</span></label>
+                <select id="cajeraId" class="caja-input" disabled>
+                    <option value="">— Selecciona local y turno primero —</option>
+                </select>
+            </div>
+            <?php endif; ?>
             <?php endif; ?>
             <div class="caja-field">
-                <label>Personal del turno <span class="req">*</span></label>
+                <label>Vendedora <span class="req">*</span></label>
                 <select id="vendedorId" class="caja-input" disabled>
                     <option value="">— Selecciona local y turno primero —</option>
                 </select>
                 <small id="horarioHint" style="font-size:.72rem;color:#94a3b8;margin-top:.25rem;display:block;">
-                    Solo aparece el personal asignado en el horario de hoy para ese local y turno.
+                    Solo aparece el personal asignado en el horario para ese local, turno y fecha.
                 </small>
             </div>
         </div>
+        <?php if (!$esAdminCaja): ?>
         <div class="caja-base-info" style="font-size:0.82rem;color:#64748b;margin:.5rem 0;">
             Fecha de operación: <strong><?= date('d/m/Y') ?></strong>
         </div>
+        <?php endif; ?>
         <div class="caja-base-info" id="baseInfo" hidden>
             <p>Base del día anterior: <strong id="baseAmount">S/ 0.00</strong></p>
         </div>
         <button class="caja-btn caja-btn--primary" onclick="mostrarEncuesta()" id="btnCrear">
-            Continuar →
+            <?= $esAdminCaja ? 'Abrir sesión' : 'Continuar' ?> →
         </button>
     </section>
 
