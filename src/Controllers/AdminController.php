@@ -456,10 +456,12 @@ class AdminController extends Controller
             $actTareasLimpieza   = $estrellaRepo->getTareasTodas();
             $actTasaRojaHistorial = $estrellaRepo->getTasaRojaHistorial();
             $actTasaRojaVigente   = $estrellaRepo->getTasaRojaVigente();
+            $actMovimientos       = $estrellaRepo->getMovimientosAzules($actDesde, $actHasta);
 
             $actividadesDatos = compact(
                 'actMes','actMesActual','actDesde','actHasta',
-                'actEstrellas','actTareasLimpieza','actTasaRojaHistorial','actTasaRojaVigente'
+                'actEstrellas','actTareasLimpieza','actTasaRojaHistorial','actTasaRojaVigente',
+                'actMovimientos'
             );
         }
 

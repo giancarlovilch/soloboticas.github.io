@@ -10,6 +10,7 @@ $actEstrellas         = $actEstrellas         ?? [];
 $actTareasLimpieza    = $actTareasLimpieza    ?? [];
 $actTasaRojaHistorial = $actTasaRojaHistorial ?? [];
 $actTasaRojaVigente   = $actTasaRojaVigente   ?? 0;
+$actMovimientos       = $actMovimientos       ?? [];
 
 $meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 [$anioF, $nmesF] = explode('-', $actMes);
@@ -184,6 +185,67 @@ $hoy = date('Y-m-d');
     </p>
     <?php endif; ?>
 
+    <!-- ── Detalle de movimientos (seguimiento de puntos azules) ─ -->
+    <p class="eco-sec-title">🔍 Detalle de movimientos — <?= $mesLabel ?></p>
+    <p style="font-size:.75rem;color:#64748b;margin:-.4rem 0 .65rem;">
+        Cada voto de limpieza y cada ajuste por sanción, uno por uno. Si a alguien "le falta" una estrella
+        azul frente a lo que ve reflejado, es porque uno de sus registros aparece aquí como
+        <strong style="color:#991b1b;">denunciado o sancionado</strong> (vale 0 en vez del valor original).
+    </p>
+    <input type="text" id="movFiltroNombre" placeholder="🔎 Filtrar por nombre (quién dio o quién recibió)…"
+           oninput="movFiltrar()"
+           style="width:100%;box-sizing:border-box;padding:.55rem .8rem;border:1.5px solid #fbcfe8;
+                  border-radius:8px;font-size:.82rem;margin-bottom:.75rem;outline:none;">
+    <?php if (empty($actMovimientos)): ?>
+    <div class="eco-empty">Sin movimientos de estrellas azules en <?= $mesLabel ?>.</div>
+    <?php else: ?>
+    <div class="eco-table-wrap">
+        <table class="eco-table" id="movTabla">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Quién dio</th>
+                    <th>Quién recibió</th>
+                    <th>Actividad / Motivo</th>
+                    <th class="text-center">🔵 Estrellas</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($actMovimientos as $m):
+                $nombres = mb_strtolower(($m['votante_nombre'] ?? '') . ' ' . $m['beneficiario_nombre']);
+                if ($m['tipo'] === 'ajuste') {
+                    $estado = '<span class="eco-badge" style="background:#f1f5f9;color:#64748b;">⚖️ Ajuste por sanción</span>';
+                } elseif ($m['sancionado']) {
+                    $estado = '<span class="eco-badge" style="background:#fee2e2;color:#991b1b;">🚫 Sancionado (' . (int)$m['reportes'] . ' denuncias)</span>';
+                } elseif ($m['reportes'] > 0) {
+                    $estado = '<span class="eco-badge" style="background:#fef3c7;color:#92400e;">⚠️ Denunciado ' . (int)$m['reportes'] . '/2</span>';
+                } else {
+                    $estado = '<span class="eco-badge" style="background:#d1fae5;color:#065f46;">✅ Normal</span>';
+                }
+            ?>
+            <tr data-nombres="<?= htmlspecialchars($nombres) ?>">
+                <td style="white-space:nowrap;font-size:.75rem;color:#64748b;"><?= date('d/m/Y', strtotime($m['fecha'])) ?></td>
+                <td style="font-weight:600;"><?= $m['tipo'] === 'ajuste' ? '—' : htmlspecialchars($m['votante_nombre']) ?></td>
+                <td style="font-weight:600;"><?= htmlspecialchars($m['beneficiario_nombre']) ?></td>
+                <td>
+                    <?= htmlspecialchars($m['detalle']) ?>
+                    <?php if (!empty($m['local_desc'])): ?>
+                    <div style="font-size:.68rem;color:#94a3b8;"><?= htmlspecialchars($m['local_desc']) ?> · <?= htmlspecialchars($m['turno_desc']) ?></div>
+                    <?php endif; ?>
+                </td>
+                <td class="text-center" style="font-weight:700;color:<?= $m['estrellas'] < 0 ? '#dc2626' : '#1d4ed8' ?>;">
+                    <?= $m['estrellas'] > 0 ? '+' : '' ?><?= $fmtEst($m['estrellas']) ?>
+                </td>
+                <td><?= $estado ?></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <p class="eco-empty" id="movVacio" style="display:none;">Ningún movimiento coincide con "<span id="movVacioTexto"></span>".</p>
+    <?php endif; ?>
+
     <!-- ── Catálogo de actividades de limpieza ───────────────── -->
     <p class="eco-sec-title">🧹 Actividades de limpieza — valor en estrellas</p>
     <div class="eco-table-wrap">
@@ -283,6 +345,23 @@ async function trAgregar() {
     const res = await r.json();
     if (res.success) { actShowMsg('trMsg', 'Tasa guardada.', true); setTimeout(() => location.reload(), 900); }
     else actShowMsg('trMsg', res.message || 'Error.', false);
+}
+
+// ── Filtro de nombres en el detalle de movimientos ───────
+function movFiltrar() {
+    const texto = document.getElementById('movFiltroNombre').value.trim().toLowerCase();
+    const filas = document.querySelectorAll('#movTabla tbody tr');
+    let visibles = 0;
+    filas.forEach(fila => {
+        const coincide = fila.dataset.nombres.includes(texto);
+        fila.style.display = coincide ? '' : 'none';
+        if (coincide) visibles++;
+    });
+    const vacio = document.getElementById('movVacio');
+    if (vacio) {
+        vacio.style.display = (texto && visibles === 0) ? 'block' : 'none';
+        document.getElementById('movVacioTexto').textContent = texto;
+    }
 }
 
 // ── Catálogo de tareas de limpieza ───────────────────────

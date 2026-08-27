@@ -573,6 +573,57 @@ class EstrellaRepository
         return $rows;
     }
 
+    /**
+     * Feed unificado de movimientos de estrellas azules (votos + ajustes por sanción) para
+     * el panel de seguimiento del admin: permite ver quién le dio a quién, cuándo, y si algún
+     * voto fue denunciado o sancionado — algo que el resumen agregado por persona no muestra.
+     */
+    public function getMovimientosAzules(string $desde, string $hasta): array
+    {
+        $desdeEf = $this->epochFloor($desde);
+
+        $stmtVotos = $this->db->prepare(
+            "SELECT ev.id_voto AS id, ev.fecha, 'voto' AS tipo,
+                    pb.nombres AS beneficiario_nombre, pv.nombres AS votante_nombre,
+                    tl.descripcion AS detalle, ev.calificacion AS estrellas, ev.sancionado,
+                    l.descripcion AS local_desc, t.descripcion AS turno_desc,
+                    (SELECT COUNT(*) FROM estrella_reporte er WHERE er.voto_id = ev.id_voto) AS reportes
+             FROM estrella_voto ev
+             INNER JOIN postulante pb ON pb.id_postulante = ev.beneficiario_id
+             INNER JOIN postulante pv ON pv.id_postulante = ev.votante_id
+             INNER JOIN tarea_limpieza tl ON tl.id_tarea = ev.tarea_id
+             LEFT JOIN local l ON l.id_local = ev.local_id
+             LEFT JOIN turno t ON t.id_turno = ev.turno_id
+             WHERE ev.fecha BETWEEN :desde AND :hasta
+             ORDER BY ev.fecha_registro DESC"
+        );
+        $stmtVotos->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
+        $votos = $stmtVotos->fetchAll();
+
+        $stmtAjustes = $this->db->prepare(
+            "SELECT ea.id, ea.fecha, 'ajuste' AS tipo,
+                    p.nombres AS beneficiario_nombre, NULL AS votante_nombre,
+                    ea.motivo AS detalle, ea.estrellas, 0 AS sancionado,
+                    NULL AS local_desc, NULL AS turno_desc, 0 AS reportes
+             FROM estrella_ajuste ea
+             INNER JOIN postulante p ON p.id_postulante = ea.postulante_id
+             WHERE ea.fecha BETWEEN :desde AND :hasta
+             ORDER BY ea.id DESC"
+        );
+        $stmtAjustes->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
+        $ajustes = $stmtAjustes->fetchAll();
+
+        $out = array_merge($votos, $ajustes);
+        usort($out, fn($a, $b) => strcmp($b['fecha'], $a['fecha']) ?: ($b['id'] <=> $a['id']));
+
+        foreach ($out as &$r) {
+            $r['sancionado'] = (bool)$r['sancionado'];
+            $r['reportes']   = (int)$r['reportes'];
+            $r['estrellas']  = ($r['tipo'] === 'voto' && $r['sancionado']) ? 0 : (float)$r['estrellas'];
+        }
+        return $out;
+    }
+
     /** Detalle de turnos asistidos (fuente de las estrellas rojas) */
     public function getDetalleTurnos(int $postulanteId, string $desde, string $hasta): array
     {
