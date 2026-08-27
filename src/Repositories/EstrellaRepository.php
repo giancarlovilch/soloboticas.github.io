@@ -16,7 +16,8 @@ class EstrellaRepository
 
     public const EPOCH = '2026-08-24';
 
-    private const EST_ROJA_POR_TURNO  = 5;
+    /** Usado solo si nunca se configuró ninguna tasa en configuracion_estrella_roja */
+    public const EST_ROJA_POR_TURNO_DEFAULT = 2;
     private const EST_AZUL_POR_VOTO   = 1;
 
     /** Cada mes arranca con este colchón de estrellas en ambos lados de la balanza */
@@ -39,6 +40,52 @@ class EstrellaRepository
     private function epochFloor(string $desde): string
     {
         return $desde < self::EPOCH ? self::EPOCH : $desde;
+    }
+
+    // ── Tasa de estrellas rojas por turno (con vigencia por fecha) ──
+    /** Historial completo de tasas, la más reciente primero (para el admin) */
+    public function getTasaRojaHistorial(): array
+    {
+        return $this->db->query(
+            "SELECT * FROM configuracion_estrella_roja ORDER BY fecha_vigencia DESC, id DESC"
+        )->fetchAll();
+    }
+
+    /** Tasa vigente hoy (para mostrarla como "el default actual") */
+    public function getTasaRojaVigente(): int
+    {
+        return $this->resolverTasaRoja($this->getTasasRojaOrdenadas(), date('Y-m-d'));
+    }
+
+    /** Agrega una nueva tasa vigente desde una fecha — no borra el historial anterior */
+    public function agregarTasaRoja(int $monto, string $fechaVigencia): string|bool
+    {
+        if ($monto < 0) return 'El monto no puede ser negativo';
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVigencia)) return 'Fecha inválida';
+
+        $this->db->prepare(
+            "INSERT INTO configuracion_estrella_roja (monto, fecha_vigencia) VALUES (:monto, :fecha)"
+        )->execute(['monto' => $monto, 'fecha' => $fechaVigencia]);
+        return true;
+    }
+
+    /** Todas las tasas configuradas, ordenadas de más antigua a más reciente (para resolver en memoria) */
+    private function getTasasRojaOrdenadas(): array
+    {
+        return $this->db->query(
+            "SELECT monto, fecha_vigencia FROM configuracion_estrella_roja ORDER BY fecha_vigencia ASC"
+        )->fetchAll();
+    }
+
+    /** Resuelve qué tasa aplicaba en una fecha dada, a partir de una lista ya ordenada ASC */
+    private function resolverTasaRoja(array $tasasOrdenadas, string $fecha): int
+    {
+        $monto = self::EST_ROJA_POR_TURNO_DEFAULT;
+        foreach ($tasasOrdenadas as $t) {
+            if ($t['fecha_vigencia'] <= $fecha) $monto = (int)$t['monto'];
+            else break;
+        }
+        return $monto;
     }
 
     // ── Catálogo de tareas ─────────────────────────────────
@@ -321,11 +368,19 @@ class EstrellaRepository
         $desdeEf = $this->epochFloor($desde);
 
         $stmtTurnos = $this->db->prepare(
-            "SELECT COUNT(*) FROM asistencia
-             WHERE postulante_id = :pid AND fecha BETWEEN :desde AND :hasta AND estado != 'FALTA'"
+            "SELECT fecha, COUNT(*) AS n FROM asistencia
+             WHERE postulante_id = :pid AND fecha BETWEEN :desde AND :hasta AND estado != 'FALTA'
+             GROUP BY fecha"
         );
         $stmtTurnos->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
-        $turnos = (int)$stmtTurnos->fetchColumn();
+        $tasas = $this->getTasasRojaOrdenadas();
+        $turnos = 0;
+        $rojasTareas = 0;
+        foreach ($stmtTurnos->fetchAll() as $r) {
+            $n = (int)$r['n'];
+            $turnos      += $n;
+            $rojasTareas += $n * $this->resolverTasaRoja($tasas, $r['fecha']);
+        }
 
         $stmtGanadas = $this->db->prepare(
             "SELECT COALESCE(SUM(calificacion), 0) FROM estrella_voto
@@ -348,7 +403,7 @@ class EstrellaRepository
         $stmtAjustes->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
         $azulesAjustes = (int)$stmtAjustes->fetchColumn();
 
-        $rojas  = self::BASE_ROJAS  + $turnos * self::EST_ROJA_POR_TURNO;
+        $rojas  = self::BASE_ROJAS  + $rojasTareas;
         $azules = round(self::BASE_AZULES + $azulesTareas + $azulesVotos + $azulesAjustes, 1);
         $diferencia = $rojas - $azules;
 
@@ -377,12 +432,20 @@ class EstrellaRepository
         )->fetchAll();
 
         $turnosMap = [];
+        $rojasTareasMap = [];
         $stmtT = $this->db->prepare(
-            "SELECT postulante_id, COUNT(*) AS turnos FROM asistencia
-             WHERE fecha BETWEEN :desde AND :hasta AND estado != 'FALTA' GROUP BY postulante_id"
+            "SELECT postulante_id, fecha, COUNT(*) AS n FROM asistencia
+             WHERE fecha BETWEEN :desde AND :hasta AND estado != 'FALTA'
+             GROUP BY postulante_id, fecha"
         );
         $stmtT->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
-        foreach ($stmtT->fetchAll() as $r) $turnosMap[(int)$r['postulante_id']] = (int)$r['turnos'];
+        $tasas = $this->getTasasRojaOrdenadas();
+        foreach ($stmtT->fetchAll() as $r) {
+            $pid = (int)$r['postulante_id'];
+            $n = (int)$r['n'];
+            $turnosMap[$pid] = ($turnosMap[$pid] ?? 0) + $n;
+            $rojasTareasMap[$pid] = ($rojasTareasMap[$pid] ?? 0) + $n * $this->resolverTasaRoja($tasas, $r['fecha']);
+        }
 
         $ganadasMap = []; // pid => ['total' => float, 'CODIGO' => n_eventos]
         $stmtG = $this->db->prepare(
@@ -422,7 +485,7 @@ class EstrellaRepository
             $azulesTareas = round($ganadasMap[$pid]['total'] ?? 0, 1);
             $azulesVotos  = ($votosMap[$pid] ?? 0) * self::EST_AZUL_POR_VOTO;
             $azulesAjustes = $ajustesMap[$pid] ?? 0;
-            $rojas        = self::BASE_ROJAS  + $turnos * self::EST_ROJA_POR_TURNO;
+            $rojas        = self::BASE_ROJAS  + ($rojasTareasMap[$pid] ?? 0);
             $azules       = round(self::BASE_AZULES + $azulesTareas + $azulesVotos + $azulesAjustes, 1);
             $diferencia   = $rojas - $azules;
             $out[] = [
@@ -480,6 +543,11 @@ class EstrellaRepository
              ORDER BY a.fecha DESC"
         );
         $stmt->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
-        return $stmt->fetchAll();
+        $rows = $stmt->fetchAll();
+        $tasas = $this->getTasasRojaOrdenadas();
+        foreach ($rows as &$r) {
+            $r['tasa_roja'] = $this->resolverTasaRoja($tasas, $r['fecha']);
+        }
+        return $rows;
     }
 }
