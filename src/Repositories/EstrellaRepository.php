@@ -16,20 +16,28 @@ class EstrellaRepository
 
     public const EPOCH = '2026-08-24';
 
-    private const EST_ROJA_POR_TURNO  = 5;
-    private const EST_AZUL_POR_VOTO   = 1;
+    // Claves de configuracion_estrella. Los valores reales viven en la BD (con fecha
+    // de vigencia e historial); estos son solo el nombre de la clave y un respaldo
+    // por si esa clave nunca se llegó a insertar en la tabla.
+    private const CLAVE_ROJA_TURNO           = 'EST_ROJA_POR_TURNO';
+    private const CLAVE_BASE_ROJAS           = 'BASE_ROJAS';
+    private const CLAVE_BASE_AZULES          = 'BASE_AZULES';
+    private const CLAVE_AZUL_POR_VOTO        = 'EST_AZUL_POR_VOTO';
+    private const CLAVE_SOL_POR_ESTRELLA     = 'SOL_POR_ESTRELLA';
+    private const CLAVE_MAX_REPORTES_SANCION = 'MAX_REPORTES_SANCION';
+    private const CLAVE_PENALTY_BENEFICIARIO = 'PENALTY_BENEFICIARIO';
+    private const CLAVE_PENALTY_VOTANTE      = 'PENALTY_VOTANTE';
 
-    /** Cada mes arranca con este colchón de estrellas en ambos lados de la balanza */
-    private const BASE_ROJAS  = 50;
-    private const BASE_AZULES = 50;
-
-    /** Equivalencia monetaria: cada estrella de diferencia vale este monto */
-    public const SOL_POR_ESTRELLA = 0.10;
-
-    /** Denuncias necesarias para que un voto se sancione automáticamente */
-    private const MAX_REPORTES_SANCION = 2;
-    private const PENALTY_BENEFICIARIO = -50; // a quien recibió estrellas sin merecerlas
-    private const PENALTY_VOTANTE      = -100; // a quien otorgó estrellas falsas
+    private const DEFAULTS = [
+        self::CLAVE_ROJA_TURNO           => 2,
+        self::CLAVE_BASE_ROJAS           => 50,
+        self::CLAVE_BASE_AZULES          => 50,
+        self::CLAVE_AZUL_POR_VOTO        => 1,
+        self::CLAVE_SOL_POR_ESTRELLA     => 0.10,
+        self::CLAVE_MAX_REPORTES_SANCION => 2,
+        self::CLAVE_PENALTY_BENEFICIARIO => -50,
+        self::CLAVE_PENALTY_VOTANTE      => -100,
+    ];
 
     public function __construct()
     {
@@ -39,6 +47,74 @@ class EstrellaRepository
     private function epochFloor(string $desde): string
     {
         return $desde < self::EPOCH ? self::EPOCH : $desde;
+    }
+
+    // ── Configuración con vigencia por fecha (montos, tasas, penalidades) ──
+    /**
+     * Valor de una clave vigente en una fecha puntual (para cálculos "de un solo momento":
+     * la penalidad que aplica HOY, el colchón vigente al inicio del mes consultado, etc.)
+     */
+    private function getParametro(string $clave, string $fecha): float
+    {
+        return $this->resolverParametro($this->getParametrosOrdenados($clave), $clave, $fecha);
+    }
+
+    /** Todos los valores configurados para una clave, de más antiguo a más reciente */
+    private function getParametrosOrdenados(string $clave): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT valor, fecha_vigencia FROM configuracion_estrella
+             WHERE clave = :clave ORDER BY fecha_vigencia ASC"
+        );
+        $stmt->execute(['clave' => $clave]);
+        return $stmt->fetchAll();
+    }
+
+    /** Resuelve qué valor aplicaba en una fecha dada, a partir de una lista ya ordenada ASC */
+    private function resolverParametro(array $valoresOrdenados, string $clave, string $fecha): float
+    {
+        $valor = self::DEFAULTS[$clave] ?? 0.0;
+        foreach ($valoresOrdenados as $v) {
+            if ($v['fecha_vigencia'] <= $fecha) $valor = (float)$v['valor'];
+            else break;
+        }
+        return $valor;
+    }
+
+    /** Agrega un nuevo valor vigente desde una fecha para una clave — no borra el historial anterior */
+    private function agregarParametro(string $clave, float $valor, string $fechaVigencia): string|bool
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVigencia)) return 'Fecha inválida';
+
+        $this->db->prepare(
+            "INSERT INTO configuracion_estrella (clave, valor, fecha_vigencia) VALUES (:clave, :valor, :fecha)"
+        )->execute(['clave' => $clave, 'valor' => $valor, 'fecha' => $fechaVigencia]);
+        return true;
+    }
+
+    // ── Tasa de estrellas rojas por turno (la única con UI de admin por ahora) ──
+    /** Historial completo de la tasa, la más reciente primero (para el admin) */
+    public function getTasaRojaHistorial(): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT id, valor AS monto, fecha_vigencia, creado_en FROM configuracion_estrella
+             WHERE clave = :clave ORDER BY fecha_vigencia DESC, id DESC"
+        );
+        $stmt->execute(['clave' => self::CLAVE_ROJA_TURNO]);
+        return $stmt->fetchAll();
+    }
+
+    /** Tasa vigente hoy (para mostrarla como "el default actual") */
+    public function getTasaRojaVigente(): int
+    {
+        return (int)$this->getParametro(self::CLAVE_ROJA_TURNO, date('Y-m-d'));
+    }
+
+    /** Agrega una nueva tasa de estrellas rojas vigente desde una fecha */
+    public function agregarTasaRoja(int $monto, string $fechaVigencia): string|bool
+    {
+        if ($monto < 0) return 'El monto no puede ser negativo';
+        return $this->agregarParametro(self::CLAVE_ROJA_TURNO, (float)$monto, $fechaVigencia);
     }
 
     // ── Catálogo de tareas ─────────────────────────────────
@@ -289,30 +365,36 @@ class EstrellaRepository
         $count->execute(['vid' => $votoId]);
         $reportes = (int)$count->fetchColumn();
 
+        $hoy = date('Y-m-d');
+        $maxReportes = (int)$this->getParametro(self::CLAVE_MAX_REPORTES_SANCION, $hoy);
+
         $sancionado = false;
-        if ($reportes >= self::MAX_REPORTES_SANCION) {
+        if ($reportes >= $maxReportes) {
             $this->db->prepare("UPDATE estrella_voto SET sancionado = 1 WHERE id_voto = :id")->execute(['id' => $votoId]);
+
+            $penaltyBeneficiario = $this->getParametro(self::CLAVE_PENALTY_BENEFICIARIO, $hoy);
+            $penaltyVotante      = $this->getParametro(self::CLAVE_PENALTY_VOTANTE, $hoy);
 
             $this->db->prepare(
                 "INSERT INTO estrella_ajuste (postulante_id, estrellas, motivo, voto_id, fecha)
                  VALUES (:pid, :est, :motivo, :vid, :fecha)"
             )->execute([
-                'pid' => $voto['beneficiario_id'], 'est' => self::PENALTY_BENEFICIARIO,
+                'pid' => $voto['beneficiario_id'], 'est' => $penaltyBeneficiario,
                 'motivo' => 'Sanción: recibió estrellas por una actividad denunciada como falsa',
-                'vid' => $votoId, 'fecha' => date('Y-m-d'),
+                'vid' => $votoId, 'fecha' => $hoy,
             ]);
             $this->db->prepare(
                 "INSERT INTO estrella_ajuste (postulante_id, estrellas, motivo, voto_id, fecha)
                  VALUES (:pid, :est, :motivo, :vid, :fecha)"
             )->execute([
-                'pid' => $voto['votante_id'], 'est' => self::PENALTY_VOTANTE,
+                'pid' => $voto['votante_id'], 'est' => $penaltyVotante,
                 'motivo' => 'Sanción: otorgó estrellas por una actividad denunciada como falsa',
-                'vid' => $votoId, 'fecha' => date('Y-m-d'),
+                'vid' => $votoId, 'fecha' => $hoy,
             ]);
             $sancionado = true;
         }
 
-        return ['ok' => true, 'reportes' => $reportes, 'maximo' => self::MAX_REPORTES_SANCION, 'sancionado' => $sancionado];
+        return ['ok' => true, 'reportes' => $reportes, 'maximo' => $maxReportes, 'sancionado' => $sancionado];
     }
 
     // ── Balance de estrellas ────────────────────────────────
@@ -321,11 +403,19 @@ class EstrellaRepository
         $desdeEf = $this->epochFloor($desde);
 
         $stmtTurnos = $this->db->prepare(
-            "SELECT COUNT(*) FROM asistencia
-             WHERE postulante_id = :pid AND fecha BETWEEN :desde AND :hasta AND estado != 'FALTA'"
+            "SELECT fecha, COUNT(*) AS n FROM asistencia
+             WHERE postulante_id = :pid AND fecha BETWEEN :desde AND :hasta AND estado != 'FALTA'
+             GROUP BY fecha"
         );
         $stmtTurnos->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
-        $turnos = (int)$stmtTurnos->fetchColumn();
+        $tasas = $this->getParametrosOrdenados(self::CLAVE_ROJA_TURNO);
+        $turnos = 0;
+        $rojasTareas = 0;
+        foreach ($stmtTurnos->fetchAll() as $r) {
+            $n = (int)$r['n'];
+            $turnos      += $n;
+            $rojasTareas += $n * $this->resolverParametro($tasas, self::CLAVE_ROJA_TURNO, $r['fecha']);
+        }
 
         $stmtGanadas = $this->db->prepare(
             "SELECT COALESCE(SUM(calificacion), 0) FROM estrella_voto
@@ -339,7 +429,7 @@ class EstrellaRepository
         );
         $stmtVotos->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
         $votosEmitidos = (int)$stmtVotos->fetchColumn();
-        $azulesVotos   = $votosEmitidos * self::EST_AZUL_POR_VOTO;
+        $azulesVotos   = $votosEmitidos * $this->getParametro(self::CLAVE_AZUL_POR_VOTO, $hasta);
 
         $stmtAjustes = $this->db->prepare(
             "SELECT COALESCE(SUM(estrellas), 0) FROM estrella_ajuste
@@ -348,8 +438,10 @@ class EstrellaRepository
         $stmtAjustes->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
         $azulesAjustes = (int)$stmtAjustes->fetchColumn();
 
-        $rojas  = self::BASE_ROJAS  + $turnos * self::EST_ROJA_POR_TURNO;
-        $azules = round(self::BASE_AZULES + $azulesTareas + $azulesVotos + $azulesAjustes, 1);
+        $baseRojas  = $this->getParametro(self::CLAVE_BASE_ROJAS, $desdeEf);
+        $baseAzules = $this->getParametro(self::CLAVE_BASE_AZULES, $desdeEf);
+        $rojas  = $baseRojas  + $rojasTareas;
+        $azules = round($baseAzules + $azulesTareas + $azulesVotos + $azulesAjustes, 1);
         $diferencia = $rojas - $azules;
 
         return [
@@ -361,7 +453,7 @@ class EstrellaRepository
             'azules_ajustes' => $azulesAjustes,
             'azules'         => $azules,
             'diferencia'     => round($diferencia, 1),
-            'monto'          => round($diferencia * self::SOL_POR_ESTRELLA, 2),
+            'monto'          => round($diferencia * $this->getParametro(self::CLAVE_SOL_POR_ESTRELLA, $hasta), 2),
         ];
     }
 
@@ -377,12 +469,20 @@ class EstrellaRepository
         )->fetchAll();
 
         $turnosMap = [];
+        $rojasTareasMap = [];
         $stmtT = $this->db->prepare(
-            "SELECT postulante_id, COUNT(*) AS turnos FROM asistencia
-             WHERE fecha BETWEEN :desde AND :hasta AND estado != 'FALTA' GROUP BY postulante_id"
+            "SELECT postulante_id, fecha, COUNT(*) AS n FROM asistencia
+             WHERE fecha BETWEEN :desde AND :hasta AND estado != 'FALTA'
+             GROUP BY postulante_id, fecha"
         );
         $stmtT->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
-        foreach ($stmtT->fetchAll() as $r) $turnosMap[(int)$r['postulante_id']] = (int)$r['turnos'];
+        $tasas = $this->getParametrosOrdenados(self::CLAVE_ROJA_TURNO);
+        foreach ($stmtT->fetchAll() as $r) {
+            $pid = (int)$r['postulante_id'];
+            $n = (int)$r['n'];
+            $turnosMap[$pid] = ($turnosMap[$pid] ?? 0) + $n;
+            $rojasTareasMap[$pid] = ($rojasTareasMap[$pid] ?? 0) + $n * $this->resolverParametro($tasas, self::CLAVE_ROJA_TURNO, $r['fecha']);
+        }
 
         $ganadasMap = []; // pid => ['total' => float, 'CODIGO' => n_eventos]
         $stmtG = $this->db->prepare(
@@ -415,15 +515,20 @@ class EstrellaRepository
         $stmtA->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
         foreach ($stmtA->fetchAll() as $r) $ajustesMap[(int)$r['postulante_id']] = (int)$r['total'];
 
+        $azulPorVoto = $this->getParametro(self::CLAVE_AZUL_POR_VOTO, $hasta);
+        $solPorEstrella = $this->getParametro(self::CLAVE_SOL_POR_ESTRELLA, $hasta);
+        $baseRojas  = $this->getParametro(self::CLAVE_BASE_ROJAS, $desdeEf);
+        $baseAzules = $this->getParametro(self::CLAVE_BASE_AZULES, $desdeEf);
+
         $out = [];
         foreach ($staff as $s) {
             $pid          = (int)$s['id'];
             $turnos       = $turnosMap[$pid] ?? 0;
             $azulesTareas = round($ganadasMap[$pid]['total'] ?? 0, 1);
-            $azulesVotos  = ($votosMap[$pid] ?? 0) * self::EST_AZUL_POR_VOTO;
+            $azulesVotos  = ($votosMap[$pid] ?? 0) * $azulPorVoto;
             $azulesAjustes = $ajustesMap[$pid] ?? 0;
-            $rojas        = self::BASE_ROJAS  + $turnos * self::EST_ROJA_POR_TURNO;
-            $azules       = round(self::BASE_AZULES + $azulesTareas + $azulesVotos + $azulesAjustes, 1);
+            $rojas        = $baseRojas  + ($rojasTareasMap[$pid] ?? 0);
+            $azules       = round($baseAzules + $azulesTareas + $azulesVotos + $azulesAjustes, 1);
             $diferencia   = $rojas - $azules;
             $out[] = [
                 'id'            => $pid,
@@ -435,7 +540,7 @@ class EstrellaRepository
                 'azules_ajustes'=> $azulesAjustes,
                 'azules'        => $azules,
                 'diferencia'    => round($diferencia, 1),
-                'monto'         => round($diferencia * self::SOL_POR_ESTRELLA, 2),
+                'monto'         => round($diferencia * $solPorEstrella, 2),
                 'tareas'        => array_diff_key($ganadasMap[$pid] ?? [], ['total' => true]),
             ];
         }
@@ -480,6 +585,11 @@ class EstrellaRepository
              ORDER BY a.fecha DESC"
         );
         $stmt->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
-        return $stmt->fetchAll();
+        $rows = $stmt->fetchAll();
+        $tasas = $this->getParametrosOrdenados(self::CLAVE_ROJA_TURNO);
+        foreach ($rows as &$r) {
+            $r['tasa_roja'] = $this->resolverParametro($tasas, self::CLAVE_ROJA_TURNO, $r['fecha']);
+        }
+        return $rows;
     }
 }

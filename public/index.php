@@ -260,6 +260,7 @@ $router->post('/admin/api/ingreso-kgyr/{id}/confirmar-directo', [AdminController
 $router->post('/admin/api/tarea-limpieza/agregar',        [AdminController::class, 'addTareaLimpieza']);
 $router->post('/admin/api/tarea-limpieza/{id}/actualizar',[AdminController::class, 'actualizarTareaLimpieza']);
 $router->post('/admin/api/tarea-limpieza/{id}/toggle',    [AdminController::class, 'toggleTareaLimpieza']);
+$router->post('/admin/api/tasa-roja/agregar',              [AdminController::class, 'addTasaRoja']);
 $router->post('/admin/api/tarifa-base/agregar',      [AdminController::class, 'addTarifaBase']);
 $router->post('/admin/api/tarifa-base/{id}/eliminar',[AdminController::class, 'eliminarTarifaBase']);
 $router->post('/admin/api/bono/agregar',                   [AdminController::class, 'addBono']);
