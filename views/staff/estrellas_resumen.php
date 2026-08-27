@@ -153,7 +153,7 @@ $enContra   = $diferencia > 0;
                 <div class="er-item__main"><?= $dow ?> <?= date('d/m', strtotime($t['fecha'])) ?></div>
                 <div class="er-item__sub"><?= htmlspecialchars($t['local_desc'] ?? '—') ?> · <?= $turnoLabel[$t['turno_id']] ?? 'Turno' ?></div>
             </div>
-            <div class="er-item__badge" style="color:#dc2626;">+<?= (int)$t['tasa_roja'] ?> 🔴</div>
+            <div class="er-item__badge" style="color:#dc2626;">+5 🔴</div>
         </div>
         <?php endforeach; ?>
     </div>

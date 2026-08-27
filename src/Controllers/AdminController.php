@@ -429,37 +429,18 @@ class AdminController extends Controller
             }
             $ecoMesActual = date('Y-m');
 
+            // ── Resumen de estrellas (rojas = asistencia, azules = tareas de limpieza votadas) ──
+            require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+            $estrellaRepo = new EstrellaRepository();
+            $ecoEstrellas = $estrellaRepo->getEstrellasTodos($ecoDesde, $ecoHasta);
+            $ecoTareasLimpieza = $estrellaRepo->getTareasTodas();
+
             $economiaDatos = compact(
                 'ecoPagos','ecoTrabajadores','ecoMes','ecoMesActual','ecoPid','ecoTipo',
                 'ecoIngresos','ecoTotalIngresos','ecoTotalBonos','ecoEstudioInfo',
                 'ecoTarifasInfo','ecoBonosVInfo','ecoBonosOInfo','ecoBonoEstudioMonto',
                 'ecoBonoServicioMonto','ecoNombreTrabajador','ecoSupervisorPeriodos',
-                'estBonoRef'
-            );
-        }
-
-        // Datos para la página de actividades (estrellas del equipo + catálogo de tareas + tasa roja)
-        if ($page === 'actividades') {
-            require_once __DIR__ . '/../Core/Database.php';
-            require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
-            $db = \Database::getConnection();
-            $estrellaRepo = new EstrellaRepository();
-
-            $actMes = $_GET['mes'] ?? date('Y-m');
-            if (!preg_match('/^\d{4}-\d{2}$/', $actMes)) $actMes = date('Y-m');
-            [$actAnio, $actNmes] = explode('-', $actMes);
-            $actDesde = "{$actAnio}-{$actNmes}-01";
-            $actHasta = date('Y-m-t', strtotime($actDesde));
-            $actMesActual = date('Y-m');
-
-            $actEstrellas        = $estrellaRepo->getEstrellasTodos($actDesde, $actHasta);
-            $actTareasLimpieza   = $estrellaRepo->getTareasTodas();
-            $actTasaRojaHistorial = $estrellaRepo->getTasaRojaHistorial();
-            $actTasaRojaVigente   = $estrellaRepo->getTasaRojaVigente();
-
-            $actividadesDatos = compact(
-                'actMes','actMesActual','actDesde','actHasta',
-                'actEstrellas','actTareasLimpieza','actTasaRojaHistorial','actTasaRojaVigente'
+                'estBonoRef','ecoEstrellas','ecoTareasLimpieza'
             );
         }
 
@@ -769,20 +750,6 @@ class AdminController extends Controller
         require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
         (new EstrellaRepository())->toggleTarea($id);
         $this->success('Estado actualizado.');
-    }
-
-    /** POST /admin/api/tasa-roja/agregar */
-    public function addTasaRoja(): void
-    {
-        $this->middlewareAdmin();
-        $data = $this->getAllInput();
-        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
-        $result = (new EstrellaRepository())->agregarTasaRoja(
-            (int)($data['monto'] ?? -1),
-            $data['fecha_vigencia'] ?? ''
-        );
-        if ($result === true) $this->success('Tasa guardada.');
-        else $this->error($result, 422);
     }
 
     /** POST /admin/api/tarifa-base/{id}/eliminar */
