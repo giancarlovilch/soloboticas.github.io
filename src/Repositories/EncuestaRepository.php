@@ -73,7 +73,7 @@ class EncuestaRepository
     /** Registra o actualiza (si ya existía) la calificación de un evaluador sobre un compañero/turno */
     public function registrarEncuesta(
         int $evaluadorId, int $evaluadoId, string $fecha, int $turnoId, array $valores, string $password
-    ): string|true {
+    ): string|bool {
         $stmt = $this->db->prepare("SELECT password FROM usuario WHERE postulante_id = :pid LIMIT 1");
         $stmt->execute(['pid' => $evaluadorId]);
         $hash = $stmt->fetchColumn();

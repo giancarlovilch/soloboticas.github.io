@@ -65,7 +65,7 @@ class EstrellaRepository
         )->fetchAll();
     }
 
-    public function crearTarea(string $codigo, string $descripcion, int $estrellasMax): string|true
+    public function crearTarea(string $codigo, string $descripcion, int $estrellasMax): string|bool
     {
         $codigo = strtoupper(trim($codigo));
         if ($codigo === '' || $descripcion === '' || $estrellasMax < 1) {
@@ -84,7 +84,7 @@ class EstrellaRepository
         return true;
     }
 
-    public function actualizarTarea(int $id, string $descripcion, int $estrellasMax): string|true
+    public function actualizarTarea(int $id, string $descripcion, int $estrellasMax): string|bool
     {
         if ($descripcion === '' || $estrellasMax < 1) return 'Datos inválidos';
         $stmt = $this->db->prepare(
@@ -95,7 +95,7 @@ class EstrellaRepository
     }
 
     /** Activa/desactiva una tarea (no se elimina para no romper el historial de votos ya registrados) */
-    public function toggleTarea(int $id): string|true
+    public function toggleTarea(int $id): string|bool
     {
         $stmt = $this->db->prepare("UPDATE tarea_limpieza SET activo = 1 - activo WHERE id_tarea = :id");
         $stmt->execute(['id' => $id]);
