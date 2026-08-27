@@ -99,6 +99,7 @@ class StaffController extends Controller
 
         $estrellas = $repo->getEstrellas($postulanteId, $desde, $hasta);
         $detalleTareas = $repo->getDetalleTareasRecibidas($postulanteId, $desde, $hasta);
+        $detalleVotos  = $repo->getDetalleVotosEmitidos($postulanteId, $desde, $hasta);
         $detalleTurnos = $repo->getDetalleTurnos($postulanteId, $desde, $hasta);
 
         require_once __DIR__ . '/../../views/staff/estrellas_resumen.php';

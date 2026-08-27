@@ -113,6 +113,13 @@ $enContra   = $diferencia > 0;
     </div>
     <?php endif; ?>
 
+    <?php if (!empty($estrellas['votos_emitidos'])): ?>
+    <div class="er-empty" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;text-align:left;margin-bottom:1.25rem;">
+        🗳️ Por calificar a tus compañeros este mes: <strong>+<?= $fmtEst($estrellas['azules_votos']) ?> ⭐</strong>
+        (<?= (int)$estrellas['votos_emitidos'] ?> voto<?= $estrellas['votos_emitidos'] == 1 ? '' : 's' ?> emitido<?= $estrellas['votos_emitidos'] == 1 ? '' : 's' ?> · se te da a ti por participar, no a quien calificas)
+    </div>
+    <?php endif; ?>
+
     <p class="er-sec-title">🧹 Actividades reconocidas</p>
     <p class="er-anon">Se muestra qué te calificaron y cuánto ganaste — sin decir quién lo hizo.</p>
     <?php if (empty($detalleTareas)): ?>
@@ -135,6 +142,26 @@ $enContra   = $diferencia > 0;
                 <div class="er-item__badge">+<?= $fmtEst($d['azules']) ?> ⭐</div>
                 <?php endif; ?>
             </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
+    <p class="er-sec-title">🗳️ Votos que diste</p>
+    <p class="er-anon">Cada vez que calificas a un compañero ganas ⭐ azules tú, independiente de la calificación que le des a él/ella.</p>
+    <?php if (empty($detalleVotos)): ?>
+    <div class="er-empty">Aún no has calificado a ningún compañero en <?= $mesLabel ?>.</div>
+    <?php else: ?>
+    <div class="er-list" style="margin-top:.6rem;">
+        <?php foreach ($detalleVotos as $v):
+            $dow = $diasLabel[(int)date('w', strtotime($v['fecha']))];
+        ?>
+        <div class="er-item">
+            <div>
+                <div class="er-item__main">Calificaste a <?= htmlspecialchars($v['beneficiario_nombre']) ?></div>
+                <div class="er-item__sub"><?= htmlspecialchars($v['tarea']) ?> · <?= $dow ?> <?= date('d/m', strtotime($v['fecha'])) ?> · <?= htmlspecialchars($v['local_desc']) ?> · <?= htmlspecialchars($v['turno_desc']) ?></div>
+            </div>
+            <div class="er-item__badge">+<?= $fmtEst($v['azul_ganado']) ?> ⭐</div>
         </div>
         <?php endforeach; ?>
     </div>

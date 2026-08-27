@@ -456,12 +456,36 @@ class AdminController extends Controller
             $actTareasLimpieza   = $estrellaRepo->getTareasTodas();
             $actTasaRojaHistorial = $estrellaRepo->getTasaRojaHistorial();
             $actTasaRojaVigente   = $estrellaRepo->getTasaRojaVigente();
-            $actMovimientos       = $estrellaRepo->getMovimientosAzules($actDesde, $actHasta);
+            $actTasaAzulVotoHistorial = $estrellaRepo->getTasaAzulVotoHistorial();
+            $actTasaAzulVotoVigente   = $estrellaRepo->getTasaAzulVotoVigente();
+
+            // Reporte detallado de un trabajador puntual (equivalente admin de /staff/estrellas/resumen)
+            $actTrabajadorId = isset($_GET['trabajador']) ? (int)$_GET['trabajador'] : 0;
+            $actTrabajadorNombre = null;
+            $actDetalleTareas = [];
+            $actDetalleVotos  = [];
+            $actDetalleTurnos = [];
+            $actDetalleEstrellas = null;
+            if ($actTrabajadorId > 0) {
+                foreach ($actEstrellas as $e) {
+                    if ($e['id'] === $actTrabajadorId) { $actTrabajadorNombre = $e['nombre']; break; }
+                }
+                if ($actTrabajadorNombre !== null) {
+                    $actDetalleEstrellas = $estrellaRepo->getEstrellas($actTrabajadorId, $actDesde, $actHasta);
+                    $actDetalleTareas    = $estrellaRepo->getDetalleTareasRecibidas($actTrabajadorId, $actDesde, $actHasta);
+                    $actDetalleVotos     = $estrellaRepo->getDetalleVotosEmitidos($actTrabajadorId, $actDesde, $actHasta);
+                    $actDetalleTurnos    = $estrellaRepo->getDetalleTurnos($actTrabajadorId, $actDesde, $actHasta);
+                } else {
+                    $actTrabajadorId = 0;
+                }
+            }
 
             $actividadesDatos = compact(
                 'actMes','actMesActual','actDesde','actHasta',
                 'actEstrellas','actTareasLimpieza','actTasaRojaHistorial','actTasaRojaVigente',
-                'actMovimientos'
+                'actTasaAzulVotoHistorial','actTasaAzulVotoVigente',
+                'actTrabajadorId','actTrabajadorNombre','actDetalleEstrellas',
+                'actDetalleTareas','actDetalleVotos','actDetalleTurnos'
             );
         }
 
@@ -781,6 +805,20 @@ class AdminController extends Controller
         require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
         $result = (new EstrellaRepository())->agregarTasaRoja(
             (int)($data['monto'] ?? -1),
+            $data['fecha_vigencia'] ?? ''
+        );
+        if ($result === true) $this->success('Tasa guardada.');
+        else $this->error($result, 422);
+    }
+
+    /** POST /admin/api/tasa-azul-voto/agregar */
+    public function addTasaAzulVoto(): void
+    {
+        $this->middlewareAdmin();
+        $data = $this->getAllInput();
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $result = (new EstrellaRepository())->agregarTasaAzulVoto(
+            (float)($data['monto'] ?? -1),
             $data['fecha_vigencia'] ?? ''
         );
         if ($result === true) $this->success('Tasa guardada.');

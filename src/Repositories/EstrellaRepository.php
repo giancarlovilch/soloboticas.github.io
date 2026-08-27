@@ -92,7 +92,7 @@ class EstrellaRepository
         return true;
     }
 
-    // ── Tasa de estrellas rojas por turno (la única con UI de admin por ahora) ──
+    // ── Tasa de estrellas rojas por turno ───────────────────
     /** Historial completo de la tasa, la más reciente primero (para el admin) */
     public function getTasaRojaHistorial(): array
     {
@@ -115,6 +115,31 @@ class EstrellaRepository
     {
         if ($monto < 0) return 'El monto no puede ser negativo';
         return $this->agregarParametro(self::CLAVE_ROJA_TURNO, (float)$monto, $fechaVigencia);
+    }
+
+    // ── Estrellas azules por voto emitido ───────────────────
+    /** Historial completo de la tasa, la más reciente primero (para el admin) */
+    public function getTasaAzulVotoHistorial(): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT id, valor AS monto, fecha_vigencia, creado_en FROM configuracion_estrella
+             WHERE clave = :clave ORDER BY fecha_vigencia DESC, id DESC"
+        );
+        $stmt->execute(['clave' => self::CLAVE_AZUL_POR_VOTO]);
+        return $stmt->fetchAll();
+    }
+
+    /** Tasa vigente hoy (para mostrarla como "el default actual") */
+    public function getTasaAzulVotoVigente(): float
+    {
+        return $this->getParametro(self::CLAVE_AZUL_POR_VOTO, date('Y-m-d'));
+    }
+
+    /** Agrega una nueva tasa de estrellas azules por voto vigente desde una fecha */
+    public function agregarTasaAzulVoto(float $monto, string $fechaVigencia): string|bool
+    {
+        if ($monto < 0) return 'El monto no puede ser negativo';
+        return $this->agregarParametro(self::CLAVE_AZUL_POR_VOTO, $monto, $fechaVigencia);
     }
 
     // ── Catálogo de tareas ─────────────────────────────────
@@ -425,11 +450,18 @@ class EstrellaRepository
         $azulesTareas = (float)$stmtGanadas->fetchColumn();
 
         $stmtVotos = $this->db->prepare(
-            "SELECT COUNT(*) FROM estrella_voto WHERE votante_id = :pid AND fecha BETWEEN :desde AND :hasta"
+            "SELECT fecha, COUNT(*) AS n FROM estrella_voto
+             WHERE votante_id = :pid AND fecha BETWEEN :desde AND :hasta GROUP BY fecha"
         );
         $stmtVotos->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
-        $votosEmitidos = (int)$stmtVotos->fetchColumn();
-        $azulesVotos   = $votosEmitidos * $this->getParametro(self::CLAVE_AZUL_POR_VOTO, $hasta);
+        $tasasAzul = $this->getParametrosOrdenados(self::CLAVE_AZUL_POR_VOTO);
+        $votosEmitidos = 0;
+        $azulesVotos = 0;
+        foreach ($stmtVotos->fetchAll() as $r) {
+            $n = (int)$r['n'];
+            $votosEmitidos += $n;
+            $azulesVotos   += $n * $this->resolverParametro($tasasAzul, self::CLAVE_AZUL_POR_VOTO, $r['fecha']);
+        }
 
         $stmtAjustes = $this->db->prepare(
             "SELECT COALESCE(SUM(estrellas), 0) FROM estrella_ajuste
@@ -499,13 +531,19 @@ class EstrellaRepository
             $ganadasMap[$pid][$codigo] = ($ganadasMap[$pid][$codigo] ?? 0) + 1;
         }
 
-        $votosMap = [];
+        $azulesVotosMap = [];
         $stmtV = $this->db->prepare(
-            "SELECT votante_id, COUNT(*) AS votos FROM estrella_voto
-             WHERE fecha BETWEEN :desde AND :hasta GROUP BY votante_id"
+            "SELECT votante_id, fecha, COUNT(*) AS votos FROM estrella_voto
+             WHERE fecha BETWEEN :desde AND :hasta GROUP BY votante_id, fecha"
         );
         $stmtV->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
-        foreach ($stmtV->fetchAll() as $r) $votosMap[(int)$r['votante_id']] = (int)$r['votos'];
+        $tasasAzul = $this->getParametrosOrdenados(self::CLAVE_AZUL_POR_VOTO);
+        foreach ($stmtV->fetchAll() as $r) {
+            $pid = (int)$r['votante_id'];
+            $n = (int)$r['votos'];
+            $azulesVotosMap[$pid] = ($azulesVotosMap[$pid] ?? 0)
+                + $n * $this->resolverParametro($tasasAzul, self::CLAVE_AZUL_POR_VOTO, $r['fecha']);
+        }
 
         $ajustesMap = [];
         $stmtA = $this->db->prepare(
@@ -515,7 +553,6 @@ class EstrellaRepository
         $stmtA->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
         foreach ($stmtA->fetchAll() as $r) $ajustesMap[(int)$r['postulante_id']] = (int)$r['total'];
 
-        $azulPorVoto = $this->getParametro(self::CLAVE_AZUL_POR_VOTO, $hasta);
         $solPorEstrella = $this->getParametro(self::CLAVE_SOL_POR_ESTRELLA, $hasta);
         $baseRojas  = $this->getParametro(self::CLAVE_BASE_ROJAS, $desdeEf);
         $baseAzules = $this->getParametro(self::CLAVE_BASE_AZULES, $desdeEf);
@@ -525,7 +562,7 @@ class EstrellaRepository
             $pid          = (int)$s['id'];
             $turnos       = $turnosMap[$pid] ?? 0;
             $azulesTareas = round($ganadasMap[$pid]['total'] ?? 0, 1);
-            $azulesVotos  = ($votosMap[$pid] ?? 0) * $azulPorVoto;
+            $azulesVotos  = $azulesVotosMap[$pid] ?? 0;
             $azulesAjustes = $ajustesMap[$pid] ?? 0;
             $rojas        = $baseRojas  + ($rojasTareasMap[$pid] ?? 0);
             $azules       = round($baseAzules + $azulesTareas + $azulesVotos + $azulesAjustes, 1);
@@ -574,54 +611,31 @@ class EstrellaRepository
     }
 
     /**
-     * Feed unificado de movimientos de estrellas azules (votos + ajustes por sanción) para
-     * el panel de seguimiento del admin: permite ver quién le dio a quién, cuándo, y si algún
-     * voto fue denunciado o sancionado — algo que el resumen agregado por persona no muestra.
+     * Detalle de los votos que el propio usuario emitió calificando a compañeros
+     * (fuente de "1 azul por voto" — la única azul que no viene de tareas propias ni ajustes,
+     * y que por eso no aparece en "Actividades reconocidas" del resumen del staff).
      */
-    public function getMovimientosAzules(string $desde, string $hasta): array
+    public function getDetalleVotosEmitidos(int $postulanteId, string $desde, string $hasta): array
     {
         $desdeEf = $this->epochFloor($desde);
-
-        $stmtVotos = $this->db->prepare(
-            "SELECT ev.id_voto AS id, ev.fecha, 'voto' AS tipo,
-                    pb.nombres AS beneficiario_nombre, pv.nombres AS votante_nombre,
-                    tl.descripcion AS detalle, ev.calificacion AS estrellas, ev.sancionado,
-                    l.descripcion AS local_desc, t.descripcion AS turno_desc,
-                    (SELECT COUNT(*) FROM estrella_reporte er WHERE er.voto_id = ev.id_voto) AS reportes
+        $stmt = $this->db->prepare(
+            "SELECT ev.fecha, pb.nombres AS beneficiario_nombre, tl.descripcion AS tarea,
+                    ev.calificacion, l.descripcion AS local_desc, t.descripcion AS turno_desc
              FROM estrella_voto ev
-             INNER JOIN postulante pb ON pb.id_postulante = ev.beneficiario_id
-             INNER JOIN postulante pv ON pv.id_postulante = ev.votante_id
-             INNER JOIN tarea_limpieza tl ON tl.id_tarea = ev.tarea_id
-             LEFT JOIN local l ON l.id_local = ev.local_id
-             LEFT JOIN turno t ON t.id_turno = ev.turno_id
-             WHERE ev.fecha BETWEEN :desde AND :hasta
-             ORDER BY ev.fecha_registro DESC"
+             INNER JOIN postulante pb     ON pb.id_postulante = ev.beneficiario_id
+             INNER JOIN tarea_limpieza tl ON tl.id_tarea      = ev.tarea_id
+             INNER JOIN local l           ON l.id_local       = ev.local_id
+             INNER JOIN turno t           ON t.id_turno       = ev.turno_id
+             WHERE ev.votante_id = :pid AND ev.fecha BETWEEN :desde AND :hasta
+             ORDER BY ev.fecha DESC"
         );
-        $stmtVotos->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
-        $votos = $stmtVotos->fetchAll();
-
-        $stmtAjustes = $this->db->prepare(
-            "SELECT ea.id, ea.fecha, 'ajuste' AS tipo,
-                    p.nombres AS beneficiario_nombre, NULL AS votante_nombre,
-                    ea.motivo AS detalle, ea.estrellas, 0 AS sancionado,
-                    NULL AS local_desc, NULL AS turno_desc, 0 AS reportes
-             FROM estrella_ajuste ea
-             INNER JOIN postulante p ON p.id_postulante = ea.postulante_id
-             WHERE ea.fecha BETWEEN :desde AND :hasta
-             ORDER BY ea.id DESC"
-        );
-        $stmtAjustes->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
-        $ajustes = $stmtAjustes->fetchAll();
-
-        $out = array_merge($votos, $ajustes);
-        usort($out, fn($a, $b) => strcmp($b['fecha'], $a['fecha']) ?: ($b['id'] <=> $a['id']));
-
-        foreach ($out as &$r) {
-            $r['sancionado'] = (bool)$r['sancionado'];
-            $r['reportes']   = (int)$r['reportes'];
-            $r['estrellas']  = ($r['tipo'] === 'voto' && $r['sancionado']) ? 0 : (float)$r['estrellas'];
+        $stmt->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
+        $rows = $stmt->fetchAll();
+        $tasasAzul = $this->getParametrosOrdenados(self::CLAVE_AZUL_POR_VOTO);
+        foreach ($rows as &$r) {
+            $r['azul_ganado'] = $this->resolverParametro($tasasAzul, self::CLAVE_AZUL_POR_VOTO, $r['fecha']);
         }
-        return $out;
+        return $rows;
     }
 
     /** Detalle de turnos asistidos (fuente de las estrellas rojas) */

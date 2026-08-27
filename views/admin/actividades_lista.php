@@ -10,13 +10,22 @@ $actEstrellas         = $actEstrellas         ?? [];
 $actTareasLimpieza    = $actTareasLimpieza    ?? [];
 $actTasaRojaHistorial = $actTasaRojaHistorial ?? [];
 $actTasaRojaVigente   = $actTasaRojaVigente   ?? 0;
-$actMovimientos       = $actMovimientos       ?? [];
+$actTasaAzulVotoHistorial = $actTasaAzulVotoHistorial ?? [];
+$actTasaAzulVotoVigente   = $actTasaAzulVotoVigente   ?? 0;
+$actTrabajadorId      = $actTrabajadorId      ?? 0;
+$actTrabajadorNombre  = $actTrabajadorNombre  ?? null;
+$actDetalleEstrellas  = $actDetalleEstrellas  ?? null;
+$actDetalleTareas     = $actDetalleTareas     ?? [];
+$actDetalleVotos      = $actDetalleVotos      ?? [];
+$actDetalleTurnos     = $actDetalleTurnos     ?? [];
 
 $meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 [$anioF, $nmesF] = explode('-', $actMes);
 $mesLabel = $meses[(int)$nmesF - 1] . ' ' . $anioF;
 $fmtEst = fn($v) => (floor($v) == $v) ? (string)(int)$v : number_format($v, 1);
 $hoy = date('Y-m-d');
+$diasLabel  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+$turnoLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
 ?>
 <style>
 .eco-wrap { max-width:900px;margin:0 auto;padding:.5rem 0 3rem; }
@@ -39,6 +48,30 @@ $hoy = date('Y-m-d');
 .act-add-form input { padding:.4rem .65rem;border:1.5px solid #fbcfe8;border-radius:7px;font-size:.8rem;width:100%;box-sizing:border-box; }
 .act-msg { font-size:.78rem;padding:.4rem .75rem;border-radius:7px;margin-top:.6rem;display:none; }
 @media(max-width:600px){ .act-kpi-box{flex-direction:column;align-items:flex-start;gap:.4rem;} }
+
+/* Reporte detallado por trabajador */
+.rep-select-wrap { display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem; }
+.rep-select { padding:.55rem .8rem;border:1.5px solid #fbcfe8;border-radius:8px;font-size:.85rem;font-weight:600;color:#1e293b;background:#fff0f6;min-width:240px;outline:none; }
+.rep-kpis { display:grid;grid-template-columns:repeat(2,1fr);gap:.65rem;margin-bottom:1rem;max-width:420px; }
+.rep-kpi   { background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:.85rem 1rem;text-align:center; }
+.rep-kpi__num   { font-size:1.4rem;font-weight:800; }
+.rep-kpi__label { font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-top:2px; }
+.rep-monto { border-radius:12px;padding:1rem 1.2rem;margin-bottom:1.25rem;text-align:center;max-width:420px; }
+.rep-monto--contra { background:#fee2e2;border:1.5px solid #fecaca; }
+.rep-monto--favor  { background:#dbeafe;border:1.5px solid #bfdbfe; }
+.rep-monto__label { font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.25rem; }
+.rep-monto--contra .rep-monto__label { color:#991b1b; }
+.rep-monto--favor  .rep-monto__label { color:#1d4ed8; }
+.rep-monto__num { font-size:1.5rem;font-weight:800; }
+.rep-monto--contra .rep-monto__num { color:#dc2626; }
+.rep-monto--favor  .rep-monto__num { color:#1d4ed8; }
+.rep-sub-title { font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin:1.25rem 0 .6rem; }
+.rep-list { display:flex;flex-direction:column;gap:.5rem; }
+.rep-item { background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:.65rem .85rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem; }
+.rep-item__main  { font-size:.82rem;font-weight:700;color:#1e293b; }
+.rep-item__sub   { font-size:.7rem;color:#94a3b8;margin-top:1px; }
+.rep-item__badge { font-size:.72rem;font-weight:800;color:#1d4ed8;white-space:nowrap; }
+.rep-item__estado--sancionado { background:#fee2e2;color:#991b1b;font-size:.66rem;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap; }
 </style>
 
 <div class="eco-wrap">
@@ -122,6 +155,62 @@ $hoy = date('Y-m-d');
     </div>
     <?php endif; ?>
 
+    <!-- ── Estrellas azules por voto emitido ─────────────────── -->
+    <p class="eco-sec-title">🔵 Estrellas azules por voto emitido</p>
+    <div class="act-kpi-box">
+        <div>
+            <div class="act-kpi-box__num" style="color:#1d4ed8;"><?= $fmtEst($actTasaAzulVotoVigente) ?></div>
+            <div class="act-kpi-box__label">Tasa vigente hoy</div>
+        </div>
+        <p style="font-size:.75rem;color:#64748b;margin:0;flex:1;min-width:200px;">
+            Cada trabajador suma esta cantidad de estrellas azules automáticamente por cada voto que emite
+            calificando a un compañero (independiente de la calificación que le dé). Al guardar una nueva
+            tasa con una fecha de inicio, todo el sistema se recalcula solo.
+        </p>
+    </div>
+
+    <div class="act-card">
+        <p style="font-size:.75rem;font-weight:600;color:#475569;margin-bottom:.5rem;">Registrar nueva tasa</p>
+        <div class="act-add-form">
+            <div style="min-width:120px;">
+                <label>Estrellas azules por voto</label>
+                <input type="number" id="taNuevoMonto" min="0" max="10" step="0.5" placeholder="2">
+            </div>
+            <div style="min-width:160px;">
+                <label>Vigente desde</label>
+                <input type="date" id="taNuevaFecha" value="<?= $hoy ?>">
+            </div>
+            <button onclick="taAgregar()"
+                    style="background:#db2777;color:#fff;border:none;border-radius:8px;padding:.5rem 1.1rem;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;">
+                + Guardar tasa
+            </button>
+        </div>
+        <div id="taMsg" class="act-msg"></div>
+    </div>
+
+    <?php if (!empty($actTasaAzulVotoHistorial)): ?>
+    <div class="eco-table-wrap" style="margin-top:.75rem;">
+        <table class="eco-table">
+            <thead>
+                <tr>
+                    <th>Estrellas azules / voto</th>
+                    <th>Vigente desde</th>
+                    <th>Registrado</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($actTasaAzulVotoHistorial as $ta): ?>
+            <tr>
+                <td style="font-weight:700;color:#1d4ed8;">🔵 <?= $fmtEst($ta['monto']) ?></td>
+                <td><?= date('d/m/Y', strtotime($ta['fecha_vigencia'])) ?></td>
+                <td style="font-size:.72rem;color:#94a3b8;"><?= date('d/m/Y H:i', strtotime($ta['creado_en'])) ?></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+
     <!-- ── Estrellas del equipo ──────────────────────────────── -->
     <p class="eco-sec-title">⭐ Estrellas del equipo — <?= $mesLabel ?></p>
     <?php if (empty($actEstrellas)): ?>
@@ -183,67 +272,6 @@ $hoy = date('Y-m-d');
     <p style="font-size:.68rem;color:#94a3b8;margin-top:.5rem;">
         Cada mes arranca 50 vs 50 · cada ⭐ de diferencia equivale a S/ 0.10 al cierre del mes.
     </p>
-    <?php endif; ?>
-
-    <!-- ── Detalle de movimientos (seguimiento de puntos azules) ─ -->
-    <p class="eco-sec-title">🔍 Detalle de movimientos — <?= $mesLabel ?></p>
-    <p style="font-size:.75rem;color:#64748b;margin:-.4rem 0 .65rem;">
-        Cada voto de limpieza y cada ajuste por sanción, uno por uno. Si a alguien "le falta" una estrella
-        azul frente a lo que ve reflejado, es porque uno de sus registros aparece aquí como
-        <strong style="color:#991b1b;">denunciado o sancionado</strong> (vale 0 en vez del valor original).
-    </p>
-    <input type="text" id="movFiltroNombre" placeholder="🔎 Filtrar por nombre (quién dio o quién recibió)…"
-           oninput="movFiltrar()"
-           style="width:100%;box-sizing:border-box;padding:.55rem .8rem;border:1.5px solid #fbcfe8;
-                  border-radius:8px;font-size:.82rem;margin-bottom:.75rem;outline:none;">
-    <?php if (empty($actMovimientos)): ?>
-    <div class="eco-empty">Sin movimientos de estrellas azules en <?= $mesLabel ?>.</div>
-    <?php else: ?>
-    <div class="eco-table-wrap">
-        <table class="eco-table" id="movTabla">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Quién dio</th>
-                    <th>Quién recibió</th>
-                    <th>Actividad / Motivo</th>
-                    <th class="text-center">🔵 Estrellas</th>
-                    <th>Estado</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($actMovimientos as $m):
-                $nombres = mb_strtolower(($m['votante_nombre'] ?? '') . ' ' . $m['beneficiario_nombre']);
-                if ($m['tipo'] === 'ajuste') {
-                    $estado = '<span class="eco-badge" style="background:#f1f5f9;color:#64748b;">⚖️ Ajuste por sanción</span>';
-                } elseif ($m['sancionado']) {
-                    $estado = '<span class="eco-badge" style="background:#fee2e2;color:#991b1b;">🚫 Sancionado (' . (int)$m['reportes'] . ' denuncias)</span>';
-                } elseif ($m['reportes'] > 0) {
-                    $estado = '<span class="eco-badge" style="background:#fef3c7;color:#92400e;">⚠️ Denunciado ' . (int)$m['reportes'] . '/2</span>';
-                } else {
-                    $estado = '<span class="eco-badge" style="background:#d1fae5;color:#065f46;">✅ Normal</span>';
-                }
-            ?>
-            <tr data-nombres="<?= htmlspecialchars($nombres) ?>">
-                <td style="white-space:nowrap;font-size:.75rem;color:#64748b;"><?= date('d/m/Y', strtotime($m['fecha'])) ?></td>
-                <td style="font-weight:600;"><?= $m['tipo'] === 'ajuste' ? '—' : htmlspecialchars($m['votante_nombre']) ?></td>
-                <td style="font-weight:600;"><?= htmlspecialchars($m['beneficiario_nombre']) ?></td>
-                <td>
-                    <?= htmlspecialchars($m['detalle']) ?>
-                    <?php if (!empty($m['local_desc'])): ?>
-                    <div style="font-size:.68rem;color:#94a3b8;"><?= htmlspecialchars($m['local_desc']) ?> · <?= htmlspecialchars($m['turno_desc']) ?></div>
-                    <?php endif; ?>
-                </td>
-                <td class="text-center" style="font-weight:700;color:<?= $m['estrellas'] < 0 ? '#dc2626' : '#1d4ed8' ?>;">
-                    <?= $m['estrellas'] > 0 ? '+' : '' ?><?= $fmtEst($m['estrellas']) ?>
-                </td>
-                <td><?= $estado ?></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <p class="eco-empty" id="movVacio" style="display:none;">Ningún movimiento coincide con "<span id="movVacioTexto"></span>".</p>
     <?php endif; ?>
 
     <!-- ── Catálogo de actividades de limpieza ───────────────── -->
@@ -314,6 +342,125 @@ $hoy = date('Y-m-d');
         <div id="tlMsg" class="act-msg"></div>
     </div>
 
+    <!-- ── Reporte detallado por trabajador (al final: es lo más largo) ── -->
+    <p class="eco-sec-title">🧑 Reporte detallado por trabajador — <?= $mesLabel ?></p>
+    <form method="GET" class="rep-select-wrap">
+        <input type="hidden" name="page" value="actividades">
+        <input type="hidden" name="mes" value="<?= htmlspecialchars($actMes) ?>">
+        <select name="trabajador" class="rep-select" onchange="this.form.submit()">
+            <option value="0">— Selecciona un trabajador —</option>
+            <?php foreach ($actEstrellas as $e): ?>
+            <option value="<?= (int)$e['id'] ?>" <?= $actTrabajadorId === (int)$e['id'] ? 'selected' : '' ?>>
+                <?= htmlspecialchars($e['nombre']) ?>
+            </option>
+            <?php endforeach; ?>
+        </select>
+    </form>
+
+    <?php if ($actTrabajadorId === 0): ?>
+    <div class="eco-empty">Elige un trabajador de la lista para ver su detalle de estrellas del mes.</div>
+    <?php elseif ($actDetalleEstrellas === null): ?>
+    <div class="eco-empty">No se encontró a ese trabajador en <?= $mesLabel ?>.</div>
+    <?php else:
+        $repDif      = (float)($actDetalleEstrellas['diferencia'] ?? 0);
+        $repMonto    = (float)($actDetalleEstrellas['monto']      ?? 0);
+        $repEnContra = $repDif > 0;
+    ?>
+    <div class="rep-kpis">
+        <div class="rep-kpi">
+            <div class="rep-kpi__num" style="color:#dc2626;">🔴 <?= (int)$actDetalleEstrellas['rojas'] ?></div>
+            <div class="rep-kpi__label">Estrellas rojas</div>
+        </div>
+        <div class="rep-kpi">
+            <div class="rep-kpi__num" style="color:#1d4ed8;">🔵 <?= $fmtEst($actDetalleEstrellas['azules']) ?></div>
+            <div class="rep-kpi__label">Estrellas azules</div>
+        </div>
+    </div>
+
+    <div class="rep-monto <?= $repEnContra ? 'rep-monto--contra' : 'rep-monto--favor' ?>">
+        <div class="rep-monto__label"><?= $repEnContra ? '⚠️ Diferencia en contra' : '✅ Diferencia a favor' ?></div>
+        <div class="rep-monto__num"><?= $fmtEst(abs($repDif)) ?> ⭐ = S/ <?= number_format(abs($repMonto), 2) ?></div>
+    </div>
+
+    <?php if (!empty($actDetalleEstrellas['azules_ajustes'])): ?>
+    <div class="eco-empty" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;text-align:left;margin-bottom:1.25rem;max-width:420px;">
+        ⚖️ Ajustes por sanciones este mes: <strong><?= $actDetalleEstrellas['azules_ajustes'] > 0 ? '+' : '' ?><?= (int)$actDetalleEstrellas['azules_ajustes'] ?> ⭐</strong>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($actDetalleEstrellas['votos_emitidos'])): ?>
+    <div class="eco-empty" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;text-align:left;margin-bottom:1.25rem;max-width:420px;">
+        🗳️ Por calificar a compañeros: <strong>+<?= $fmtEst($actDetalleEstrellas['azules_votos']) ?> ⭐</strong>
+        (<?= (int)$actDetalleEstrellas['votos_emitidos'] ?> voto<?= $actDetalleEstrellas['votos_emitidos'] == 1 ? '' : 's' ?>)
+    </div>
+    <?php endif; ?>
+
+    <p class="rep-sub-title">🧹 Actividades reconocidas</p>
+    <?php if (empty($actDetalleTareas)): ?>
+    <div class="eco-empty">Sin actividades reconocidas en <?= $mesLabel ?>.</div>
+    <?php else: ?>
+    <div class="rep-list">
+        <?php foreach ($actDetalleTareas as $d):
+            $dow = $diasLabel[(int)date('w', strtotime($d['fecha']))];
+        ?>
+        <div class="rep-item">
+            <div>
+                <div class="rep-item__main"><?= htmlspecialchars($d['tarea']) ?></div>
+                <div class="rep-item__sub"><?= $dow ?> <?= date('d/m', strtotime($d['fecha'])) ?> · <?= htmlspecialchars($d['local_desc']) ?> · <?= htmlspecialchars($d['turno_desc']) ?></div>
+            </div>
+            <?php if ($d['sancionado']): ?>
+            <div style="text-align:right;">
+                <div class="rep-item__badge" style="color:#dc2626;">0 ⭐</div>
+                <span class="rep-item__estado--sancionado">🚫 Sancionado</span>
+            </div>
+            <?php else: ?>
+            <div class="rep-item__badge">+<?= $fmtEst($d['azules']) ?> ⭐</div>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
+    <p class="rep-sub-title">🗳️ Votos que dio</p>
+    <?php if (empty($actDetalleVotos)): ?>
+    <div class="eco-empty">No calificó a ningún compañero en <?= $mesLabel ?>.</div>
+    <?php else: ?>
+    <div class="rep-list">
+        <?php foreach ($actDetalleVotos as $v):
+            $dow = $diasLabel[(int)date('w', strtotime($v['fecha']))];
+        ?>
+        <div class="rep-item">
+            <div>
+                <div class="rep-item__main">Calificó a <?= htmlspecialchars($v['beneficiario_nombre']) ?></div>
+                <div class="rep-item__sub"><?= htmlspecialchars($v['tarea']) ?> · <?= $dow ?> <?= date('d/m', strtotime($v['fecha'])) ?> · <?= htmlspecialchars($v['local_desc']) ?> · <?= htmlspecialchars($v['turno_desc']) ?></div>
+            </div>
+            <div class="rep-item__badge">+<?= $fmtEst($v['azul_ganado']) ?> ⭐</div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
+    <p class="rep-sub-title">📅 Turnos asistidos</p>
+    <?php if (empty($actDetalleTurnos)): ?>
+    <div class="eco-empty">Sin turnos registrados en <?= $mesLabel ?>.</div>
+    <?php else: ?>
+    <div class="rep-list">
+        <?php foreach ($actDetalleTurnos as $t):
+            $dow = $diasLabel[(int)date('w', strtotime($t['fecha']))];
+        ?>
+        <div class="rep-item">
+            <div>
+                <div class="rep-item__main"><?= $dow ?> <?= date('d/m', strtotime($t['fecha'])) ?></div>
+                <div class="rep-item__sub"><?= htmlspecialchars($t['local_desc'] ?? '—') ?> · <?= $turnoLabel[$t['turno_id']] ?? 'Turno' ?></div>
+            </div>
+            <div class="rep-item__badge" style="color:#dc2626;">+<?= (int)$t['tasa_roja'] ?> 🔴</div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
+    <?php endif; ?>
+
 </div>
 
 <script>
@@ -347,21 +494,22 @@ async function trAgregar() {
     else actShowMsg('trMsg', res.message || 'Error.', false);
 }
 
-// ── Filtro de nombres en el detalle de movimientos ───────
-function movFiltrar() {
-    const texto = document.getElementById('movFiltroNombre').value.trim().toLowerCase();
-    const filas = document.querySelectorAll('#movTabla tbody tr');
-    let visibles = 0;
-    filas.forEach(fila => {
-        const coincide = fila.dataset.nombres.includes(texto);
-        fila.style.display = coincide ? '' : 'none';
-        if (coincide) visibles++;
-    });
-    const vacio = document.getElementById('movVacio');
-    if (vacio) {
-        vacio.style.display = (texto && visibles === 0) ? 'block' : 'none';
-        document.getElementById('movVacioTexto').textContent = texto;
+// ── Tasa de estrellas azules por voto ────────────────────
+async function taAgregar() {
+    const data = {
+        monto:          document.getElementById('taNuevoMonto').value,
+        fecha_vigencia: document.getElementById('taNuevaFecha').value,
+    };
+    if (data.monto === '' || !data.fecha_vigencia) {
+        actShowMsg('taMsg', 'Completa la cantidad de estrellas y la fecha.', false);
+        return;
     }
+    const r   = await fetch(actApiUrl('/admin/api/tasa-azul-voto/agregar'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    });
+    const res = await r.json();
+    if (res.success) { actShowMsg('taMsg', 'Tasa guardada.', true); setTimeout(() => location.reload(), 900); }
+    else actShowMsg('taMsg', res.message || 'Error.', false);
 }
 
 // ── Catálogo de tareas de limpieza ───────────────────────
