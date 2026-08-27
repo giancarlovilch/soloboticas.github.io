@@ -216,7 +216,7 @@ function actualizarResumen(slots) {
 
     const libres = {};
     slots.forEach(s => {
-        if (s.rol_puesto === 'ALMACENERA' || s.rol_puesto === 'LIMPIEZA') return;
+        if (['ALMACENERA','LIMPIEZA','ABASTECIMIENTO','INVENTARIO','COMPRAS','AUDITORIA'].includes(s.rol_puesto)) return;
         const lid = s.local_id;
         if (!libres[lid]) libres[lid] = 0;
         if (!s.postulante_id) libres[lid]++;

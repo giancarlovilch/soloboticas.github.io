@@ -87,7 +87,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
 .hor-sala {
     background: var(--hor-card);
     border: 1px solid var(--hor-border);
-    border-top: 4px solid var(--sala-color);
+    border-top: 8px solid var(--sala-color);
     border-radius: 14px;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -102,11 +102,11 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
 .hor-sala__icono { font-size: 1.2rem; }
 
 /* ── TURNO ─────────────────────────────────────────── */
-.hor-turno-block { padding: 1rem 1.4rem 1.25rem; }
+.hor-turno-block { padding: 0.5rem 0.5rem 0.5rem; }
 .hor-turno-block + .hor-turno-block { border-top: 1px dashed var(--hor-border); padding-top: 1.25rem; }
 .hor-turno-label {
     font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
-    color: var(--hor-muted); margin-bottom: .75rem;
+    color: var(--hor-muted); 
     display: flex; align-items: center; gap: .4rem;
 }
 
@@ -152,7 +152,7 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
 
 /* ── ASIENTOS ─────────────────────────────────────── */
 .hor-asiento {
-    height: 44px;
+    height: 30px;
     border-radius: 7px;
     display: flex; align-items: center; justify-content: center;
     font-size: clamp(0.55rem, 1.3vw, 0.72rem); font-weight: 600;

@@ -13,6 +13,7 @@ $LOCALES     = [
     2 => ['nombre' => 'Local 2', 'color' => '#0097A7'],
     3 => ['nombre' => 'Local 3', 'color' => '#5b21b6'],
     4 => ['nombre' => 'Local 4', 'color' => '#d97706'],
+    5 => ['nombre' => 'Administración', 'color' => '#0f172a', 'icono' => '🗂️'],
 ];
 // $slotsConfig y $roles vienen del controller (desde BD)
 $slotsConfig = $slotsConfig ?? [];
@@ -20,9 +21,8 @@ $roles       = $roles       ?? [];
 
 $slotLabels = [
     3 => [
-        'VENDEDORA'  => [1 => 'sb3', 2 => 'sb5'],
-        'CAJERA'     => [1 => 'sb3', 2 => 'sb7', 3 => 'sb5'],
-        'ALMACENERA' => [1 => false, 2 => false],
+        'VENDEDORA' => [1 => 'sb3', 2 => 'sb5'],
+        'CAJERA'    => [1 => 'sb3', 2 => 'sb7', 3 => 'sb5'],
     ],
 ];
 
@@ -171,7 +171,7 @@ if ($semana) {
     ?>
     <section class="hor-sala" style="--sala-color:<?= $localInfo['color'] ?>;">
         <div class="hor-sala__titulo">
-            <span class="hor-sala__icono">🏪</span>
+            <span class="hor-sala__icono"><?= $localInfo['icono'] ?? '🏪' ?></span>
             <?= $localInfo['nombre'] ?>
             <button onclick="cargarSlots()"
                     title="Actualizar turnos"
@@ -208,7 +208,10 @@ if ($semana) {
                      style="--rol-color:<?= $rolColor ?>;">
                     <?php
                         $rolDesc  = htmlspecialchars($roles[$rol]['desc'] ?? $rol);
-                        $rolAbrev = ['CAJERA'=>'C','VENDEDORA'=>'V','LIMPIEZA'=>'L','ALMACENERA'=>'A'][$rol] ?? mb_substr($rolDesc, 0, 1);
+                        $rolAbrev = [
+                            'CAJERA'=>'C','VENDEDORA'=>'V','LIMPIEZA'=>'L','ALMACENERA'=>'A',
+                            'ABASTECIMIENTO'=>'Ab','INVENTARIO'=>'In','COMPRAS'=>'Co','AUDITORIA'=>'Au',
+                        ][$rol] ?? mb_substr($rolDesc, 0, 1);
                     ?>
                     <div class="hor-grid__rol-label">
                         <span class="hor-rol-full"><?= $rolDesc ?></span>

@@ -189,7 +189,7 @@ class HorarioController extends Controller
         $semanaId      = isset($_GET['semana']) ? (int)$_GET['semana'] : ($semanas[0]['id_semana'] ?? null);
         $semana        = $semanaId ? $this->repo->getSemanaById($semanaId) : null;
         $semanaProxima = $this->repo->getSemanaProxima();
-        $slotsConfig   = $this->repo->getSlotsConfig();
+        $slotsConfig   = $semanaId ? $this->repo->getSlotsConfigForSemana($semanaId) : [];
         $roles         = $this->repo->getRoles();
 
         require_once __DIR__ . '/../../views/horario/historial.php';

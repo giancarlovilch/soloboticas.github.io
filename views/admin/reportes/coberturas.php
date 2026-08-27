@@ -5,10 +5,14 @@ $meses    = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','
 $mesLabel = $meses[(int)$nmesF - 1] . ' ' . $anioF;
 
 $roles = [
-    'CAJERA'     => 'Cajera',
-    'VENDEDORA'  => 'Vendedora',
-    'ALMACENERA' => 'Almacenera',
-    'LIMPIEZA'   => 'Limpieza',
+    'CAJERA'         => 'Cajera',
+    'VENDEDORA'      => 'Vendedora',
+    'ALMACENERA'     => 'Almacenera',
+    'ABASTECIMIENTO' => 'Abastecimiento',
+    'INVENTARIO'     => 'Inventario',
+    'LIMPIEZA'       => 'Limpieza',
+    'COMPRAS'        => 'Compras',
+    'AUDITORIA'      => 'Auditoría',
 ];
 $turnoLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
 $diasLabel  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];

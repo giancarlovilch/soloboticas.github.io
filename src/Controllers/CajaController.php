@@ -536,6 +536,17 @@ class CajaController extends Controller
             exit;
         }
 
+        // Portero: para un cuadre ya cerrado, exige confirmar contraseña antes de
+        // mostrar los datos y deja registro de quién entró y cuándo. Al admin no
+        // se le pregunta: ya tiene acceso total y auditable por otras vías.
+        if ($userRol !== 'ADMIN' && empty($_SESSION['visita_confirmada'][$id])) {
+            $sesionId       = $id;
+            $origen         = 'REPORTE';
+            $nombreCompleto = $this->repo->getNombreCompleto($postulanteId) ?: $userName;
+            require_once __DIR__ . '/../../views/caja/confirmar_acceso.php';
+            return;
+        }
+
         $data = $this->repo->getReporte($id);
         extract($data); // $sesion, $detalle, $venta, $gastos, $rectifs
 
@@ -553,6 +564,9 @@ class CajaController extends Controller
 
         // Historial de cambios post-cierre
         $auditoria = $this->repo->getAuditoria($id);
+
+        // Registro de accesos (empadronamiento)
+        $visitas = $this->repo->getVisitas($id);
 
         require_once __DIR__ . '/../../views/caja/reporte.php';
     }
@@ -1047,7 +1061,9 @@ class CajaController extends Controller
         $opIngresos = (int)($data['oper_ingresos_bcp'] ?? -1);
         $opSalida   = (int)($data['oper_salida_bcp']   ?? -1);
         $opOtros    = (int)($data['oper_otros_bcp']    ?? -1);
-        if ($opIngresos < 0 || $opSalida < 0 || $opOtros < 0) {
+        $opSeguros  = (int)($data['oper_seguros_bcp']  ?? 0);
+        $opTarjetas = (int)($data['oper_tarjetas_bcp'] ?? 0);
+        if ($opIngresos < 0 || $opSalida < 0 || $opOtros < 0 || $opSeguros < 0 || $opTarjetas < 0) {
             $this->error('Valor inválido', 422);
             return;
         }
@@ -1055,13 +1071,42 @@ class CajaController extends Controller
         $sesion = $this->repo->getSesionById($id);
         if (!$sesion) { $this->error('Sesión no encontrada', 404); return; }
 
-        $this->repo->updateNumOperacionesBcp($id, $opIngresos, $opSalida, $opOtros, $postulanteId);
+        $this->repo->updateNumOperacionesBcp($id, $opIngresos, $opSalida, $opOtros, $postulanteId, $opSeguros, $opTarjetas);
         $this->success('Operaciones BCP actualizadas', [
-            'num_operaciones_bcp' => $opIngresos + $opSalida,
+            'num_operaciones_bcp' => $opIngresos + $opSalida
+                + ($opSeguros  * \CajaRepository::EQUIV_SEGURO_BCP)
+                + ($opTarjetas * \CajaRepository::EQUIV_TARJETA_BCP),
             'oper_ingresos_bcp'   => $opIngresos,
             'oper_salida_bcp'     => $opSalida,
             'oper_otros_bcp'      => $opOtros,
+            'oper_seguros_bcp'    => $opSeguros,
+            'oper_tarjetas_bcp'   => $opTarjetas,
         ]);
+    }
+
+    // ── POST /caja/api/sesion/{id}/confirmar-visita ────────
+    // "Portero": confirma la contraseña de quien entra a ver un cuadre ya
+    // cerrado y deja registro (empadronamiento) de quién y cuándo.
+    public function confirmarVisita(int $id): void
+    {
+        $postulanteId = $this->requireAuth();
+        $data         = $this->getAllInput();
+        $password     = trim($data['password'] ?? '');
+        $origen       = in_array($data['origen'] ?? '', ['REPORTE', 'INCIDENCIA'], true)
+                      ? $data['origen'] : 'REPORTE';
+
+        if (empty($password)) { $this->error('La contraseña es requerida', 400); return; }
+        if (!$this->repo->verificarPasswordAdmin($postulanteId, $password)) {
+            $this->error('Contraseña incorrecta', 401);
+            return;
+        }
+
+        $sesion = $this->repo->getSesionById($id);
+        if (!$sesion) { $this->error('Sesión no encontrada', 404); return; }
+
+        $this->repo->registrarVisita($id, $postulanteId, $origen);
+        $_SESSION['visita_confirmada'][$id] = time();
+        $this->success('Acceso confirmado');
     }
 
     // ── Helper: transacción ────────────────────────────────

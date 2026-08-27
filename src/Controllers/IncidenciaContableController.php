@@ -148,14 +148,29 @@ class IncidenciaContableController extends Controller
             exit;
         }
         $postulanteId = $this->requireEditableIncidenciaPage($incidencia);
+
+        $cajaRepo = new CajaRepository();
+        $sesionId = (int)$incidencia['sesion_origen_id'];
+
+        // Portero: si el cuadre que respalda esta incidencia ya está cerrado,
+        // exige confirmar contraseña antes de mostrar los datos y deja registro
+        // de quién entró y cuándo (compartido con /caja/reporte/{id}). Al admin
+        // no se le pregunta: ya tiene acceso total y auditable por otras vías.
+        $sesionChk = $cajaRepo->getSesionById($sesionId);
+        if ($userRol !== 'ADMIN' && $sesionChk && $sesionChk['estado'] === 'CERRADA' && empty($_SESSION['visita_confirmada'][$sesionId])) {
+            $origen         = 'INCIDENCIA';
+            $nombreCompleto = $cajaRepo->getNombreCompleto($postulanteId) ?: $userName;
+            require_once __DIR__ . '/../../views/caja/confirmar_acceso.php';
+            return;
+        }
+
         $movimientos  = $this->repo->getMovimientos($id);
 
-        $cajaRepo      = new CajaRepository();
         $sbRepo        = new SoloBankRepository();
         $tpRepo        = new TerminalPosRepository();
-        $sesionId      = (int)$incidencia['sesion_origen_id'];
         $reporte       = $cajaRepo->getReporte($sesionId);
         $auditoriaCaja = $cajaRepo->getAuditoria($sesionId);
+        $visitasCuadre = $cajaRepo->getVisitas($sesionId);
         $valesDisponibles   = $sbRepo->getValesDisponibles();
         $valesRegDisponibles = $this->repo->getValesDisponibles();
         $valesRegPropios     = $this->repo->getValesByIncidencia($id);

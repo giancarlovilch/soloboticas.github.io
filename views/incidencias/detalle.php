@@ -373,6 +373,40 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
 
             <div class="group-label">Datos del arqueo</div>
 
+            <!-- ── 0. Registro de accesos (empadronamiento) ─────── -->
+            <?php
+            $tieneVisitasInc  = !empty($visitasCuadre ?? []);
+            $totalIngresosInc = $tieneVisitasInc ? array_sum(array_column($visitasCuadre, 'veces')) : 0;
+            ?>
+            <div class="card card--blue">
+                <div class="card-head">
+                    <p class="card-title">🔒 Registro de accesos a este cuadre</p>
+                    <?php if ($tieneVisitasInc): ?>
+                    <span style="font-size:.72rem;color:#94a3b8;">
+                        <?= count($visitasCuadre) ?> persona<?= count($visitasCuadre) !== 1 ? 's' : '' ?>
+                        · <?= $totalIngresosInc ?> ingreso<?= $totalIngresosInc !== 1 ? 's' : '' ?>
+                    </span>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body">
+                    <?php if ($tieneVisitasInc): ?>
+                    <ul class="item-list">
+                        <?php foreach ($visitasCuadre as $v): ?>
+                        <li>
+                            <span class="item-desc"><?= htmlspecialchars($v['visitante']) ?></span>
+                            <span style="font-size:.73rem;color:#64748b;">
+                                <strong style="color:#0e7490;"><?= (int)$v['veces'] ?></strong> veces
+                                · última: <?= date('d/m/y H:i', strtotime($v['ultima_visita'])) ?>
+                            </span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php else: ?>
+                    <p style="font-size:.8rem;color:#94a3b8;margin:0;">Nadie ha confirmado su ingreso todavía.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+
             <!-- ── 1. Conteo de efectivo ──────────────────────── -->
             <div class="card card--blue">
                 <div class="card-head">
@@ -466,6 +500,8 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     $opIngActual = (int)($dc['oper_ingresos_bcp'] ?? 0);
                     $opSalActual = (int)($dc['oper_salida_bcp']   ?? 0);
                     $opOtrActual = (int)($dc['oper_otros_bcp']    ?? 0);
+                    $opSegActual = (int)($dc['oper_seguros_bcp']  ?? 0);
+                    $opTarActual = (int)($dc['oper_tarjetas_bcp'] ?? 0);
                     ?>
                     <hr class="sec-divider" style="margin:.9rem 0 .6rem;">
                     <div>
@@ -475,17 +511,33 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                                 Operaciones (bono): <strong id="numBcpActual"><?= $numOpsBcp !== null ? (int)$numOpsBcp : '—' ?></strong>
                             </span>
                         </div>
-                        <div style="display:flex;align-items:flex-end;gap:.5rem;flex-wrap:wrap;">
-                            <div style="display:flex;flex-direction:column;gap:.2rem;background:#d1fae5;border:1.5px solid #a7f3d0;border-radius:7px;padding:.35rem .5rem;">
-                                <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#059669;">Total</label>
-                                <input type="number" min="0" step="1" id="bcpTotalInput" value="<?= $opIngActual + $opSalActual + $opOtrActual ?>"
-                                       style="width:60px;padding:.2rem .3rem;border:1px solid #a7f3d0;border-radius:5px;font-size:.85rem;font-weight:700;text-align:center;font-family:inherit;outline:none;background:#fff;">
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.6rem;">
+                            <div style="display:flex;gap:.5rem;">
+                                <div style="display:flex;flex-direction:column;gap:.2rem;background:#d1fae5;border:1.5px solid #a7f3d0;border-radius:7px;padding:.35rem .5rem;">
+                                    <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#059669;">Total</label>
+                                    <input type="number" min="0" step="1" id="bcpTotalInput" value="<?= $opIngActual + $opSalActual + $opOtrActual ?>"
+                                           style="width:60px;padding:.2rem .3rem;border:1px solid #a7f3d0;border-radius:5px;font-size:.85rem;font-weight:700;text-align:center;font-family:inherit;outline:none;background:#fff;">
+                                </div>
+                                <div style="display:flex;flex-direction:column;gap:.2rem;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:7px;padding:.35rem .5rem;">
+                                    <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#64748b;">Otros</label>
+                                    <input type="number" min="0" step="1" id="bcpOtrosInput" value="<?= $opOtrActual ?>"
+                                           style="width:60px;padding:.2rem .3rem;border:1px solid #e2e8f0;border-radius:5px;font-size:.85rem;font-weight:700;text-align:center;font-family:inherit;outline:none;background:#fff;">
+                                </div>
                             </div>
-                            <div style="display:flex;flex-direction:column;gap:.2rem;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:7px;padding:.35rem .5rem;">
-                                <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#64748b;">Otros</label>
-                                <input type="number" min="0" step="1" id="bcpOtrosInput" value="<?= $opOtrActual ?>"
-                                       style="width:60px;padding:.2rem .3rem;border:1px solid #e2e8f0;border-radius:5px;font-size:.85rem;font-weight:700;text-align:center;font-family:inherit;outline:none;background:#fff;">
+                            <div style="display:flex;gap:.5rem;">
+                                <div style="display:flex;flex-direction:column;gap:.2rem;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:7px;padding:.35rem .5rem;">
+                                    <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#2563eb;">Seguros <span style="font-weight:500;text-transform:none;">(1=50)</span></label>
+                                    <input type="number" min="0" step="1" id="bcpSegurosInput" value="<?= $opSegActual ?>"
+                                           style="width:60px;padding:.2rem .3rem;border:1px solid #bfdbfe;border-radius:5px;font-size:.85rem;font-weight:700;text-align:center;font-family:inherit;outline:none;background:#fff;">
+                                </div>
+                                <div style="display:flex;flex-direction:column;gap:.2rem;background:#fdf4ff;border:1.5px solid #f0abfc;border-radius:7px;padding:.35rem .5rem;">
+                                    <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#a21caf;">Tarjetas <span style="font-weight:500;text-transform:none;">(1=200)</span></label>
+                                    <input type="number" min="0" step="1" id="bcpTarjetasInput" value="<?= $opTarActual ?>"
+                                           style="width:60px;padding:.2rem .3rem;border:1px solid #f0abfc;border-radius:5px;font-size:.85rem;font-weight:700;text-align:center;font-family:inherit;outline:none;background:#fff;">
+                                </div>
                             </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:.5rem;margin-top:.5rem;">
                             <button class="btn btn-primary btn-sm" onclick="guardarNumBcp()">Guardar</button>
                             <span id="bcpAlert" style="display:none;" class="alert"></span>
                         </div>
@@ -2013,9 +2065,11 @@ async function guardarConteo() {
 
 // ── Guardar operaciones BCP ─────────────────────────────
 async function guardarNumBcp() {
-    const total = parseInt(document.getElementById('bcpTotalInput').value, 10);
-    const otros = parseInt(document.getElementById('bcpOtrosInput').value, 10);
-    if ([total, otros].some(v => isNaN(v) || v < 0)) {
+    const total    = parseInt(document.getElementById('bcpTotalInput').value, 10);
+    const otros    = parseInt(document.getElementById('bcpOtrosInput').value, 10);
+    const seguros  = parseInt(document.getElementById('bcpSegurosInput').value, 10) || 0;
+    const tarjetas = parseInt(document.getElementById('bcpTarjetasInput').value, 10) || 0;
+    if ([total, otros, seguros, tarjetas].some(v => isNaN(v) || v < 0)) {
         mostrarAlerta('bcpAlert', 'Valor inválido', 'err');
         return;
     }
@@ -2023,9 +2077,10 @@ async function guardarNumBcp() {
     try {
         await apiPost(`${BASE}/caja/api/sesion/${SESION_ID}/num-ops-bcp`, {
             oper_ingresos_bcp: monetario, oper_salida_bcp: 0, oper_otros_bcp: otros,
+            oper_seguros_bcp: seguros, oper_tarjetas_bcp: tarjetas,
         });
         mostrarAlerta('bcpAlert', '✓ Actualizado', 'ok');
-        document.getElementById('numBcpActual').textContent = monetario;
+        document.getElementById('numBcpActual').textContent = monetario + (seguros * 50) + (tarjetas * 200);
         setTimeout(() => location.reload(), 900);
     } catch(e) {
         mostrarAlerta('bcpAlert', e.message, 'err');

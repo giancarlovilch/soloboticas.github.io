@@ -9,6 +9,7 @@ $LOCALES = [
     2 => ['nombre' => 'Local 2', 'color' => '#0097A7'],
     3 => ['nombre' => 'Local 3', 'color' => '#5b21b6'],
     4 => ['nombre' => 'Local 4', 'color' => '#d97706'],
+    5 => ['nombre' => 'Administración', 'color' => '#0f172a', 'icono' => '🗂️'],
 ];
 $slotsConfig = $slotsConfig ?? [];
 $roles       = $roles       ?? [];
@@ -131,7 +132,7 @@ if ($semana) {
     ?>
     <section class="hor-sala" style="--sala-color:<?= $localInfo['color'] ?>;">
         <div class="hor-sala__titulo">
-            <span class="hor-sala__icono">🏪</span>
+            <span class="hor-sala__icono"><?= $localInfo['icono'] ?? '🏪' ?></span>
             <?= $localInfo['nombre'] ?>
         </div>
 
@@ -266,7 +267,7 @@ function renderSlotsHistorial(slots) {
             el.className = 'hor-asiento hor-asiento--libre';
             el.querySelector('.hor-asiento__nombre').textContent = '—';
             if (ES_ADMIN) agregarBtnPickerH(el);
-            if (s.rol_puesto !== 'ALMACENERA' && s.rol_puesto !== 'LIMPIEZA') {
+            if (!['ALMACENERA','LIMPIEZA','ABASTECIMIENTO','INVENTARIO','COMPRAS','AUDITORIA'].includes(s.rol_puesto)) {
                 libres[s.local_id] = (libres[s.local_id] || 0) + 1;
             }
         }

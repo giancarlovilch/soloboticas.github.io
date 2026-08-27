@@ -5,6 +5,14 @@ $userRol   = $userRol  ?? $_SESSION['user_rol']  ?? 'STAFF';
 $diasSemana = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 $meses      = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)date('n') - 1] . ' de ' . date('Y');
+$estrellas  = $estrellas ?? ['rojas' => 0, 'azules' => 0, 'turnos' => 0];
+$estRojas   = (int)$estrellas['rojas'];
+$estAzules  = (float)$estrellas['azules'];
+$estTotal   = max(1, $estRojas + $estAzules);
+$estPctAzul = round(($estAzules / $estTotal) * 100);
+$fmtEst     = fn($v) => (floor($v) == $v) ? (string)(int)$v : number_format($v, 1);
+$estDiferencia = (float)($estrellas['diferencia'] ?? ($estRojas - $estAzules));
+$estMonto      = (float)($estrellas['monto']      ?? round($estDiferencia * 0.10, 2));
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -67,6 +75,60 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
         @media (max-width: 480px) {
             .db-grid { grid-template-columns: 1fr; }
         }
+
+        /* Balanza de estrellas */
+        .estrellas-card {
+            background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px;
+            padding: 1rem 1.1rem; 
+        }
+        .estrellas-hd {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: .6rem;
+        }
+        .estrellas-hd__title {
+            font-size: .72rem; font-weight: 800; text-transform: uppercase;
+            letter-spacing: .06em; color: #64748b;
+        }
+        .estrellas-monto {
+            font-size: .78rem; font-weight: 800; padding: .25rem .65rem; border-radius: 20px;
+            white-space: nowrap;
+        }
+        .estrellas-monto--contra { background: #fee2e2; color: #dc2626; }
+        .estrellas-monto--favor  { background: #dbeafe; color: #1d4ed8; }
+        .estrellas-monto--parejo { background: #f1f5f9; color: #64748b; }
+        .estrellas-bar {
+            position: relative; height: 14px; border-radius: 999px; overflow: hidden;
+            background: #dc2626; display: flex;
+        }
+        .estrellas-bar__azul {
+            background: linear-gradient(90deg,#3b82f6,#1d4ed8);
+            height: 100%;
+        }
+        .estrellas-bar__rojo {
+            background: linear-gradient(90deg,#ef4444,#dc2626);
+            height: 100%; flex: 1;
+        }
+        .estrellas-rate {
+            font-size: .68rem; color: #94a3b8; margin: -.2rem 0 .55rem; display: flex;
+            align-items: center; gap: .3rem;
+        }
+        .estrellas-rate strong { color: #64748b; font-weight: 700; }
+        .estrellas-bar-labels {
+            display: flex; justify-content: space-between; margin-top: .3rem;
+            font-size: .78rem; font-weight: 800;
+        }
+        .estrellas-bar-labels .azul { color: #1d4ed8; }
+        .estrellas-bar-labels .rojo { color: #dc2626; }
+        .estrellas-msg { font-size: .72rem; color: #64748b; margin-top: .55rem; }
+        .estrellas-actions { display: flex; gap: .5rem; margin-top: .65rem; }
+        .estrellas-cta {
+            flex: 1; text-align: center; padding: .5rem .5rem;
+            border-radius: 8px; background: #1d4ed8; color: #fff; text-decoration: none;
+            font-size: .76rem; font-weight: 700;
+        }
+        .estrellas-cta--ghost {
+            background: #eff6ff; color: #1d4ed8; border: 1.5px solid #bfdbfe;
+        }
     </style>
 </head>
 <body>
@@ -100,6 +162,38 @@ $diaLabel   = $diasSemana[date('w')] . ', ' . date('d') . ' de ' . $meses[(int)d
     <section class="staff-card staff-clock-card">
         <div class="staff-clock" id="reloj">00:00:00</div>
         <div class="staff-date"><?= $diaLabel ?></div>
+    </section>
+
+    <!-- ── Balanza de estrellas del mes ─────────────────── -->
+    <section class="estrellas-card">
+        <div class="estrellas-hd">
+            <span class="estrellas-hd__title">⭐ Estrellas del mes</span>
+            <?php if ($estDiferencia > 0): ?>
+            <span class="estrellas-monto estrellas-monto--contra">⚠️ S/ <?= number_format(abs($estMonto), 2) ?> en contra</span>
+            <?php elseif ($estDiferencia < 0): ?>
+            <span class="estrellas-monto estrellas-monto--favor">✅ S/ <?= number_format(abs($estMonto), 2) ?> a favor</span>
+            <?php else: ?>
+            <span class="estrellas-monto estrellas-monto--parejo">S/ 0.00 · parejo</span>
+            <?php endif; ?>
+        </div>
+        <p class="estrellas-rate">⭐ = <strong>S/ 0.10</strong> · así se calcula al cierre del mes</p>
+        <div class="estrellas-bar">
+            <div class="estrellas-bar__azul" style="width:<?= $estPctAzul ?>%;"></div>
+            <div class="estrellas-bar__rojo"></div>
+        </div>
+        <div class="estrellas-bar-labels">
+            <span class="azul"><?= $fmtEst($estAzules) ?></span>
+            <span class="rojo"><?= $estRojas ?></span>
+        </div>
+        <?php if ($estAzules >= $estRojas): ?>
+        <p class="estrellas-msg">✅ Vas ganando. Sigue sumando azules para cerrar el mes arriba.</p>
+        <?php else: ?>
+        <p class="estrellas-msg">⚠️ Las rojas van ganando. Gana azules para emparejar la balanza.</p>
+        <?php endif; ?>
+        <div class="estrellas-actions">
+            <a href="<?= $basePath ?>/staff/estrellas" class="estrellas-cta">⭐ Ganar estrellas</a>
+            <a href="<?= $basePath ?>/staff/estrellas/resumen" class="estrellas-cta estrellas-cta--ghost">📋 Resumen</a>
+        </div>
     </section>
 
     <!-- ── Grid de módulos ──────────────────────────────── -->

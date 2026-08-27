@@ -32,6 +32,31 @@ class HorarioRepository
     }
 
     /**
+     * Configuración de slots de una semana puntual, leída desde horario_slot real
+     * (no desde la plantilla vigente). Necesario para el historial: una semana pasada
+     * debe mostrar los roles que existían en ese momento, aunque la plantilla haya
+     * cambiado después (p. ej. Almacenera reemplazada por Abastecimiento/Inventario).
+     * Devuelve [local_id => [codigo_rol => cantidad]]
+     */
+    public function getSlotsConfigForSemana(int $semanaId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT hs.local_id, rh.codigo, MAX(hs.slot_num) AS cantidad, rh.orden
+             FROM horario_slot hs
+             INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+             WHERE hs.semana_id = :sid
+             GROUP BY hs.local_id, rh.id_rol_horario, rh.codigo, rh.orden
+             ORDER BY hs.local_id, rh.orden"
+        );
+        $stmt->execute(['sid' => $semanaId]);
+        $config = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $config[$r['local_id']][$r['codigo']] = (int)$r['cantidad'];
+        }
+        return $config;
+    }
+
+    /**
      * Roles disponibles: [codigo => ['desc' => '...', 'opcional' => 0/1]]
      */
     public function getRoles(): array

@@ -2,42 +2,39 @@
 $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
 $modo     = $modo ?? 'pendientes';
 
+// Paleta decorativa 1..10 (roja→verde). Para "ánimo" se usa invertida (más fuego = peor).
+$paleta = ['#ef4444','#f0653a','#f4854a','#f5a83c','#eab308','#bef264','#a3e635','#4ade80','#22c55e','#16a34a'];
+$paletaInv = array_reverse($paleta);
+
+// Cada aspecto con su propio sticker, variado y alegre.
+$aspectos = [
+    'puntualidad'  => ['label' => '⏰ Puntualidad',         'icono' => '⏰', 'paleta' => $paleta,
+                        'hint' => '¿Llegó puntual a su turno?', 'malo' => '😞', 'bueno' => '😊'],
+    'orden'        => ['label' => '🗂️ Orden',               'icono' => '🗂️', 'paleta' => $paleta,
+                        'hint' => '¿Trabajó de forma ordenada y dejó su área en orden?', 'malo' => '😞', 'bueno' => '😊'],
+    'higiene'      => ['label' => '🧼 Higiene',              'icono' => '🧼', 'paleta' => $paleta,
+                        'hint' => '¿Mantuvo una higiene personal impecable?', 'malo' => '😞', 'bueno' => '😊'],
+    'presentacion' => ['label' => '✨ Presentación personal','icono' => '✨', 'paleta' => $paleta,
+                        'hint' => '¿Se presentó con uniforme e imagen impecables?', 'malo' => '😞', 'bueno' => '😊'],
+    'animo'        => ['label' => '🔥 Estado de ánimo',      'icono' => '🔥', 'paleta' => $paletaInv,
+                        'hint' => '', 'malo' => '😠', 'bueno' => '😊'],
+    'uso_celular'  => ['label' => '📱 Uso de celular',       'icono' => '📱', 'paleta' => $paleta,
+                        'hint' => '¿Se mantuvo alejado del teléfono durante su turno?', 'malo' => '😞', 'bueno' => '😊'],
+    'confianza'    => ['label' => '🛡️ Confianza / Honestidad','icono' => '🛡️', 'paleta' => $paleta,
+                        'hint' => '¿Trabajó con ética, moral y valores, sin hacer trampa?', 'malo' => '😞', 'bueno' => '😊'],
+];
+
 // ── Variables modo "mis-encuestas" ────────────────────
 if ($modo === 'mis-encuestas') {
     $mesesNomCompleto = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     $mesLabel     = $mesesNomCompleto[(int)date('n', strtotime($desde)) - 1] . ' ' . date('Y', strtotime($desde));
     $mesPasado    = date('Y-m', strtotime($desde . ' -1 month'));
     $mesSiguiente = date('Y-m', strtotime($desde . ' +1 month'));
-    $mesActual    = date('Y-m');
+    $mesActual    = $mesActual ?? date('Y-m');
     $diasLabel    = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
     $turnoLabel   = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
-
-    $puntInfo = [
-        'MUY_TEMPRANO' => ['label'=>'+10 min antes', 'bg'=>'#eff6ff','color'=>'#1e40af'],
-        'TEMPRANO'     => ['label'=>'Temprano',       'bg'=>'#f0fdfe','color'=>'#0e7490'],
-        'TARDE'        => ['label'=>'Tarde',           'bg'=>'#fef3c7','color'=>'#92400e'],
-        'MUY_TARDE'    => ['label'=>'+10 min tarde',   'bg'=>'#fee2e2','color'=>'#991b1b'],
-    ];
-
-    $slotsPorFechaTurno = [];
-    foreach ($slots as $s) { $slotsPorFechaTurno[$s['fecha_dia']][$s['turno_id']] = $s; }
-
-    $fechas = array_unique(array_merge(
-        array_keys($slotsPorFechaTurno),
-        array_keys($asistPorFecha)
-    ));
-    sort($fechas);
-
-    $totalManana = 0; $totalTarde = 0;
-    foreach ($slots as $s) { if ($s['turno_id'] == 1) $totalManana++; else $totalTarde++; }
-
-    $conFicha = 0; $conFalta = 0;
-    foreach ($slots as $s) {
-        $a = $asistPorFecha[$s['fecha_dia']][$s['turno_id']] ?? $asistPorFecha[$s['fecha_dia']][0] ?? null;
-        if ($a && $a['estado'] === 'FALTA') $conFalta++;
-        elseif ($a) $conFicha++;
-    }
-    $sinRegistro = count($slots) - $conFicha - $conFalta;
+    $promedios    = $promedios ?? [];
+    $detalle      = $detalle   ?? [];
 }
 
 // ── Variables modo "pendientes" ───────────────────────
@@ -46,17 +43,10 @@ if ($modo === 'pendientes') {
     $desde            = $desde            ?? date('Y-m-01');
     $hasta            = $hasta            ?? date('Y-m-d');
     $filtroTrabajador = $filtroTrabajador ?? 0;
-    $soloSinCalif     = $soloSinCalif     ?? true;
+    $soloSinCalif     = $soloSinCalif     ?? false;
 
-    $sinFicha = count(array_filter($slotsData, fn($s) => !$s['id_asistencia']));
-    $total    = count($slotsData);
-
-    $puntInfo = [
-        'MUY_TEMPRANO' => ['label'=>'+10 min antes', 'bg'=>'#eff6ff','color'=>'#1e40af'],
-        'TEMPRANO'     => ['label'=>'Temprano',       'bg'=>'#f0fdfe','color'=>'#0e7490'],
-        'TARDE'        => ['label'=>'Tarde',           'bg'=>'#fef3c7','color'=>'#92400e'],
-        'MUY_TARDE'    => ['label'=>'+10 min tarde',   'bg'=>'#fee2e2','color'=>'#991b1b'],
-    ];
+    $sinCalificar = count(array_filter($slotsData, fn($s) => !$s['id_encuesta']));
+    $total        = count($slotsData);
 }
 ?>
 <!DOCTYPE html>
@@ -85,12 +75,9 @@ if ($modo === 'pendientes') {
 
         /* Botones de acción en tabla */
         .mh-acc { display:flex;gap:.3rem;flex-wrap:wrap;align-items:center; }
-        .mh-btn { border:none;border-radius:6px;padding:4px 10px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap; }
-        .mh-btn--entrada  { background:#0097A7;color:#fff; }
-        .mh-btn--salida   { background:#7c3aed;color:#fff; }
-        .mh-btn--falta    { background:#dc2626;color:#fff; }
-        .mh-btn--revertir { background:transparent;border:1px solid #fca5a5 !important;color:#dc2626; }
-        .mh-btn--filled   { opacity:.75; }
+        .mh-btn { border:none;border-radius:6px;padding:5px 12px;font-size:.74rem;font-weight:700;cursor:pointer;white-space:nowrap; }
+        .mh-btn--calificar { background:#0097A7;color:#fff; }
+        .mh-btn--filled    { background:#7c3aed; }
 
         /* Selector de modo */
         .mh-mode-bar { display:flex;gap:.5rem;margin-bottom:1.25rem;border-bottom:2px solid #e2e8f0;padding-bottom:.75rem; }
@@ -105,46 +92,36 @@ if ($modo === 'pendientes') {
         /* Modal overlay */
         .mh-ov { position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:500;display:flex;align-items:center;justify-content:center; }
         .mh-ov[hidden] { display:none!important; }
-        .mh-modal { background:#fff;border-radius:14px;padding:1.5rem;width:480px;max-width:96vw;box-shadow:0 20px 60px rgba(0,0,0,.22);max-height:92vh;overflow-y:auto; }
+        .mh-modal { background:#fff;border-radius:14px;padding:1.5rem;width:620px;max-width:96vw;box-shadow:0 20px 60px rgba(0,0,0,.22);max-height:92vh;overflow-y:auto; }
         .mh-modal h3 { font-size:1rem;font-weight:700;margin:0 0 .25rem;color:#1e293b; }
         .mh-modal-sub { font-size:.75rem;color:#64748b;margin-bottom:1rem; }
-        .mh-err { font-size:.75rem;color:#dc2626;margin-bottom:.5rem;display:none; }
+        .mh-err { font-size:.75rem;color:#dc2626;margin-bottom:.5rem;display:none;background:#fee2e2;border-radius:8px;padding:.5rem .7rem; }
         .mh-modal__footer { display:flex;gap:.5rem;justify-content:flex-end;margin-top:.75rem; }
         .mh-modal__footer button { border:none;border-radius:7px;padding:.5rem 1.1rem;font-size:.82rem;font-weight:700;cursor:pointer; }
 
-        /* Radio button groups */
-        .mh-field { margin-bottom:.7rem; }
-        .mh-field__label { font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:.3rem; }
-        .mh-rg { display:flex;gap:.3rem;flex-wrap:wrap; }
-        .mh-rb { padding:.38rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;background:#fff;color:#475569;transition:all .13s;line-height:1.3;text-align:center; }
-        .mh-rb small { display:block;font-size:.62rem;font-weight:400;color:#94a3b8;margin-top:1px; }
-        .mh-rb.active { border-color:#0097A7;background:#f0fdfe;color:#0e7490; }
-
-        /* Bloques de sección */
-        .mh-block { background:#f8fafc;border-radius:10px;padding:.7rem .85rem;margin-bottom:.65rem;border:1px solid #e8edf2; }
-        .mh-block__hd { font-size:.67rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:.55rem;display:flex;align-items:center;gap:.35rem; }
-        .mh-row-2 { display:grid;grid-template-columns:1fr 1fr;gap:.5rem; }
-
-        /* Variantes de color para botones (data-color) */
-        .mh-rb[data-color="blue"]   { border-color:#bfdbfe;color:#3b82f6; }
-        .mh-rb[data-color="green"]  { border-color:#a7f3d0;color:#10b981; }
-        .mh-rb[data-color="amber"]  { border-color:#fde68a;color:#d97706; }
-        .mh-rb[data-color="orange"] { border-color:#fed7aa;color:#f97316; }
-        .mh-rb[data-color="red"]    { border-color:#fecaca;color:#ef4444; }
-        .mh-rb[data-color="purple"] { border-color:#ddd6fe;color:#8b5cf6; }
-        .mh-rb[data-color="blue"].active   { border-color:#3b82f6;background:#dbeafe;color:#1e40af; }
-        .mh-rb[data-color="green"].active  { border-color:#10b981;background:#d1fae5;color:#065f46; }
-        .mh-rb[data-color="amber"].active  { border-color:#f59e0b;background:#fef3c7;color:#92400e; }
-        .mh-rb[data-color="orange"].active { border-color:#f97316;background:#ffedd5;color:#9a3412; }
-        .mh-rb[data-color="red"].active    { border-color:#ef4444;background:#fee2e2;color:#991b1b; }
-        .mh-rb[data-color="purple"].active { border-color:#8b5cf6;background:#ede9fe;color:#5b21b6; }
+        /* Bloques de aspecto (escala 1-10 tipo monedas) */
+        .mh-block { background:#f8fafc;border-radius:10px;padding:.7rem .85rem;margin-bottom:.6rem;border:1px solid #e8edf2; }
+        .mh-block--confianza { background:#f5f3ff;border-color:#ddd6fe; }
+        .mh-block__hd { font-size:.78rem;font-weight:800;color:#1e293b;margin-bottom:.5rem;display:flex;align-items:center;justify-content:space-between; }
+        .mh-block__val { font-size:.72rem;font-weight:700;color:#64748b; }
+        .mh-scale { display:flex;gap:3px;flex-wrap:wrap; }
+        .mh-coin { font-size:1.35rem;line-height:1;background:none;border:none;cursor:pointer;opacity:.22;padding:2px;transition:opacity .1s,transform .1s; }
+        .mh-coin.on { opacity:1; }
+        .mh-coin:active { transform:scale(1.2); }
 
         .mh-pwd { display:flex;flex-direction:column;gap:.2rem;margin-top:.75rem;border-top:1px solid #f1f5f9;padding-top:.75rem; }
         .mh-pwd label { font-size:.75rem;font-weight:600;color:#475569; }
         .mh-pwd input { padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;outline:none;width:100%;box-sizing:border-box; }
-        textarea.mh-textarea { width:100%;padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.82rem;resize:vertical;min-height:60px;outline:none;box-sizing:border-box;font-family:inherit; }
 
-        @media(max-width:640px){ .mh-kpis{grid-template-columns:repeat(2,1fr);} }
+        /* Promedios (modo mis-encuestas) */
+        .mh-prom-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem;margin-bottom:1.25rem; }
+        .mh-prom-card { background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:.8rem .9rem;text-align:center; }
+        .mh-prom-card__num   { font-size:1.35rem;font-weight:800;color:#0097A7; }
+        .mh-prom-card__label { font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-top:2px; }
+        .mh-prom-bar { height:6px;border-radius:99px;background:#e2e8f0;margin-top:.4rem;overflow:hidden; }
+        .mh-prom-bar__fill { height:100%;background:linear-gradient(90deg,#f59e0b,#22c55e); }
+
+        @media(max-width:640px){ .mh-kpis{grid-template-columns:repeat(2,1fr);} .mh-prom-grid{grid-template-columns:repeat(2,1fr);} }
     </style>
 </head>
 <body style="background:#f1f5f9;min-height:100vh;">
@@ -166,166 +143,44 @@ if ($modo === 'pendientes') {
 </header>
 
 <?php if ($modo !== 'mis-encuestas'): ?>
-<!-- ── Modales (solo en modo pendientes) ──────────────── -->
-
-<!-- Modal revertir falta -->
-<div id="mhModalRevertir" class="mh-ov" hidden>
-    <div class="mh-modal" style="max-width:360px;">
-        <h3>Revertir falta</h3>
-        <p id="mhRevertirDesc" class="mh-modal-sub"></p>
-        <div id="mhRevertirErr" class="mh-err"></div>
-        <input type="hidden" id="mhRevertirId">
-        <div class="mh-pwd">
-            <label>Tu contraseña para confirmar</label>
-            <input type="password" id="mhRevertirPwd" placeholder="Tu contraseña de acceso">
-        </div>
-        <div class="mh-modal__footer">
-            <button onclick="cerrarModalRevertir()" style="background:#f1f5f9;color:#475569;">Cancelar</button>
-            <button onclick="confirmarRevertir()" style="background:#dc2626;color:#fff;">Revertir</button>
-        </div>
-    </div>
-</div>
-
-<!-- Modal falta -->
-<div id="mhModalFalta" class="mh-ov" hidden>
-    <div class="mh-modal" style="max-width:360px;">
-        <h3>Registrar falta</h3>
-        <p id="mhFaltaDesc" class="mh-modal-sub"></p>
-        <div style="background:#fee2e2;border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem;font-size:.82rem;color:#991b1b;font-weight:600;">
-            ⚠ Se registrará que este trabajador no se presentó a su turno.
-        </div>
-        <div id="mhFaltaErr" class="mh-err"></div>
-        <div class="mh-pwd">
-            <label>Tu contraseña *</label>
-            <input type="password" id="mhFaltaPwd" placeholder="Tu contraseña de acceso">
-        </div>
-        <div class="mh-modal__footer">
-            <button onclick="cerrarModalFalta()" style="background:#f1f5f9;color:#475569;">Cancelar</button>
-            <button onclick="confirmarFalta()" style="background:#dc2626;color:#fff;">Confirmar falta</button>
-        </div>
-    </div>
-</div>
-
-<!-- Modal encuesta -->
+<!-- ── Modal de calificación (solo en modo pendientes) ── -->
 <div id="mhModal" class="mh-ov" hidden>
     <div class="mh-modal">
         <h3 id="mhModalTitulo"></h3>
         <p id="mhModalDesc" class="mh-modal-sub"></p>
         <div id="mhErr" class="mh-err"></div>
 
-        <div id="mhSecEntrada">
-            <div class="mh-block">
-                <div class="mh-block__hd">⏰ Puntualidad al ingreso</div>
-                <div class="mh-rg">
-                    <button type="button" class="mh-rb" data-color="blue"   data-field="llegada_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRadio(this)">Muy anticipado <small>+10 min antes</small></button>
-                    <button type="button" class="mh-rb" data-color="green"  data-field="llegada_puntualidad" data-val="TEMPRANO"     onclick="pickRadio(this)">Con anticipación <small>menos de 10 min</small></button>
-                    <button type="button" class="mh-rb" data-color="orange" data-field="llegada_puntualidad" data-val="TARDE"        onclick="pickRadio(this)">Retraso leve <small>menos de 10 min</small></button>
-                    <button type="button" class="mh-rb" data-color="red"    data-field="llegada_puntualidad" data-val="MUY_TARDE"    onclick="pickRadio(this)">Retraso considerable <small>+10 min tarde</small></button>
-                </div>
+        <?php foreach ($aspectos as $campo => $a):
+            $esConfianza = $campo === 'confianza';
+        ?>
+        <div class="mh-block<?= $esConfianza ? ' mh-block--confianza' : '' ?>">
+            <div class="mh-block__hd">
+                <span><?= $a['label'] ?></span>
+                <span class="mh-block__val" id="val-<?= $campo ?>">—/10</span>
             </div>
-            <div class="mh-block">
-                <div class="mh-block__hd">🏪 Estado del área al ingreso</div>
-                <div class="mh-row-2">
-                    <div class="mh-field">
-                        <span class="mh-field__label">¿El área estaba ordenada?</span>
-                        <div class="mh-rg">
-                            <button type="button" class="mh-rb" data-color="green" data-field="area_ordenada_ingreso" data-val="1" onclick="pickRadio(this)">Sí</button>
-                            <button type="button" class="mh-rb" data-color="red"   data-field="area_ordenada_ingreso" data-val="0" onclick="pickRadio(this)">No</button>
-                        </div>
-                    </div>
-                    <div class="mh-field">
-                        <span class="mh-field__label">¿El área estaba limpia?</span>
-                        <div class="mh-rg">
-                            <button type="button" class="mh-rb" data-color="green" data-field="area_limpia_ingreso" data-val="1" onclick="pickRadio(this)">Sí</button>
-                            <button type="button" class="mh-rb" data-color="red"   data-field="area_limpia_ingreso" data-val="0" onclick="pickRadio(this)">No</button>
-                        </div>
-                    </div>
+            <?php if (!empty($a['hint'])): ?>
+            <p style="font-size:.68rem;color:<?= $esConfianza ? '#6d28d9' : '#94a3b8' ?>;margin:-.2rem 0 .45rem;"><?= $a['hint'] ?></p>
+            <?php endif; ?>
+            <div style="display:flex;align-items:center;gap:.4rem;">
+                <?php if (!empty($a['malo'])): ?><span style="font-size:1.25rem;" title="Mal ánimo"><?= $a['malo'] ?></span><?php endif; ?>
+                <div class="mh-scale" data-field="<?= $campo ?>">
+                    <?php for ($i = 1; $i <= 10; $i++): ?>
+                    <button type="button" class="mh-coin" data-field="<?= $campo ?>" data-val="<?= $i ?>"
+                            style="color:<?= $a['paleta'][$i-1] ?>;" onclick="pickScale(this)"><?= $a['icono'] ?></button>
+                    <?php endfor; ?>
                 </div>
-            </div>
-            <div class="mh-block">
-                <div class="mh-block__hd">👕 Presentación personal</div>
-                <div class="mh-field"><span class="mh-field__label">Higiene personal</span><div class="mh-rg">
-                    <button type="button" class="mh-rb" data-color="red"   data-field="aseo_personal" data-val="DEFICIENTE" onclick="pickRadio(this)">Deficiente</button>
-                    <button type="button" class="mh-rb" data-color="amber" data-field="aseo_personal" data-val="ACEPTABLE"  onclick="pickRadio(this)">Aceptable</button>
-                    <button type="button" class="mh-rb" data-color="green" data-field="aseo_personal" data-val="OPTIMO"     onclick="pickRadio(this)">Óptimo</button>
-                </div></div>
-                <div class="mh-field"><span class="mh-field__label">Uniforme e indumentaria</span><div class="mh-rg">
-                    <button type="button" class="mh-rb" data-color="red"   data-field="vestimenta" data-val="DESCUIDADO"  onclick="pickRadio(this)">Descuidado</button>
-                    <button type="button" class="mh-rb" data-color="amber" data-field="vestimenta" data-val="PRESENTABLE" onclick="pickRadio(this)">Presentable</button>
-                    <button type="button" class="mh-rb" data-color="green" data-field="vestimenta" data-val="IMPECABLE"   onclick="pickRadio(this)">Impecable</button>
-                </div></div>
-                <div class="mh-row-2">
-                    <div class="mh-field"><span class="mh-field__label">Estado de uñas</span><div class="mh-rg">
-                        <button type="button" class="mh-rb" data-color="red"   data-field="unas" data-val="DESCUIDADAS" onclick="pickRadio(this)">Descuidadas</button>
-                        <button type="button" class="mh-rb" data-color="amber" data-field="unas" data-val="ACEPTABLES"  onclick="pickRadio(this)">Aceptables</button>
-                        <button type="button" class="mh-rb" data-color="green" data-field="unas" data-val="CUIDADAS"    onclick="pickRadio(this)">Cuidadas</button>
-                    </div></div>
-                    <div class="mh-field"><span class="mh-field__label">Presentación del cabello</span><div class="mh-rg">
-                        <button type="button" class="mh-rb" data-color="red"   data-field="cabello" data-val="SUELTO"   onclick="pickRadio(this)">Suelto</button>
-                        <button type="button" class="mh-rb" data-color="green" data-field="cabello" data-val="RECOGIDO" onclick="pickRadio(this)">Recogido</button>
-                        <button type="button" class="mh-rb" data-color="green" data-field="cabello" data-val="MONO"     onclick="pickRadio(this)">Con moño</button>
-                    </div></div>
-                </div>
+                <?php if (!empty($a['bueno'])): ?><span style="font-size:1.25rem;" title="Buen ánimo"><?= $a['bueno'] ?></span><?php endif; ?>
             </div>
         </div>
+        <?php endforeach; ?>
 
-        <div id="mhSecSalida" hidden>
-            <div class="mh-block">
-                <div class="mh-block__hd">⏰ Puntualidad al retiro</div>
-                <div class="mh-rg">
-                    <button type="button" class="mh-rb" data-color="blue"   data-field="salida_puntualidad" data-val="MUY_TEMPRANO" onclick="pickRadio(this)">Muy anticipado <small>+10 min antes</small></button>
-                    <button type="button" class="mh-rb" data-color="green"  data-field="salida_puntualidad" data-val="TEMPRANO"     onclick="pickRadio(this)">Con anticipación <small>menos de 10 min</small></button>
-                    <button type="button" class="mh-rb" data-color="orange" data-field="salida_puntualidad" data-val="TARDE"        onclick="pickRadio(this)">Retraso leve <small>menos de 10 min</small></button>
-                    <button type="button" class="mh-rb" data-color="red"    data-field="salida_puntualidad" data-val="MUY_TARDE"    onclick="pickRadio(this)">Retraso considerable <small>+10 min tarde</small></button>
-                </div>
-            </div>
-            <div class="mh-block">
-                <div class="mh-block__hd">🧹 Cierre del turno</div>
-                <div class="mh-field"><span class="mh-field__label">Estado del área de trabajo al cierre</span><div class="mh-rg">
-                    <button type="button" class="mh-rb" data-color="red"   data-field="estado_area_cierre" data-val="DESCUIDADO"  onclick="pickRadio(this)">Descuidado</button>
-                    <button type="button" class="mh-rb" data-color="amber" data-field="estado_area_cierre" data-val="PRESENTABLE" onclick="pickRadio(this)">Presentable</button>
-                    <button type="button" class="mh-rb" data-color="green" data-field="estado_area_cierre" data-val="IMPECABLE"   onclick="pickRadio(this)">Impecable</button>
-                </div></div>
-                <div class="mh-row-2">
-                    <div class="mh-field"><span class="mh-field__label">¿Realizó la limpieza de su área?</span><div class="mh-rg">
-                        <button type="button" class="mh-rb" data-color="green" data-field="limpieza_area_cierre" data-val="1" onclick="pickRadio(this)">Sí</button>
-                        <button type="button" class="mh-rb" data-color="red"   data-field="limpieza_area_cierre" data-val="0" onclick="pickRadio(this)">No</button>
-                    </div></div>
-                    <div class="mh-field"><span class="mh-field__label">¿Dejó su área ordenada?</span><div class="mh-rg">
-                        <button type="button" class="mh-rb" data-color="green" data-field="area_ordenada_cierre" data-val="1" onclick="pickRadio(this)">Sí</button>
-                        <button type="button" class="mh-rb" data-color="red"   data-field="area_ordenada_cierre" data-val="0" onclick="pickRadio(this)">No</button>
-                    </div></div>
-                </div>
-                <div class="mh-field"><span class="mh-field__label">¿Participó en la apertura y/o cierre del local?</span><div class="mh-rg">
-                    <button type="button" class="mh-rb" data-color="green" data-field="participo_apertura_cierre" data-val="1" onclick="pickRadio(this)">Sí</button>
-                    <button type="button" class="mh-rb" data-color="red"   data-field="participo_apertura_cierre" data-val="0" onclick="pickRadio(this)">No</button>
-                </div></div>
-            </div>
-            <div class="mh-block">
-                <div class="mh-block__hd">📊 Evaluación del turno</div>
-                <div class="mh-field"><span class="mh-field__label">Uso del celular personal durante el turno</span><div class="mh-rg">
-                    <button type="button" class="mh-rb" data-color="green"  data-field="uso_celular" data-val="NO_USO"    onclick="pickRadio(this)">No usó el celular</button>
-                    <button type="button" class="mh-rb" data-color="amber"  data-field="uso_celular" data-val="OCASIONAL" onclick="pickRadio(this)">Uso ocasional</button>
-                    <button type="button" class="mh-rb" data-color="red"    data-field="uso_celular" data-val="FRECUENTE" onclick="pickRadio(this)">Uso frecuente</button>
-                </div></div>
-                <div class="mh-field"><span class="mh-field__label">Calificación general del turno</span><div class="mh-rg">
-                    <button type="button" class="mh-rb" data-color="red"    data-field="calificacion_turno" data-val="MALO"      onclick="pickRadio(this)">Malo</button>
-                    <button type="button" class="mh-rb" data-color="orange" data-field="calificacion_turno" data-val="REGULAR"   onclick="pickRadio(this)">Regular</button>
-                    <button type="button" class="mh-rb" data-color="green"  data-field="calificacion_turno" data-val="BUENO"     onclick="pickRadio(this)">Bueno</button>
-                    <button type="button" class="mh-rb" data-color="purple" data-field="calificacion_turno" data-val="EXCELENTE" onclick="pickRadio(this)">Excelente</button>
-                </div></div>
-            </div>
-        </div>
-
-        <div class="mh-sep">Comentarios</div>
-        <textarea id="mhComentarios" class="mh-textarea" maxlength="200" placeholder="Observaciones del turno (máx. 200 caracteres)"></textarea>
         <div class="mh-pwd">
             <label>Tu contraseña para confirmar *</label>
             <input type="password" id="mhPassword" placeholder="Tu contraseña de acceso">
         </div>
         <div class="mh-modal__footer">
             <button onclick="cerrarModal()" style="background:#f1f5f9;color:#475569;">Cancelar</button>
-            <button onclick="confirmarRegistro()" style="background:#0097A7;color:#fff;">Actualizar</button>
+            <button onclick="confirmarRegistro()" style="background:#0097A7;color:#fff;">Guardar</button>
         </div>
     </div>
 </div>
@@ -373,8 +228,8 @@ if ($modo === 'pendientes') {
 
     <p style="font-size:.75rem;color:#64748b;margin-bottom:.75rem;">
         <?= $total ?> turno<?= $total !== 1 ? 's' : '' ?>
-        <?php if ($sinFicha > 0): ?>
-        · <strong style="color:#dc2626;"><?= $sinFicha ?> sin ficha</strong>
+        <?php if ($sinCalificar > 0): ?>
+        · <strong style="color:#dc2626;"><?= $sinCalificar ?> sin calificar por ti</strong>
         <?php endif; ?>
     </p>
 
@@ -392,44 +247,21 @@ if ($modo === 'pendientes') {
                 <th>Compañero/a</th>
                 <th>Turno · Local</th>
                 <th>Estado</th>
-                <th>Llegada</th>
-                <th>Salida</th>
-                <th>Reg. por</th>
-                <th>Acciones</th>
+                <th>Acción</th>
             </tr>
         </thead>
         <tbody>
         <?php foreach ($slotsData as $s):
-            $asist    = $s['id_asistencia'] ? $s : null;
-            $esFalta  = $asist && $asist['estado'] === 'FALTA';
-            $llegPI   = $asist ? ($puntInfo[$asist['llegada_puntualidad'] ?? ''] ?? null) : null;
-            $salidPI  = $asist ? ($puntInfo[$asist['salida_puntualidad']  ?? ''] ?? null) : null;
-            $rowBg    = !$asist ? '#fafafa' : ($esFalta ? '#fff5f5' : '');
-
-            $asistData = $asist ? [
-                'llegada_puntualidad'       => $asist['llegada_puntualidad'],
-                'area_ordenada_ingreso'     => $asist['area_ordenada_ingreso'],
-                'area_limpia_ingreso'       => $asist['area_limpia_ingreso'],
-                'aseo_personal'             => $asist['aseo_personal'],
-                'vestimenta'                => $asist['vestimenta'],
-                'unas'                      => $asist['unas'],
-                'cabello'                   => $asist['cabello'],
-                'salida_puntualidad'        => $asist['salida_puntualidad'],
-                'estado_area_cierre'        => $asist['estado_area_cierre'],
-                'limpieza_area_cierre'      => $asist['limpieza_area_cierre'],
-                'area_ordenada_cierre'      => $asist['area_ordenada_cierre'],
-                'participo_apertura_cierre' => $asist['participo_apertura_cierre'],
-                'uso_celular'               => $asist['uso_celular'],
-                'calificacion_turno'        => $asist['calificacion_turno'],
-                'comentarios_ficha'         => $asist['comentarios_ficha'],
-                'id_asistencia'             => $asist['id_asistencia'],
-            ] : null;
-            $asistJson = htmlspecialchars(json_encode($asistData), ENT_QUOTES);
+            $yaCalificado = (bool)$s['id_encuesta'];
+            $encData = $yaCalificado ? array_intersect_key($s, array_flip([
+                'puntualidad','orden','higiene','presentacion','animo','uso_celular',
+            ])) : null;
+            $encJson = htmlspecialchars(json_encode($encData), ENT_QUOTES);
             $diasLabel = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
             $dow  = $diasLabel[(int)date('w', strtotime($s['fecha_dia']))];
             $diaN = date('d/m', strtotime($s['fecha_dia']));
         ?>
-        <tr style="background:<?= $rowBg ?>">
+        <tr>
             <td style="white-space:nowrap;">
                 <strong style="color:#1e293b;"><?= $dow ?></strong>
                 <span class="mh-sub"><?= $diaN ?></span>
@@ -445,62 +277,23 @@ if ($modo === 'pendientes') {
                 <span class="mh-sub"><?= htmlspecialchars($s['local_desc']) ?></span>
             </td>
             <td>
-                <?php if ($esFalta): ?>
-                    <span class="mh-badge" style="background:#fee2e2;color:#991b1b;">Falta</span>
-                <?php elseif ($llegPI): ?>
-                    <span class="mh-badge" style="background:#d1fae5;color:#065f46;">Presente</span>
+                <?php if ($yaCalificado): ?>
+                    <span class="mh-badge" style="background:#ede9fe;color:#5b21b6;">Calificado por ti</span>
                 <?php else: ?>
-                    <span style="color:#cbd5e1;font-size:.75rem;">Sin reg.</span>
+                    <span style="color:#cbd5e1;font-size:.75rem;">Pendiente</span>
                 <?php endif; ?>
             </td>
             <td>
-                <?php if ($llegPI): ?>
-                    <span class="mh-badge" style="background:<?= $llegPI['bg']?>;color:<?= $llegPI['color']?>"><?= $llegPI['label']?></span>
-                <?php else: ?><span style="color:#cbd5e1;">—</span><?php endif; ?>
-            </td>
-            <td>
-                <?php if ($salidPI): ?>
-                    <span class="mh-badge" style="background:<?= $salidPI['bg']?>;color:<?= $salidPI['color']?>"><?= $salidPI['label']?></span>
-                <?php else: ?><span style="color:#cbd5e1;">—</span><?php endif; ?>
-            </td>
-            <td style="font-size:.72rem;color:#0097A7;">
-                <?= htmlspecialchars($s['registrado_por_nombre'] ?? '—') ?>
-            </td>
-            <td>
                 <div class="mh-acc">
-                    <?php if (!$esFalta): ?>
-                    <button class="mh-btn mh-btn--entrada <?= $asist && $asist['llegada_puntualidad'] ? 'mh-btn--filled' : '' ?>"
+                    <button class="mh-btn mh-btn--calificar <?= $yaCalificado ? 'mh-btn--filled' : '' ?>"
                         data-pid="<?= $s['postulante_id'] ?>"
                         data-fecha="<?= $s['fecha_dia'] ?>"
                         data-turno="<?= $s['turno_id'] ?>"
                         data-nombre="<?= htmlspecialchars($s['trabajador_nombre'], ENT_QUOTES) ?>"
-                        data-asist="<?= $asistJson ?>"
-                        onclick="abrirModal('ENTRADA', this)">
-                        <?= $asist && $asist['llegada_puntualidad'] ? '✏ Entrada' : 'Entrada' ?>
+                        data-enc="<?= $encJson ?>"
+                        onclick="abrirModal(this)">
+                        <?= $yaCalificado ? '✏ Editar' : 'Calificar' ?>
                     </button>
-                    <button class="mh-btn mh-btn--salida <?= $asist && $asist['salida_puntualidad'] ? 'mh-btn--filled' : '' ?>"
-                        data-pid="<?= $s['postulante_id'] ?>"
-                        data-fecha="<?= $s['fecha_dia'] ?>"
-                        data-turno="<?= $s['turno_id'] ?>"
-                        data-nombre="<?= htmlspecialchars($s['trabajador_nombre'], ENT_QUOTES) ?>"
-                        data-asist="<?= $asistJson ?>"
-                        onclick="abrirModal('SALIDA', this)">
-                        <?= $asist && $asist['salida_puntualidad'] ? '✏ Salida' : 'Salida' ?>
-                    </button>
-                    <button class="mh-btn mh-btn--falta"
-                        data-pid="<?= $s['postulante_id'] ?>"
-                        data-fecha="<?= $s['fecha_dia'] ?>"
-                        data-turno="<?= $s['turno_id'] ?>"
-                        data-nombre="<?= htmlspecialchars($s['trabajador_nombre'], ENT_QUOTES) ?>"
-                        onclick="abrirModalFalta(this)">
-                        Faltó
-                    </button>
-                    <?php else: ?>
-                    <button class="mh-btn mh-btn--revertir"
-                        onclick="abrirModalRevertirFalta(<?= $asist['id_asistencia'] ?>, '<?= addslashes($s['trabajador_nombre']) ?>')">
-                        ↩ Revertir
-                    </button>
-                    <?php endif; ?>
                 </div>
             </td>
         </tr>
@@ -529,21 +322,43 @@ if ($modo === 'pendientes') {
     </div>
 
     <div style="background:#fef9c3;border:1px solid #fbbf24;border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.82rem;color:#92400e;">
-        👤 Esta es tu ficha personal. <strong>Solo un compañero puede completar tus encuestas.</strong>
+        👤 Esta es tu ficha personal. <strong>Solo tus compañeros pueden calificarte — nunca a ti mismo.</strong>
+        No se muestra quién te calificó, solo el resultado.
     </div>
 
-    <!-- KPIs -->
+    <!-- KPI general -->
     <div class="mh-kpis">
-        <div class="mh-kpi"><div class="mh-kpi__num" style="color:#0097A7;"><?= $totalManana ?></div><div class="mh-kpi__label">Turnos Mañana ☀️</div></div>
-        <div class="mh-kpi"><div class="mh-kpi__num" style="color:#475569;"><?= $totalTarde ?></div><div class="mh-kpi__label">Turnos Tarde 🌙</div></div>
-        <div class="mh-kpi"><div class="mh-kpi__num" style="color:#059669;"><?= $conFicha ?></div><div class="mh-kpi__label">Con ficha</div></div>
-        <div class="mh-kpi"><div class="mh-kpi__num" style="color:#dc2626;"><?= $sinRegistro ?></div><div class="mh-kpi__label">Sin registro</div></div>
+        <div class="mh-kpi"><div class="mh-kpi__num" style="color:#0097A7;"><?= (int)($promedios['total_encuestas'] ?? 0) ?></div><div class="mh-kpi__label">Encuestas recibidas</div></div>
     </div>
 
-    <?php if (empty($fechas)): ?>
+    <!-- Promedios por aspecto -->
+    <p style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:.65rem;">Tus promedios (0 a 10)</p>
+    <?php if (empty($promedios['total_encuestas'])): ?>
     <div style="text-align:center;padding:3rem;color:#94a3b8;">
-        <div style="font-size:2.5rem;margin-bottom:.5rem;">📅</div>
-        <p style="font-weight:600;">Sin turnos asignados en <?= $mesLabel ?></p>
+        <div style="font-size:2.5rem;margin-bottom:.5rem;">📊</div>
+        <p style="font-weight:600;">Aún no tienes encuestas en <?= $mesLabel ?></p>
+    </div>
+    <?php else: ?>
+    <div class="mh-prom-grid">
+        <?php foreach ($aspectos as $campo => $a):
+            $v = $promedios[$campo] ?? null;
+            $pct = $v !== null ? min(100, ($v / 10) * 100) : 0;
+            $esConfianza = $campo === 'confianza';
+        ?>
+        <div class="mh-prom-card"<?= $esConfianza ? ' style="background:#f5f3ff;border-color:#ddd6fe;"' : '' ?>>
+            <div class="mh-prom-card__num"<?= $esConfianza ? ' style="color:#6d28d9;"' : '' ?>><?= $v !== null ? number_format($v, 2) : '—' ?></div>
+            <div class="mh-prom-card__label"><?= $a['label'] ?></div>
+            <div class="mh-prom-bar"><div class="mh-prom-bar__fill" style="width:<?= $pct ?>%;"></div></div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
+    <!-- Detalle anónimo -->
+    <p class="mh-sub" style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin:1.5rem 0 .65rem;">Detalle recibido</p>
+    <?php if (empty($detalle)): ?>
+    <div style="text-align:center;padding:1.5rem;color:#94a3b8;font-size:.82rem;background:#fff;border:1px solid #e2e8f0;border-radius:10px;">
+        Sin encuestas en <?= $mesLabel ?>.
     </div>
     <?php else: ?>
     <div class="mh-table-wrap">
@@ -552,74 +367,33 @@ if ($modo === 'pendientes') {
             <tr>
                 <th>Fecha</th>
                 <th>Turno</th>
-                <th>Local · Rol</th>
-                <th>Cobertura</th>
-                <th>Estado</th>
-                <th>Llegada</th>
-                <th>Salida</th>
-                <th>Reg. por</th>
+                <th class="text-center">⏰ Puntual.</th>
+                <th class="text-center">🗂️ Orden</th>
+                <th class="text-center">🧼 Higiene</th>
+                <th class="text-center">✨ Present.</th>
+                <th class="text-center">🔥 Ánimo</th>
+                <th class="text-center">📱 Celular</th>
+                <th class="text-center">🛡️ Confianza</th>
             </tr>
         </thead>
         <tbody>
-        <?php foreach ($fechas as $fecha):
-            $dow      = $diasLabel[(int)date('w', strtotime($fecha))];
-            $diaN     = date('d/m', strtotime($fecha));
-            $slotsDia = $slotsPorFechaTurno[$fecha] ?? [];
-            $rempDia  = $rempPorFecha[$fecha]        ?? [];
-
-            foreach ($slotsDia as $turnoId => $slot):
-                $asist  = $asistPorFecha[$fecha][$turnoId]
-                        ?? $asistPorFecha[$fecha][0]
-                        ?? null;
-                $remp   = $rempDia[$turnoId] ?? null;
-                $rowBg  = $remp ? '#fff8f8' : ($slot['cubre_id'] ? '#f0fff4' : '#fff');
-                $esFalta = $asist && $asist['estado'] === 'FALTA';
-                $llegPI  = $asist ? ($puntInfo[$asist['llegada_puntualidad'] ?? ''] ?? null) : null;
-                $salidPI = $asist ? ($puntInfo[$asist['salida_puntualidad']  ?? ''] ?? null) : null;
+        <?php foreach ($detalle as $d):
+            $dow = $diasLabel[(int)date('w', strtotime($d['fecha']))];
         ?>
-            <tr style="background:<?= $rowBg ?>">
-                <td style="white-space:nowrap;">
-                    <strong style="color:#1e293b;"><?= $dow ?></strong>
-                    <span class="mh-sub"><?= $diaN ?></span>
-                </td>
-                <td>
-                    <span class="mh-badge" style="background:<?= $turnoId==1?'#fef9c3':'#e0e7ff'?>;color:<?= $turnoId==1?'#92400e':'#3730a3'?>">
-                        <?= $turnoLabel[$turnoId] ?? $turnoId ?>
-                    </span>
-                </td>
-                <td>
-                    <span style="font-weight:600;color:#1e293b;"><?= htmlspecialchars($slot['local_desc']) ?></span>
-                    <span class="mh-sub"><?= htmlspecialchars($slot['rol_desc']) ?></span>
-                </td>
-                <td style="font-size:.72rem;">
-                    <?php if ($remp): ?>
-                        <span style="color:#dc2626;">↩ <?= htmlspecialchars($remp['reemplazado_por']) ?></span>
-                    <?php elseif ($slot['cubre_id']): ?>
-                        <span style="color:#059669;">✔ <?= htmlspecialchars($slot['cubrió_a'] ?? '') ?></span>
-                    <?php else: ?>
-                        <span style="color:#cbd5e1;">—</span>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <?php if ($esFalta): ?>
-                        <span class="mh-badge" style="background:#fee2e2;color:#991b1b;">Falta</span>
-                    <?php elseif ($llegPI): ?>
-                        <span class="mh-badge" style="background:#d1fae5;color:#065f46;">Presente</span>
-                    <?php else: ?>
-                        <span style="color:#cbd5e1;font-size:.75rem;">Sin reg.</span>
-                    <?php endif; ?>
-                </td>
-                <td><?php if ($llegPI): ?>
-                    <span class="mh-badge" style="background:<?=$llegPI['bg']?>;color:<?=$llegPI['color']?>"><?=$llegPI['label']?></span>
-                <?php else: ?><span style="color:#cbd5e1;">—</span><?php endif; ?></td>
-                <td><?php if ($salidPI): ?>
-                    <span class="mh-badge" style="background:<?=$salidPI['bg']?>;color:<?=$salidPI['color']?>"><?=$salidPI['label']?></span>
-                <?php else: ?><span style="color:#cbd5e1;">—</span><?php endif; ?></td>
-                <td style="font-size:.72rem;color:#0097A7;">
-                    <?= htmlspecialchars($asist['registrado_por_nombre'] ?? '—') ?>
-                </td>
-            </tr>
-        <?php endforeach; ?>
+        <tr>
+            <td style="white-space:nowrap;">
+                <strong style="color:#1e293b;"><?= $dow ?></strong>
+                <span class="mh-sub"><?= date('d/m', strtotime($d['fecha'])) ?></span>
+            </td>
+            <td><?= $turnoLabel[$d['turno_id']] ?? $d['turno_desc'] ?></td>
+            <td class="text-center"><?= (int)$d['puntualidad'] ?></td>
+            <td class="text-center"><?= (int)$d['orden'] ?></td>
+            <td class="text-center"><?= (int)$d['higiene'] ?></td>
+            <td class="text-center"><?= (int)$d['presentacion'] ?></td>
+            <td class="text-center"><?= (int)$d['animo'] ?></td>
+            <td class="text-center"><?= (int)$d['uso_celular'] ?></td>
+            <td class="text-center"><?= (int)$d['confianza'] ?></td>
+        </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
@@ -632,13 +406,10 @@ if ($modo === 'pendientes') {
 <?php if ($modo !== 'mis-encuestas'): ?>
 <script>
 const BASE = '<?= $basePath ?>';
+const ASPECTOS = <?= json_encode(array_keys($aspectos)) ?>;
 
-let _seccion  = 'ENTRADA';
-let _pid      = 0;
-let _fecha    = '';
-let _turnoId  = 0;
-let _radioVals = {};
-let _faltaPid = 0; let _faltaFecha = ''; let _faltaTurno = 0;
+let _pid = 0, _fecha = '', _turnoId = 0;
+let _scaleVals = {};
 
 function fmtFecha(f) {
     const d = new Date(f + 'T12:00:00');
@@ -646,65 +417,42 @@ function fmtFecha(f) {
     return `${dias[d.getDay()]} ${d.getDate()}/${String(d.getMonth()+1).padStart(2,'0')}`;
 }
 
-function pickRadio(btn) {
+function pickScale(btn) {
     const field = btn.dataset.field;
-    document.querySelectorAll(`.mh-rb[data-field="${field}"]`).forEach(b => {
-        b.classList.remove('active');
-        b.style.borderColor = ''; b.style.color = '';
+    const val = parseInt(btn.dataset.val);
+    document.querySelectorAll(`.mh-coin[data-field="${field}"]`).forEach(b => {
+        b.classList.toggle('on', parseInt(b.dataset.val) <= val);
     });
-    btn.classList.add('active');
-    btn.style.borderColor = ''; btn.style.color = '';
-    _radioVals[field] = btn.dataset.val;
+    _scaleVals[field] = val;
+    document.getElementById(`val-${field}`).textContent = `${val}/10`;
 }
 
-function preselect(field, val) {
-    if (val === null || val === undefined) return;
-    const sVal = String(val);
-    document.querySelectorAll(`.mh-rb[data-field="${field}"]`).forEach(btn => {
-        const match = btn.dataset.val === sVal;
-        btn.classList.toggle('active', match);
-        if (!match) { btn.style.borderColor = ''; btn.style.color = ''; }
+function preselectScale(field, val) {
+    if (!val) return;
+    document.querySelectorAll(`.mh-coin[data-field="${field}"]`).forEach(b => {
+        b.classList.toggle('on', parseInt(b.dataset.val) <= val);
     });
-    _radioVals[field] = sVal;
+    _scaleVals[field] = val;
+    document.getElementById(`val-${field}`).textContent = `${val}/10`;
 }
 
 function clearAll() {
-    document.querySelectorAll('.mh-rb').forEach(b => { b.classList.remove('active'); b.style.borderColor = ''; b.style.color = ''; });
-    _radioVals = {};
+    document.querySelectorAll('.mh-coin').forEach(b => b.classList.remove('on'));
+    ASPECTOS.forEach(a => document.getElementById(`val-${a}`).textContent = '—/10');
+    _scaleVals = {};
 }
 
-function abrirModal(seccion, btn) {
-    _seccion = seccion; _pid = parseInt(btn.dataset.pid);
+function abrirModal(btn) {
+    _pid = parseInt(btn.dataset.pid);
     _fecha = btn.dataset.fecha; _turnoId = parseInt(btn.dataset.turno);
-    const exist = JSON.parse(btn.dataset.asist || 'null');
+    const exist = JSON.parse(btn.dataset.enc || 'null');
     clearAll();
     document.getElementById('mhPassword').value = '';
-    document.getElementById('mhComentarios').value = '';
     document.getElementById('mhErr').style.display = 'none';
-    document.getElementById('mhModalTitulo').textContent =
-        (seccion === 'ENTRADA' ? 'Registrar entrada' : 'Registrar salida') + ` — ${btn.dataset.nombre}`;
+    document.getElementById('mhModalTitulo').textContent = `Calificar a ${btn.dataset.nombre}`;
     document.getElementById('mhModalDesc').textContent = `${fmtFecha(_fecha)} · Confirma con TU propia contraseña.`;
-    document.getElementById('mhSecEntrada').hidden = seccion !== 'ENTRADA';
-    document.getElementById('mhSecSalida').hidden  = seccion !== 'SALIDA';
     if (exist) {
-        document.getElementById('mhComentarios').value = exist.comentarios_ficha || '';
-        if (seccion === 'ENTRADA') {
-            preselect('llegada_puntualidad',    exist.llegada_puntualidad);
-            preselect('area_ordenada_ingreso',  exist.area_ordenada_ingreso);
-            preselect('area_limpia_ingreso',    exist.area_limpia_ingreso);
-            preselect('aseo_personal',          exist.aseo_personal);
-            preselect('vestimenta',             exist.vestimenta);
-            preselect('unas',                   exist.unas);
-            preselect('cabello',                exist.cabello);
-        } else {
-            preselect('salida_puntualidad',        exist.salida_puntualidad);
-            preselect('estado_area_cierre',        exist.estado_area_cierre);
-            preselect('limpieza_area_cierre',      exist.limpieza_area_cierre);
-            preselect('area_ordenada_cierre',      exist.area_ordenada_cierre);
-            preselect('participo_apertura_cierre', exist.participo_apertura_cierre);
-            preselect('uso_celular',               exist.uso_celular);
-            preselect('calificacion_turno',        exist.calificacion_turno);
-        }
+        Object.keys(exist).forEach(k => preselectScale(k, exist[k]));
     }
     document.getElementById('mhModal').removeAttribute('hidden');
     setTimeout(() => document.getElementById('mhPassword').focus(), 80);
@@ -716,85 +464,16 @@ async function confirmarRegistro() {
     const password = document.getElementById('mhPassword').value.trim();
     const err = document.getElementById('mhErr');
     if (!password) { showErr(err, 'Tu contraseña es requerida.'); return; }
-    const payload = {
-        postulante_id: _pid, fecha: _fecha, turno_id: _turnoId,
-        seccion: _seccion, password,
-        comentarios_ficha: document.getElementById('mhComentarios').value.trim() || null,
-    };
-    const yn = (k) => _radioVals[k] !== undefined ? parseInt(_radioVals[k]) : null;
-    if (_seccion === 'ENTRADA') {
-        payload.llegada_puntualidad    = _radioVals['llegada_puntualidad'] || null;
-        payload.area_ordenada_ingreso  = yn('area_ordenada_ingreso');
-        payload.area_limpia_ingreso    = yn('area_limpia_ingreso');
-        payload.aseo_personal          = _radioVals['aseo_personal'] || null;
-        payload.vestimenta             = _radioVals['vestimenta'] || null;
-        payload.unas                   = _radioVals['unas'] || null;
-        payload.cabello                = _radioVals['cabello'] || null;
-    } else {
-        payload.salida_puntualidad        = _radioVals['salida_puntualidad'] || null;
-        payload.estado_area_cierre        = _radioVals['estado_area_cierre'] || null;
-        payload.limpieza_area_cierre      = yn('limpieza_area_cierre');
-        payload.area_ordenada_cierre      = yn('area_ordenada_cierre');
-        payload.participo_apertura_cierre = yn('participo_apertura_cierre');
-        payload.uso_celular               = _radioVals['uso_celular'] || null;
-        payload.calificacion_turno        = _radioVals['calificacion_turno'] || null;
-    }
+    const faltantes = ASPECTOS.filter(a => !_scaleVals[a]);
+    if (faltantes.length) { showErr(err, 'Completa las 7 preguntas antes de guardar.'); return; }
+
+    const payload = { evaluado_id: _pid, fecha: _fecha, turno_id: _turnoId, password, ..._scaleVals };
     try {
-        const r = await fetch(`${BASE}/staff/api/asistencia/registrar`, {
+        const r = await fetch(`${BASE}/staff/api/encuesta/registrar`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
         });
         const res = await r.json();
         if (res.success) { cerrarModal(); location.reload(); }
-        else showErr(err, res.message || 'Error.');
-    } catch { showErr(err, 'Error de conexión.'); }
-}
-
-function abrirModalFalta(btn) {
-    _faltaPid = parseInt(btn.dataset.pid); _faltaFecha = btn.dataset.fecha; _faltaTurno = parseInt(btn.dataset.turno);
-    document.getElementById('mhFaltaDesc').textContent = `${btn.dataset.nombre} · ${fmtFecha(_faltaFecha)}`;
-    document.getElementById('mhFaltaPwd').value = '';
-    document.getElementById('mhFaltaErr').style.display = 'none';
-    document.getElementById('mhModalFalta').removeAttribute('hidden');
-    setTimeout(() => document.getElementById('mhFaltaPwd').focus(), 50);
-}
-function cerrarModalFalta() { document.getElementById('mhModalFalta').setAttribute('hidden', ''); }
-
-async function confirmarFalta() {
-    const pwd = document.getElementById('mhFaltaPwd').value.trim();
-    const err = document.getElementById('mhFaltaErr');
-    if (!pwd) { showErr(err, 'Tu contraseña es requerida.'); return; }
-    try {
-        const r = await fetch(`${BASE}/staff/api/asistencia/registrar`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ postulante_id: _faltaPid, fecha: _faltaFecha, turno_id: _faltaTurno, seccion: 'FALTA', password: pwd }),
-        });
-        const res = await r.json();
-        if (res.success) { cerrarModalFalta(); location.reload(); }
-        else showErr(err, res.message || 'Error.');
-    } catch { showErr(err, 'Error de conexión.'); }
-}
-
-function abrirModalRevertirFalta(id, nombre) {
-    document.getElementById('mhRevertirId').value = id;
-    document.getElementById('mhRevertirDesc').textContent = `Eliminar el registro de falta de "${nombre}".`;
-    document.getElementById('mhRevertirPwd').value = '';
-    document.getElementById('mhRevertirErr').style.display = 'none';
-    document.getElementById('mhModalRevertir').removeAttribute('hidden');
-    setTimeout(() => document.getElementById('mhRevertirPwd').focus(), 50);
-}
-function cerrarModalRevertir() { document.getElementById('mhModalRevertir').setAttribute('hidden', ''); }
-
-async function confirmarRevertir() {
-    const id  = document.getElementById('mhRevertirId').value;
-    const pwd = document.getElementById('mhRevertirPwd').value.trim();
-    const err = document.getElementById('mhRevertirErr');
-    if (!pwd) { showErr(err, 'Tu contraseña es requerida.'); return; }
-    try {
-        const r = await fetch(`${BASE}/staff/api/asistencia/${id}/revertir`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pwd }),
-        });
-        const res = await r.json();
-        if (res.success) { cerrarModalRevertir(); location.reload(); }
         else showErr(err, res.message || 'Error.');
     } catch { showErr(err, 'Error de conexión.'); }
 }

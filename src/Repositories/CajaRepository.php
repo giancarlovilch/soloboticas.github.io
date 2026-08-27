@@ -5,6 +5,10 @@ require_once __DIR__ . '/TerminalPosRepository.php';
 
 class CajaRepository
 {
+    // Equivalencia de venta de productos BBVA en "operaciones" para el bono del agente.
+    public const EQUIV_SEGURO_BCP  = 50;
+    public const EQUIV_TARJETA_BCP = 200;
+
     private PDO $db;
 
     public function __construct()
@@ -411,10 +415,16 @@ class CajaRepository
 
         // Operaciones BCP divididas: solo ingresos + salida cuentan para el bono/ranking
         // (num_operaciones_bcp se sigue derivando de estas dos, "otros" queda solo como registro).
+        // Venta de seguros y tarjetas suman su equivalencia en operaciones (así lo exige BBVA
+        // para el cálculo del bono del agente: 1 seguro = 50 ops, 1 tarjeta = 200 ops).
         $opIngresos = $int($activos['oper_ingresos_bcp'] ?? null);
         $opSalida   = $int($activos['oper_salida_bcp']   ?? null);
         $opOtros    = $int($activos['oper_otros_bcp']    ?? null);
-        $numOps     = $opIngresos + $opSalida;
+        $opSeguros  = $int($activos['oper_seguros_bcp']  ?? null);
+        $opTarjetas = $int($activos['oper_tarjetas_bcp'] ?? null);
+        $numOps     = $opIngresos + $opSalida
+                    + ($opSeguros  * self::EQUIV_SEGURO_BCP)
+                    + ($opTarjetas * self::EQUIV_TARJETA_BCP);
 
         $sql = "INSERT INTO detalle_cuadre
                     (sesion_id, monto_caja_exterior, monto_monedas, monto_billetes_caja,
@@ -451,10 +461,13 @@ class CajaRepository
                     num_operaciones_bcp = :ops,
                     oper_ingresos_bcp   = :ing,
                     oper_salida_bcp     = :sal,
-                    oper_otros_bcp      = :otr
+                    oper_otros_bcp      = :otr,
+                    oper_seguros_bcp    = :seg,
+                    oper_tarjetas_bcp   = :tar
                  WHERE sesion_id = :sid"
             )->execute([
                 'ops' => $numOps, 'ing' => $opIngresos, 'sal' => $opSalida, 'otr' => $opOtros,
+                'seg' => $opSeguros, 'tar' => $opTarjetas,
                 'sid' => $sesionId,
             ]);
         } catch (\PDOException) { /* columnas aún no existen en BD antigua */ }
@@ -1658,7 +1671,8 @@ class CajaRepository
             $stmt = $this->db->prepare(
                 "SELECT sc.postulante_apertura_id, sc.turno_id, sc.fecha_operacion,
                         ca.local_id, dc.num_operaciones_bcp,
-                        dc.oper_ingresos_bcp, dc.oper_salida_bcp, dc.oper_otros_bcp
+                        dc.oper_ingresos_bcp, dc.oper_salida_bcp, dc.oper_otros_bcp,
+                        dc.oper_seguros_bcp, dc.oper_tarjetas_bcp
                  FROM sesion_caja sc
                  INNER JOIN caja ca ON ca.id_caja = sc.caja_id
                  LEFT  JOIN detalle_cuadre dc ON dc.sesion_id = sc.id_sesion
@@ -1691,14 +1705,17 @@ class CajaRepository
             $this->db->prepare(
                 "INSERT INTO horario_rendimiento
                     (horario_slot_id, postulante_id, sesion_caja_id, fecha, local_id, turno_id, rol_codigo,
-                     operaciones_bcp, oper_ingresos_bcp, oper_salida_bcp, oper_otros_bcp)
-                 VALUES (:slot, :pid, :sid, :fecha, :lid, :tid, 'CAJERA', :ops, :ing, :sal, :otr)
+                     operaciones_bcp, oper_ingresos_bcp, oper_salida_bcp, oper_otros_bcp,
+                     oper_seguros_bcp, oper_tarjetas_bcp)
+                 VALUES (:slot, :pid, :sid, :fecha, :lid, :tid, 'CAJERA', :ops, :ing, :sal, :otr, :seg, :tar)
                  ON DUPLICATE KEY UPDATE
                     postulante_id      = VALUES(postulante_id),
                     operaciones_bcp    = VALUES(operaciones_bcp),
                     oper_ingresos_bcp  = VALUES(oper_ingresos_bcp),
                     oper_salida_bcp    = VALUES(oper_salida_bcp),
                     oper_otros_bcp     = VALUES(oper_otros_bcp),
+                    oper_seguros_bcp   = VALUES(oper_seguros_bcp),
+                    oper_tarjetas_bcp  = VALUES(oper_tarjetas_bcp),
                     sesion_caja_id     = VALUES(sesion_caja_id)"
             )->execute([
                 'slot'  => $slotId,
@@ -1711,6 +1728,8 @@ class CajaRepository
                 'ing'   => $s['oper_ingresos_bcp'],
                 'sal'   => $s['oper_salida_bcp'],
                 'otr'   => $s['oper_otros_bcp'],
+                'seg'   => $s['oper_seguros_bcp']  ?? 0,
+                'tar'   => $s['oper_tarjetas_bcp'] ?? 0,
             ]);
         } catch (\Throwable) { /* no bloquear el flujo de caja */ }
     }
@@ -1784,6 +1803,42 @@ class CajaRepository
         $stmt->execute(['pid' => $postulanteId]);
         $hash = $stmt->fetchColumn();
         return $hash && password_verify($password, $hash);
+    }
+
+    // ── Registro de accesos a cuadres cerrados ("empadronamiento") ──
+
+    public function registrarVisita(int $sesionId, int $postulanteId, string $origen): void
+    {
+        $this->db->prepare(
+            "INSERT INTO visita_cuadre (sesion_id, postulante_id, origen) VALUES (:sid, :pid, :org)"
+        )->execute(['sid' => $sesionId, 'pid' => $postulanteId, 'org' => $origen]);
+    }
+
+    /** Una fila por persona: cuántas veces entró a este cuadre y cuándo fue la última vez. */
+    public function getVisitas(int $sesionId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT TRIM(CONCAT(p.nombres, ' ', COALESCE(p.apellidos, ''))) AS visitante,
+                    COUNT(*)     AS veces,
+                    MAX(vc.fecha) AS ultima_visita
+             FROM visita_cuadre vc
+             INNER JOIN postulante p ON p.id_postulante = vc.postulante_id
+             WHERE vc.sesion_id = :sid
+             GROUP BY vc.postulante_id, visitante
+             ORDER BY ultima_visita DESC"
+        );
+        $stmt->execute(['sid' => $sesionId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getNombreCompleto(int $postulanteId): string
+    {
+        $stmt = $this->db->prepare(
+            "SELECT TRIM(CONCAT(nombres, ' ', COALESCE(apellidos, ''))) AS nombre_completo
+             FROM postulante WHERE id_postulante = :pid LIMIT 1"
+        );
+        $stmt->execute(['pid' => $postulanteId]);
+        return (string)($stmt->fetchColumn() ?: '');
     }
 
     // ── Rectificaciones ────────────────────────────────────
@@ -1911,33 +1966,41 @@ class CajaRepository
         $this->propagarBase($sesionId);
     }
 
-    public function updateNumOperacionesBcp(int $sesionId, int $opIngresos, int $opSalida, int $opOtros, int $postulanteId): void
+    public function updateNumOperacionesBcp(int $sesionId, int $opIngresos, int $opSalida, int $opOtros, int $postulanteId, int $opSeguros = 0, int $opTarjetas = 0): void
     {
         $old = $this->db->prepare(
-            "SELECT num_operaciones_bcp, oper_ingresos_bcp, oper_salida_bcp, oper_otros_bcp
+            "SELECT num_operaciones_bcp, oper_ingresos_bcp, oper_salida_bcp, oper_otros_bcp,
+                    oper_seguros_bcp, oper_tarjetas_bcp
              FROM detalle_cuadre WHERE sesion_id = :sid"
         );
         $old->execute(['sid' => $sesionId]);
         $prev = $old->fetch();
         if (!$prev) return;
 
-        $numOps = $opIngresos + $opSalida;
+        $numOps = $opIngresos + $opSalida
+                + ($opSeguros  * self::EQUIV_SEGURO_BCP)
+                + ($opTarjetas * self::EQUIV_TARJETA_BCP);
 
         $this->audit($sesionId, $postulanteId, 'CONTEO_MODIFICADO', 'operaciones_bcp',
-            sprintf('ingresos %d, salida %d, otros %d (total %d)',
-                (int)$prev['oper_ingresos_bcp'], (int)$prev['oper_salida_bcp'],
-                (int)$prev['oper_otros_bcp'], (int)$prev['num_operaciones_bcp']),
-            sprintf('ingresos %d, salida %d, otros %d (total %d)', $opIngresos, $opSalida, $opOtros, $numOps));
+            sprintf('ingresos %d, salida %d, otros %d, seguros %d, tarjetas %d (total %d)',
+                (int)$prev['oper_ingresos_bcp'], (int)$prev['oper_salida_bcp'], (int)$prev['oper_otros_bcp'],
+                (int)($prev['oper_seguros_bcp'] ?? 0), (int)($prev['oper_tarjetas_bcp'] ?? 0),
+                (int)$prev['num_operaciones_bcp']),
+            sprintf('ingresos %d, salida %d, otros %d, seguros %d, tarjetas %d (total %d)',
+                $opIngresos, $opSalida, $opOtros, $opSeguros, $opTarjetas, $numOps));
 
         $this->db->prepare(
             "UPDATE detalle_cuadre SET
                 num_operaciones_bcp = :ops,
                 oper_ingresos_bcp   = :ing,
                 oper_salida_bcp     = :sal,
-                oper_otros_bcp      = :otr
+                oper_otros_bcp      = :otr,
+                oper_seguros_bcp    = :seg,
+                oper_tarjetas_bcp   = :tar
              WHERE sesion_id = :sid"
         )->execute([
             'ops' => $numOps, 'ing' => $opIngresos, 'sal' => $opSalida, 'otr' => $opOtros,
+            'seg' => $opSeguros, 'tar' => $opTarjetas,
             'sid' => $sesionId,
         ]);
 

@@ -1,6 +1,12 @@
 <?php
 if (!isset($_SESSION['user_rol'])) exit('Acceso denegado');
 $nombreUsuario = $nombreUsuario ?? $_SESSION['user_name'] ?? 'Administrador';
+$homeEstrellas = $homeEstrellas ?? null;
+if ($homeEstrellas) {
+    $heTot = max(1, $homeEstrellas['rojas'] + $homeEstrellas['azules']);
+    $hePctAzul = round(($homeEstrellas['azules'] / $heTot) * 100);
+    $heFmt = fn($v) => (floor($v) == $v) ? (string)(int)$v : number_format($v, 1);
+}
 ?>
 
 <div class="home-welcome">
@@ -18,6 +24,38 @@ $nombreUsuario = $nombreUsuario ?? $_SESSION['user_name'] ?? 'Administrador';
         </div>
         <div style="font-size:0.78rem;color:#64748b;"><?= date('l d/m/Y') ?></div>
     </div>
+
+    <?php if ($homeEstrellas): ?>
+    <a href="?page=economia" style="text-decoration:none;color:inherit;display:block;">
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1.1rem 1.5rem;
+                margin-bottom:1.5rem;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem;">
+            <span style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">
+                ⭐ Estrellas del equipo — este mes
+            </span>
+            <span style="font-size:.85rem;font-weight:800;">
+                <span style="color:#dc2626;">🔴 <?= $heFmt($homeEstrellas['rojas']) ?></span>
+                <span style="color:#cbd5e1;padding:0 .3rem;">vs</span>
+                <span style="color:#1d4ed8;">🔵 <?= $heFmt($homeEstrellas['azules']) ?></span>
+            </span>
+        </div>
+        <div style="height:12px;border-radius:999px;overflow:hidden;background:#dc2626;display:flex;max-width:480px;">
+            <div style="width:<?= $hePctAzul ?>%;background:linear-gradient(90deg,#3b82f6,#1d4ed8);"></div>
+            <div style="flex:1;background:linear-gradient(90deg,#ef4444,#dc2626);"></div>
+        </div>
+        <?php if (!empty($homeEstrellas['en_riesgo'])): ?>
+        <p style="font-size:.72rem;color:#64748b;margin-top:.6rem;">
+            ⚠️ En riesgo de descuento:
+            <?php foreach ($homeEstrellas['en_riesgo'] as $i => $r): ?>
+                <strong style="color:#991b1b;"><?= htmlspecialchars($r['nombre']) ?></strong><?= $i < count($homeEstrellas['en_riesgo']) - 1 ? ', ' : '' ?>
+            <?php endforeach; ?>
+        </p>
+        <?php else: ?>
+        <p style="font-size:.72rem;color:#059669;margin-top:.6rem;">✅ Nadie en riesgo de descuento este mes.</p>
+        <?php endif; ?>
+    </div>
+    </a>
+    <?php endif; ?>
 
     <div class="home-cards">
         <a href="?page=postulantes" class="home-card">

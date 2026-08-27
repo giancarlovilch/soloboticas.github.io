@@ -66,6 +66,21 @@ class AdminController extends Controller
         $p = null; // Mochila de datos del postulante
         $catalogos = []; // Mochila para los selects de la base de datos
 
+        // Resumen de estrellas del mes (widget del home)
+        $homeEstrellas = null;
+        if ($page === 'home') {
+            require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+            $rows = (new EstrellaRepository())->getEstrellasTodos(date('Y-m-01'), date('Y-m-t'));
+            $totRojas = array_sum(array_column($rows, 'rojas'));
+            $totAzules = array_sum(array_column($rows, 'azules'));
+            $enRiesgo = array_filter($rows, fn($r) => (float)$r['rojas'] > (float)$r['azules']);
+            usort($enRiesgo, fn($a, $b) => ((float)$b['rojas'] - (float)$b['azules']) <=> ((float)$a['rojas'] - (float)$a['azules']));
+            $homeEstrellas = [
+                'rojas' => $totRojas, 'azules' => $totAzules,
+                'en_riesgo' => array_slice($enRiesgo, 0, 5), 'total_personal' => count($rows),
+            ];
+        }
+
         // Si la página es update, cargamos el detalle y los catálogos reales[cite: 14]
         if ($page === 'update' && isset($_GET['id'])) {
             $id = (int)$_GET['id'];
@@ -174,7 +189,7 @@ class AdminController extends Controller
             )->fetchAll();
 
             // ── Ingresos diarios (cálculo en tiempo real) ─────
-            $slotsWhere  = "hs.fecha_dia BETWEEN :desde AND :hasta AND rh.codigo IN ('CAJERA','VENDEDORA','ALMACENERA')";
+            $slotsWhere  = "hs.fecha_dia BETWEEN :desde AND :hasta AND rh.codigo IN ('CAJERA','VENDEDORA','ALMACENERA','ABASTECIMIENTO','INVENTARIO','COMPRAS','AUDITORIA')";
             $slotsParams = ['desde' => $ecoDesde, 'hasta' => $ecoHasta];
             if ($ecoPid) { $slotsWhere .= " AND hs.postulante_id = :pid"; $slotsParams['pid'] = $ecoPid; }
 
@@ -386,7 +401,7 @@ class AdminController extends Controller
                      SELECT MAX(t2.fecha_vigencia) FROM tarifa_base_rol t2
                      WHERE t2.rol_codigo = t1.rol_codigo AND t2.fecha_vigencia <= :hoy
                  )
-                 ORDER BY FIELD(t1.rol_codigo,'CAJERA','VENDEDORA','ALMACENERA')"
+                 ORDER BY FIELD(t1.rol_codigo,'CAJERA','VENDEDORA','ALMACENERA','ABASTECIMIENTO','INVENTARIO','COMPRAS','AUDITORIA')"
             );
             $stmtTar->execute(['hoy' => $hoyStr]);
             $ecoTarifasInfo = [];
@@ -414,12 +429,18 @@ class AdminController extends Controller
             }
             $ecoMesActual = date('Y-m');
 
+            // ── Resumen de estrellas (rojas = asistencia, azules = tareas de limpieza votadas) ──
+            require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+            $estrellaRepo = new EstrellaRepository();
+            $ecoEstrellas = $estrellaRepo->getEstrellasTodos($ecoDesde, $ecoHasta);
+            $ecoTareasLimpieza = $estrellaRepo->getTareasTodas();
+
             $economiaDatos = compact(
                 'ecoPagos','ecoTrabajadores','ecoMes','ecoMesActual','ecoPid','ecoTipo',
                 'ecoIngresos','ecoTotalIngresos','ecoTotalBonos','ecoEstudioInfo',
                 'ecoTarifasInfo','ecoBonosVInfo','ecoBonosOInfo','ecoBonoEstudioMonto',
                 'ecoBonoServicioMonto','ecoNombreTrabajador','ecoSupervisorPeriodos',
-                'estBonoRef'
+                'estBonoRef','ecoEstrellas','ecoTareasLimpieza'
             );
         }
 
@@ -682,7 +703,7 @@ class AdminController extends Controller
         $rol    = $data['rol_codigo']     ?? '';
         $monto  = (float)($data['monto'] ?? 0);
         $fecha  = $data['fecha_vigencia'] ?? '';
-        if (!in_array($rol, ['CAJERA','VENDEDORA','ALMACENERA']) || $monto <= 0 || !$fecha) {
+        if (!in_array($rol, ['CAJERA','VENDEDORA','ALMACENERA','ABASTECIMIENTO','INVENTARIO','COMPRAS','AUDITORIA']) || $monto <= 0 || !$fecha) {
             $this->error('Datos inválidos', 422); return;
         }
         require_once __DIR__ . '/../Core/Database.php';
@@ -690,6 +711,45 @@ class AdminController extends Controller
             "INSERT INTO tarifa_base_rol (rol_codigo, monto, fecha_vigencia) VALUES (:rol, :monto, :fecha)"
         )->execute(['rol' => $rol, 'monto' => $monto, 'fecha' => $fecha]);
         $this->success('Tarifa agregada.');
+    }
+
+    /** POST /admin/api/tarea-limpieza/agregar */
+    public function addTareaLimpieza(): void
+    {
+        $this->middlewareAdmin();
+        $data = $this->getAllInput();
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $result = (new EstrellaRepository())->crearTarea(
+            $data['codigo']        ?? '',
+            trim($data['descripcion'] ?? ''),
+            (int)($data['estrellas_max'] ?? 0)
+        );
+        if ($result === true) $this->success('Actividad agregada.');
+        else $this->error($result, 422);
+    }
+
+    /** POST /admin/api/tarea-limpieza/{id}/actualizar */
+    public function actualizarTareaLimpieza(int $id): void
+    {
+        $this->middlewareAdmin();
+        $data = $this->getAllInput();
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $result = (new EstrellaRepository())->actualizarTarea(
+            $id,
+            trim($data['descripcion'] ?? ''),
+            (int)($data['estrellas_max'] ?? 0)
+        );
+        if ($result === true) $this->success('Actividad actualizada.');
+        else $this->error($result, 422);
+    }
+
+    /** POST /admin/api/tarea-limpieza/{id}/toggle */
+    public function toggleTareaLimpieza(int $id): void
+    {
+        $this->middlewareAdmin();
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        (new EstrellaRepository())->toggleTarea($id);
+        $this->success('Estado actualizado.');
     }
 
     /** POST /admin/api/tarifa-base/{id}/eliminar */

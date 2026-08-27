@@ -69,7 +69,11 @@ $hoy     = new DateTime('now', new DateTimeZone('America/Lima'));
 $fechaDt = new DateTime($fecha, new DateTimeZone('America/Lima'));
 $esPasado = $fechaDt < $hoy->setTime(0, 0);
 
-$roles = ['CAJERA' => 'Cajera', 'VENDEDORA' => 'Vendedora', 'ALMACENERA' => 'Almacenera'];
+$roles = [
+    'CAJERA' => 'Cajera', 'VENDEDORA' => 'Vendedora', 'ALMACENERA' => 'Almacenera',
+    'ABASTECIMIENTO' => 'Abastecimiento', 'INVENTARIO' => 'Inventario',
+    'COMPRAS' => 'Compras', 'AUDITORIA' => 'Auditoría',
+];
 $turnosLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
 ?>
 

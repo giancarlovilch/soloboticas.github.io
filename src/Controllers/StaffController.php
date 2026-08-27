@@ -53,7 +53,122 @@ class StaffController extends Controller
         $postulanteId = $this->getSessionUserId();
         $userName     = $_SESSION['user_name'] ?? 'Colaborador';
         $userRol      = $_SESSION['user_rol']  ?? 'STAFF';
+
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $desdeMes = date('Y-m-01');
+        $hastaMes = date('Y-m-t');
+        $estrellas = (new EstrellaRepository())->getEstrellas($postulanteId, $desdeMes, $hastaMes);
+
         require_once __DIR__ . '/../../views/staff/dashboard.php';
+    }
+
+    /** GET /staff/estrellas — pantalla para ganar estrellas (votar limpieza de un compañero) */
+    public function estrellas(): void
+    {
+        $postulanteId = $this->getSessionUserId();
+        $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $userName     = $_SESSION['user_name']   ?? 'Colaborador';
+
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $repo  = new EstrellaRepository();
+        $fecha = date('Y-m-d');
+
+        $misLocales = $repo->getMisLocalesTurnoHoy($postulanteId, $fecha);
+        $locales    = !empty($misLocales) ? $misLocales : $repo->getLocalesTurnoHoy($fecha);
+        $tareas     = $repo->getTareas();
+
+        require_once __DIR__ . '/../../views/staff/estrellas.php';
+    }
+
+    /** GET /staff/estrellas/resumen — reporte mensual propio (sin nombres de quién calificó) */
+    public function estrellasResumen(): void
+    {
+        $postulanteId = $this->getSessionUserId();
+        $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $userName     = $_SESSION['user_name'] ?? 'Colaborador';
+
+        $filtroMes = $_GET['mes'] ?? date('Y-m');
+        if (!preg_match('/^\d{4}-\d{2}$/', $filtroMes)) $filtroMes = date('Y-m');
+        [$anio, $nmes] = explode('-', $filtroMes);
+        $desde = "{$anio}-{$nmes}-01";
+        $hasta = date('Y-m-t', strtotime($desde));
+        $mesActual = date('Y-m');
+
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $repo = new EstrellaRepository();
+
+        $estrellas = $repo->getEstrellas($postulanteId, $desde, $hasta);
+        $detalleTareas = $repo->getDetalleTareasRecibidas($postulanteId, $desde, $hasta);
+        $detalleTurnos = $repo->getDetalleTurnos($postulanteId, $desde, $hasta);
+
+        require_once __DIR__ . '/../../views/staff/estrellas_resumen.php';
+    }
+
+    /** GET /staff/api/estrellas/companeros?local_id= */
+    public function apiEstrellasCompaneros(): void
+    {
+        $postulanteId = $this->getSessionUserId();
+        $localId = (int)($_GET['local_id'] ?? 0);
+        $turnoId = (int)($_GET['turno_id'] ?? 0);
+        if (!$localId || !$turnoId) $this->error('local_id y turno_id requeridos', 400);
+
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $this->success('OK', (new EstrellaRepository())->getCompaneros($localId, $turnoId, $postulanteId, date('Y-m-d')));
+    }
+
+    /** GET /staff/api/estrellas/dia?local_id=&turno_id= — estrellas entregadas hoy en ese local/turno */
+    public function apiEstrellasDia(): void
+    {
+        $viewerId = $this->getSessionUserId();
+        $localId = (int)($_GET['local_id'] ?? 0);
+        $turnoId = (int)($_GET['turno_id'] ?? 0);
+        if (!$localId || !$turnoId) $this->error('local_id y turno_id requeridos', 400);
+
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $this->success('OK', (new EstrellaRepository())->getVotosDelDia($localId, $turnoId, date('Y-m-d'), $viewerId));
+    }
+
+    /** POST /staff/api/estrellas/reportar — denunciar un voto como falso */
+    public function apiEstrellasReportar(): void
+    {
+        $reportanteId = $this->getSessionUserId();
+        $data = $this->getAllInput();
+
+        $votoId   = (int)($data['voto_id'] ?? 0);
+        $password = trim($data['password'] ?? '');
+        if (!$votoId || !$password) $this->error('Faltan datos requeridos', 422);
+
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $result = (new EstrellaRepository())->reportarVoto($votoId, $reportanteId, $password);
+
+        if (is_array($result)) $this->success('Denuncia registrada.', $result);
+        else $this->error($result, 400);
+    }
+
+    /** POST /staff/api/estrellas/votar */
+    public function apiEstrellasVotar(): void
+    {
+        $votanteId = $this->getSessionUserId();
+        $data = $this->getAllInput();
+
+        $beneficiarioId = (int)($data['beneficiario_id'] ?? 0);
+        $tareaId        = (int)($data['tarea_id']        ?? 0);
+        $localId        = (int)($data['local_id']        ?? 0);
+        $turnoId        = (int)($data['turno_id']        ?? 0);
+        $calificacion   = (int)($data['calificacion']    ?? 0);
+        $password       = trim($data['password']          ?? '');
+
+        if (!$beneficiarioId || !$tareaId || !$localId || !$turnoId || !$calificacion || !$password) {
+            $this->error('Faltan datos requeridos', 422);
+        }
+
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $result = (new EstrellaRepository())->registrarVoto(
+            $votanteId, $beneficiarioId, $tareaId, $localId, $turnoId, $calificacion, date('Y-m-d'), $password
+        );
+
+        if (is_array($result)) $this->success('¡Estrellas registradas!', $result);
+        else $this->error($result, 400);
     }
 
     /** GET /staff/mi-horario */
@@ -64,105 +179,69 @@ class StaffController extends Controller
         $userName      = $_SESSION['user_name'] ?? 'Colaborador';
         $modo          = $_GET['modo'] ?? 'pendientes';
 
-        require_once __DIR__ . '/../Core/Database.php';
-        require_once __DIR__ . '/../Repositories/AsistenciaRepository.php';
-        $db        = \Database::getConnection();
-        $asistRepo = new AsistenciaRepository();
+        require_once __DIR__ . '/../Repositories/EncuestaRepository.php';
+        $encRepo = new EncuestaRepository();
 
         // Lista de compañeros (excluye al propio registrador) para filtro
-        $trabajadores = $db->query(
-            "SELECT p.id_postulante AS id, p.nombres AS nombre
-             FROM postulante p INNER JOIN usuario u ON u.postulante_id = p.id_postulante
-             WHERE u.activo = 1 ORDER BY p.nombres ASC"
-        )->fetchAll();
+        $trabajadores = $encRepo->getTrabajadores();
 
         if ($modo === 'mis-encuestas') {
-            // ── Modo lectura: encuestas propias por mes ────────
+            // ── Modo lectura: mis promedios del mes (sin decir quién calificó) ──
             $filtroMes = $_GET['mes'] ?? date('Y-m');
             if (!preg_match('/^\d{4}-\d{2}$/', $filtroMes)) $filtroMes = date('Y-m');
             [$anio, $nmes] = explode('-', $filtroMes);
             $desde = "{$anio}-{$nmes}-01";
             $hasta = date('Y-m-t', strtotime($desde));
+            $mesActual = date('Y-m');
 
-            $postulanteId    = $registradorId;
-            $nombreTrabajador = $userName;
-            $esPropioHorario  = true;
+            $promedios = $encRepo->getPromedios($registradorId, $desde, $hasta);
+            $detalle   = $encRepo->getDetalleRecibidas($registradorId, $desde, $hasta);
 
-            $stmtSlots = $db->prepare(
-                "SELECT hs.id_slot, hs.fecha_dia, hs.turno_id,
-                        l.descripcion AS local_desc,
-                        t.descripcion AS turno_desc,
-                        rh.descripcion AS rol_desc,
-                        sc_cubre.id_solicitud AS cubre_id,
-                        po.nombres AS cubrió_a
-                 FROM horario_slot hs
-                 INNER JOIN local l         ON hs.local_id       = l.id_local
-                 INNER JOIN turno t         ON hs.turno_id       = t.id_turno
-                 INNER JOIN rol_horario rh  ON hs.rol_horario_id = rh.id_rol_horario
-                 LEFT JOIN solicitud_cambio sc_cubre
-                     ON sc_cubre.slot_id = hs.id_slot
-                     AND sc_cubre.postulante_solicitante_id = :pid1
-                     AND sc_cubre.tipo = 'COBERTURA' AND sc_cubre.estado = 'ACTIVA'
-                 LEFT JOIN postulante po ON sc_cubre.postulante_original_id = po.id_postulante
-                 WHERE hs.postulante_id = :pid2
-                   AND hs.fecha_dia BETWEEN :desde AND :hasta
-                 ORDER BY hs.fecha_dia ASC, hs.turno_id ASC"
-            );
-            $stmtSlots->execute(['pid1' => $postulanteId, 'pid2' => $postulanteId, 'desde' => $desde, 'hasta' => $hasta]);
-            $slots = $stmtSlots->fetchAll();
-
-            $stmtRemp = $db->prepare(
-                "SELECT hs.fecha_dia, hs.turno_id, l.descripcion AS local_desc,
-                        rh.descripcion AS rol_desc, ps.nombres AS reemplazado_por, sc.notas
-                 FROM solicitud_cambio sc
-                 INNER JOIN horario_slot hs ON sc.slot_id = hs.id_slot
-                 INNER JOIN local l  ON hs.local_id = l.id_local
-                 INNER JOIN turno t  ON hs.turno_id  = t.id_turno
-                 INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
-                 INNER JOIN postulante ps ON sc.postulante_solicitante_id = ps.id_postulante
-                 WHERE sc.postulante_original_id = :pid AND sc.tipo = 'COBERTURA' AND sc.estado = 'ACTIVA'
-                   AND hs.fecha_dia BETWEEN :desde AND :hasta
-                 ORDER BY hs.fecha_dia ASC, hs.turno_id ASC"
-            );
-            $stmtRemp->execute(['pid' => $postulanteId, 'desde' => $desde, 'hasta' => $hasta]);
-            $reemplazos = $stmtRemp->fetchAll();
-
-            $asistencias = $asistRepo->getByPostulanteRango($postulanteId, $desde, $hasta);
-            $asistPorFecha = [];
-            foreach ($asistencias as $a) {
-                $tid = (int)($a['turno_id'] ?? 0);
-                $asistPorFecha[$a['fecha']][$tid] = $a;
-            }
-            $rempPorFecha = [];
-            foreach ($reemplazos as $r) {
-                $rempPorFecha[$r['fecha_dia']][$r['turno_id']] = $r;
-            }
-
+            $filtroTrabajador = 0; $soloSinCalif = false; $slotsData = [];
         } else {
-            // ── Modo pendientes: fichas de compañeros ──────────
+            // ── Modo pendientes: calificar turnos de compañeros ──
             $desde            = $_GET['desde'] ?? date('Y-m-01');
             $hasta            = $_GET['hasta'] ?? date('Y-m-d');
             $filtroTrabajador = isset($_GET['trabajador']) ? (int)$_GET['trabajador'] : 0;
-            // Si el formulario fue enviado explícitamente ($filtro presente), respetar el checkbox.
-            // En la carga inicial (sin $filtro) el default es false: muestra todos.
-            $soloSinCalif = isset($_GET['filtro']) ? isset($_GET['sin_calif']) : false;
+            $soloSinCalif     = isset($_GET['filtro']) ? isset($_GET['sin_calif']) : false;
 
-            $slotsData = $asistRepo->getAllSlots(
-                $desde, $hasta, $filtroTrabajador, $soloSinCalif, $registradorId
-            );
+            $slotsData = $encRepo->getPendientes($desde, $hasta, $filtroTrabajador, $soloSinCalif, $registradorId);
 
-            // Variables de modo "mis-encuestas" vacías para evitar errores en la vista
-            $slots = $asistPorFecha = $rempPorFecha = [];
-            $filtroMes = date('Y-m');
-            $postulanteId = $registradorId;
-            $esPropioHorario = false;
-            $nombreTrabajador = '';
+            $filtroMes = date('Y-m'); $mesActual = date('Y-m'); $promedios = []; $detalle = [];
         }
 
         require_once __DIR__ . '/../../views/staff/mi_horario.php';
     }
 
-    /** POST /staff/api/asistencia/registrar — un compañero llena la ficha */
+    /** POST /staff/api/encuesta/registrar — un compañero califica a otro (7 aspectos, 1-10) */
+    public function registrarEncuesta(): void
+    {
+        $evaluadorId = $this->getSessionUserId();
+        $data = $this->getAllInput();
+
+        $evaluadoId = (int)($data['evaluado_id'] ?? 0);
+        $fecha      = $data['fecha']    ?? '';
+        $turnoId    = (int)($data['turno_id'] ?? 0);
+        $password   = trim($data['password'] ?? '');
+
+        if (!$evaluadoId || !$fecha || !$turnoId || !$password) {
+            $this->error('Faltan datos requeridos', 422);
+        }
+
+        require_once __DIR__ . '/../Repositories/EncuestaRepository.php';
+        $result = (new EncuestaRepository())->registrarEncuesta(
+            $evaluadorId, $evaluadoId, $fecha, $turnoId, $data, $password
+        );
+
+        if ($result === true) $this->success('Calificación registrada.');
+        else $this->error($result, 401);
+    }
+
+    /**
+     * POST /staff/api/asistencia/registrar — usado por la apertura de turno en caja
+     * (la cajera evalúa a la vendedora antes de abrir sesión). No relacionado con
+     * la encuesta de /staff/mi-horario — ese flujo usa /staff/api/encuesta/registrar.
+     */
     public function registrarAsistencia(): void
     {
         $registradorId = $this->getSessionUserId();
@@ -280,7 +359,7 @@ class StaffController extends Controller
              WHERE hs.postulante_id = :pid
                AND hs.fecha_dia BETWEEN :desde AND :hasta
                AND hs.fecha_dia <= CURDATE()
-               AND rh.codigo IN ('CAJERA','VENDEDORA','ALMACENERA')
+               AND rh.codigo IN ('CAJERA','VENDEDORA','ALMACENERA','ABASTECIMIENTO','INVENTARIO','COMPRAS','AUDITORIA')
                AND NOT EXISTS (
                    SELECT 1 FROM asistencia af
                    WHERE af.postulante_id = hs.postulante_id
@@ -482,7 +561,7 @@ class StaffController extends Controller
                  SELECT MAX(t2.fecha_vigencia) FROM tarifa_base_rol t2
                  WHERE t2.rol_codigo = t1.rol_codigo AND t2.fecha_vigencia <= :hoy
              )
-             ORDER BY FIELD(t1.rol_codigo,'CAJERA','VENDEDORA','ALMACENERA')"
+             ORDER BY FIELD(t1.rol_codigo,'CAJERA','VENDEDORA','ALMACENERA','ABASTECIMIENTO','INVENTARIO','COMPRAS','AUDITORIA')"
         );
         $stmtTar->execute(['hoy' => $hoyStr]);
         $tarifasInfo = [];
@@ -525,6 +604,9 @@ class StaffController extends Controller
                 $estBonoRef[(int)$ebr['tipo_id']][(int)$ebr['avanzado']] = (float)$ebr['monto'];
             }
         } catch (\Exception $e) { /* usa fallback */ }
+
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $estrellas = (new EstrellaRepository())->getEstrellas($postulanteId, $desde, $hasta);
 
         require_once __DIR__ . '/../../views/staff/economia.php';
     }

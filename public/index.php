@@ -124,6 +124,7 @@ $router->post('/caja/api/reporte/{id}/rectificar',        [CajaController::class
 $router->post('/caja/api/rectificacion/{id}/eliminar',    [CajaController::class, 'eliminarRectificacion']);
 $router->post('/caja/api/sesion/{id}/conteo',                [CajaController::class, 'apiConteo']);
 $router->post('/caja/api/sesion/{id}/num-ops-bcp',           [CajaController::class, 'apiUpdateNumOpsBcp']);
+$router->post('/caja/api/sesion/{id}/confirmar-visita',      [CajaController::class, 'confirmarVisita']);
 $router->post('/caja/api/sesion/{id}/ajuste-esperado',       [CajaController::class, 'addAjusteEsperado']);
 $router->post('/caja/api/ajuste-esperado/{id}/eliminar',     [CajaController::class, 'deleteAjusteEsperado']);
 $router->post('/caja/api/gasto/{modo}/{id}/editar',          [CajaController::class, 'editarGasto']);
@@ -187,10 +188,17 @@ $router->get('/incidencias/{id}',                      [IncidenciaContableContro
 // --- PORTAL STAFF (colaboradores) ---
 $router->get('/staff',                    [StaffController::class,       'index']);
 $router->get('/staff/mi-horario',              [StaffController::class, 'miHorario']);
+$router->post('/staff/api/encuesta/registrar', [StaffController::class, 'registrarEncuesta']);
 $router->post('/staff/api/asistencia/{id}/editar',   [StaffController::class, 'editarAsistencia']);
 $router->post('/staff/api/asistencia/registrar',         [StaffController::class, 'registrarAsistencia']);
 $router->post('/staff/api/asistencia/{id}/revertir',     [StaffController::class, 'revertirFalta']);
 $router->get('/staff/economia',           [StaffController::class,       'economia']);
+$router->get('/staff/estrellas',          [StaffController::class,       'estrellas']);
+$router->get('/staff/estrellas/resumen',  [StaffController::class,       'estrellasResumen']);
+$router->get('/staff/api/estrellas/companeros', [StaffController::class, 'apiEstrellasCompaneros']);
+$router->get('/staff/api/estrellas/dia',        [StaffController::class, 'apiEstrellasDia']);
+$router->post('/staff/api/estrellas/reportar',  [StaffController::class, 'apiEstrellasReportar']);
+$router->post('/staff/api/estrellas/votar',     [StaffController::class, 'apiEstrellasVotar']);
 $router->get('/staff/info',               [StaffController::class,       'info']);
 $router->get('/staff/api/historial',      [StaffController::class,       'historial']);
 $router->get('/staff/api/checklist',      [StaffController::class,       'getChecklist']);
@@ -249,6 +257,9 @@ $router->post('/admin/api/retiro-kgyr/{id}/confirmar-directo', [AdminController:
 $router->post('/admin/api/ingreso-kgyr',                      [AdminController::class, 'apiIngresoKgyrCrear']);
 $router->post('/admin/api/ingreso-kgyr/{id}/anular',          [AdminController::class, 'apiIngresoKgyrAnular']);
 $router->post('/admin/api/ingreso-kgyr/{id}/confirmar-directo', [AdminController::class, 'apiIngresoKgyrConfirmarDirecto']);
+$router->post('/admin/api/tarea-limpieza/agregar',        [AdminController::class, 'addTareaLimpieza']);
+$router->post('/admin/api/tarea-limpieza/{id}/actualizar',[AdminController::class, 'actualizarTareaLimpieza']);
+$router->post('/admin/api/tarea-limpieza/{id}/toggle',    [AdminController::class, 'toggleTareaLimpieza']);
 $router->post('/admin/api/tarifa-base/agregar',      [AdminController::class, 'addTarifaBase']);
 $router->post('/admin/api/tarifa-base/{id}/eliminar',[AdminController::class, 'eliminarTarifaBase']);
 $router->post('/admin/api/bono/agregar',                   [AdminController::class, 'addBono']);

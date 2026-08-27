@@ -9,15 +9,15 @@ $LOCALES      = [
     2 => ['nombre' => 'Local 2', 'color' => '#0097A7'],
     3 => ['nombre' => 'Local 3', 'color' => '#5b21b6'],
     4 => ['nombre' => 'Local 4', 'color' => '#d97706'],
+    5 => ['nombre' => 'Administración', 'color' => '#0f172a', 'icono' => '🗂️'],
 ];
 $slotsConfig = $slotsConfig ?? [];
 $roles       = $roles       ?? [];
 
 $slotLabels = [
     3 => [
-        'VENDEDORA'  => [1 => 'sb3', 2 => 'sb5'],
-        'CAJERA'     => [1 => 'sb3', 2 => 'sb7', 3 => 'sb5'],
-        'ALMACENERA' => [1 => false, 2 => false],
+        'VENDEDORA' => [1 => 'sb3', 2 => 'sb5'],
+        'CAJERA'    => [1 => 'sb3', 2 => 'sb7', 3 => 'sb5'],
     ],
 ];
 
@@ -164,7 +164,7 @@ if ($semana) {
     <?php if ($semana): ?>
     <div style="display:flex;justify-content:center;">
         <button id="btnCubrirPuesto" class="hor-btn-cubrir" onclick="toggleModoCubrir()"
-                style="width:min(480px,100%);font-size:1.17rem;padding:.6rem 1.5rem;">
+                style="width:min(480px,100%);font-size:1.17rem;padding:.1rem 1.5rem;">
             ⇄ CUBRIR / CAMBIAR PUESTO
         </button>
     </div>
@@ -189,7 +189,7 @@ if ($semana) {
     ?>
     <section class="hor-sala" style="--sala-color:<?= $localInfo['color'] ?>;">
         <div class="hor-sala__titulo">
-            <span class="hor-sala__icono">🏪</span>
+            <span class="hor-sala__icono"><?= $localInfo['icono'] ?? '🏪' ?></span>
             <?= $localInfo['nombre'] ?>
         </div>
 
@@ -218,7 +218,10 @@ if ($semana) {
                      style="--rol-color:<?= $rolColor ?>;">
                     <?php
                         $rolDesc  = htmlspecialchars($roles[$rol]['desc'] ?? $rol);
-                        $rolAbrev = ['CAJERA'=>'C','VENDEDORA'=>'V','LIMPIEZA'=>'L','ALMACENERA'=>'A'][$rol] ?? mb_substr($rolDesc, 0, 1);
+                        $rolAbrev = [
+                            'CAJERA'=>'C','VENDEDORA'=>'V','LIMPIEZA'=>'L','ALMACENERA'=>'A',
+                            'ABASTECIMIENTO'=>'Ab','INVENTARIO'=>'In','COMPRAS'=>'Co','AUDITORIA'=>'Au',
+                        ][$rol] ?? mb_substr($rolDesc, 0, 1);
                     ?>
                     <div class="hor-grid__rol-label">
                         <span class="hor-rol-full"><?= $rolDesc ?></span>
@@ -523,7 +526,7 @@ function renderSlots(slots) {
             } else {
                 el.querySelector('.hor-asiento__nombre').textContent = '＋';
             }
-            if (s.rol_puesto !== 'ALMACENERA' && s.rol_puesto !== 'LIMPIEZA') {
+            if (!['ALMACENERA','LIMPIEZA','ABASTECIMIENTO','INVENTARIO','COMPRAS','AUDITORIA'].includes(s.rol_puesto)) {
                 libres[s.local_id] = (libres[s.local_id] || 0) + 1;
             }
 
@@ -663,8 +666,11 @@ function abrirModalRevertir(s) {
 }
 
 // ── Modal: intercambio de puesto ───────────────────────
-const _ROLES_LABEL = { CAJERA:'Cajera', VENDEDORA:'Vendedora', ALMACENERA:'Almacenera', LIMPIEZA:'Limpieza' };
-const _LOCALES_LABEL = { '2':'SB2', '3':'SB3', '4':'SB4' };
+const _ROLES_LABEL = {
+    CAJERA:'Cajera', VENDEDORA:'Vendedora', ALMACENERA:'Almacenera', LIMPIEZA:'Limpieza',
+    ABASTECIMIENTO:'Abastecimiento', INVENTARIO:'Inventario', COMPRAS:'Compras', AUDITORIA:'Auditoría',
+};
+const _LOCALES_LABEL = { '2':'SB2', '3':'SB3', '4':'SB4', '5':'Admin' };
 
 function abrirModalIntercambio(otroSlot, miSlot) {
     _slotParaIntercambio = { miSlot, otroSlot };

@@ -353,6 +353,20 @@ $act = [
                            value="<?= isset($detalle['oper_otros_bcp']) ? (int)$detalle['oper_otros_bcp'] : '' ?>">
                     <span class="bcp-ops-hint">Consulta de movimientos y saldo</span>
                 </div>
+                <div class="bcp-ops-box bcp-ops-box--seguros">
+                    <label for="act_oper_seguros_bcp">Venta de seguros</label>
+                    <input type="number" id="act_oper_seguros_bcp" class="caja-input"
+                           min="0" step="1" placeholder="0"
+                           value="<?= isset($detalle['oper_seguros_bcp']) ? (int)$detalle['oper_seguros_bcp'] : 0 ?>">
+                    <span class="bcp-ops-hint">1 seguro = 50 operaciones</span>
+                </div>
+                <div class="bcp-ops-box bcp-ops-box--tarjetas">
+                    <label for="act_oper_tarjetas_bcp">Venta de tarjetas</label>
+                    <input type="number" id="act_oper_tarjetas_bcp" class="caja-input"
+                           min="0" step="1" placeholder="0"
+                           value="<?= isset($detalle['oper_tarjetas_bcp']) ? (int)$detalle['oper_tarjetas_bcp'] : 0 ?>">
+                    <span class="bcp-ops-hint">1 tarjeta de crédito (o 1 tarjeta + sticker) = 200 operaciones</span>
+                </div>
             </div>
             <p class="bcp-ops-warning">⚠ Queda estrictamente prohibido el fraccionamiento de operaciones, a menos que el cliente lo solicite.</p>
         </div>

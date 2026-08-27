@@ -643,8 +643,10 @@ async function guardarSesion(cerrar = false) {
 
     if (!sesionId) { showAlert(msg, 'No hay sesión activa.'); return; }
 
-    const opTotalEl = $('act_oper_total_bcp');
-    const opOtrosEl = $('act_oper_otros_bcp');
+    const opTotalEl    = $('act_oper_total_bcp');
+    const opOtrosEl    = $('act_oper_otros_bcp');
+    const opSegurosEl  = $('act_oper_seguros_bcp');
+    const opTarjetasEl = $('act_oper_tarjetas_bcp');
     if (opTotalEl && (opTotalEl.value === '' || opOtrosEl.value === '')) {
         mostrarToastCaja('Ingresa las operaciones BCP (total y otros)\n(escribe 0 si no hubo ninguna)');
         return;
@@ -666,6 +668,8 @@ async function guardarSesion(cerrar = false) {
             oper_ingresos_bcp: Math.max(0, parseInt(opTotalEl?.value ?? '0') - parseInt(opOtrosEl?.value ?? '0')),
             oper_salida_bcp:   0,
             oper_otros_bcp:    parseInt(opOtrosEl?.value ?? '0'),
+            oper_seguros_bcp:  parseInt(opSegurosEl?.value ?? '0') || 0,
+            oper_tarjetas_bcp: parseInt(opTarjetasEl?.value ?? '0') || 0,
         },
         gastos: collectGastos(),
     };

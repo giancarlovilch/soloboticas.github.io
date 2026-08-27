@@ -62,7 +62,7 @@ $hoy = date('Y-m-d');
         <p class="bn-title">Tarifa base por turno</p>
 
         <div class="bn-rol-grid">
-            <?php foreach (['CAJERA','VENDEDORA','ALMACENERA'] as $rol):
+            <?php foreach (['CAJERA','VENDEDORA','ALMACENERA','ABASTECIMIENTO','INVENTARIO','COMPRAS','AUDITORIA'] as $rol):
                 $t = $tarifaActual[$rol] ?? null;
             ?>
             <div class="bn-rol-card">
@@ -82,6 +82,10 @@ $hoy = date('Y-m-d');
                         <option value="CAJERA">Cajera</option>
                         <option value="VENDEDORA">Vendedora</option>
                         <option value="ALMACENERA">Almacenera</option>
+                        <option value="ABASTECIMIENTO">Abastecimiento</option>
+                        <option value="INVENTARIO">Inventario</option>
+                        <option value="COMPRAS">Compras</option>
+                        <option value="AUDITORIA">Auditoría</option>
                     </select>
                 </div>
                 <div style="min-width:110px;flex:1;">

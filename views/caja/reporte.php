@@ -320,9 +320,22 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
         <div class="caja-proximo">
             <p>→ Saldo de apertura del próximo turno: <strong class="text-highlight"><?= $f2($detalle['saldo_proximo_dia'] ?? $loQueEs) ?></strong>
                <small>(total arqueado)</small></p>
-            <?php if (!empty($detalle['num_operaciones_bcp'])): ?>
+            <?php if (!empty($detalle['num_operaciones_bcp'])):
+                $rTotal  = (int)($detalle['oper_ingresos_bcp'] ?? 0) + (int)($detalle['oper_salida_bcp'] ?? 0) + (int)($detalle['oper_otros_bcp'] ?? 0);
+                $rOtros  = (int)($detalle['oper_otros_bcp']    ?? 0);
+                $rSeg    = (int)($detalle['oper_seguros_bcp']  ?? 0);
+                $rTar    = (int)($detalle['oper_tarjetas_bcp'] ?? 0);
+            ?>
             <p style="margin-top:.4rem;font-size:0.82rem;color:#64748b;">
                 Operaciones BCP realizadas: <strong><?= (int)$detalle['num_operaciones_bcp'] ?></strong>
+                <?php if ($rSeg > 0 || $rTar > 0): ?>
+                <br><small style="color:#94a3b8;">
+                    Resumen — Total: <strong><?= $rTotal ?></strong>
+                    · Otros: <strong><?= $rOtros ?></strong>
+                    · Seguros: <strong><?= $rSeg ?></strong> (×50)
+                    · Tarjetas: <strong><?= $rTar ?></strong> (×200)
+                </small>
+                <?php endif; ?>
             </p>
             <?php endif; ?>
         </div>
@@ -800,6 +813,40 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
         </table>
         <?php else: ?>
         <p class="caja-empty">No se han registrado modificaciones post-cierre en este arqueo.</p>
+        <?php endif; ?>
+    </section>
+
+    <!-- ── 8. Registro de accesos (empadronamiento) ──────────── -->
+    <?php
+    $tieneVisitas  = !empty($visitas ?? []);
+    $totalIngresos = $tieneVisitas ? array_sum(array_column($visitas, 'veces')) : 0;
+    ?>
+    <section class="caja-card" style="border-left:3px solid <?= $tieneVisitas ? '#0097A7' : '#e2e8f0' ?>;">
+        <h2 class="caja-card__title" style="color:<?= $tieneVisitas ? '#0e7490' : '#94a3b8' ?>;">
+            🔒 Registro de accesos a este cuadre
+            <?php if ($tieneVisitas): ?>
+            <span style="font-size:.72rem;font-weight:700;background:#cffafe;color:#0e7490;padding:2px 9px;border-radius:5px;margin-left:.5rem;">
+                <?= count($visitas) ?> persona<?= count($visitas) !== 1 ? 's' : '' ?> · <?= $totalIngresos ?> ingreso<?= $totalIngresos !== 1 ? 's' : '' ?>
+            </span>
+            <?php endif; ?>
+        </h2>
+        <?php if ($tieneVisitas): ?>
+        <table class="caja-table">
+            <thead>
+                <tr><th>Quién</th><th>Veces que ingresó</th><th>Última entrada</th></tr>
+            </thead>
+            <tbody>
+            <?php foreach ($visitas as $v): ?>
+            <tr>
+                <td style="font-size:.8rem;color:#1e293b;font-weight:500;"><?= htmlspecialchars($v['visitante']) ?></td>
+                <td style="font-size:.8rem;color:#0e7490;font-weight:700;text-align:center;"><?= (int)$v['veces'] ?></td>
+                <td style="font-size:.75rem;color:#64748b;white-space:nowrap;"><?= date('d/m/y H:i', strtotime($v['ultima_visita'])) ?></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php else: ?>
+        <p class="caja-empty">Nadie ha confirmado su ingreso a este cuadre todavía.</p>
         <?php endif; ?>
     </section>
 

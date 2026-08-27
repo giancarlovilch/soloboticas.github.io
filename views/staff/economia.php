@@ -132,7 +132,11 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
 
             <!-- Tarifa base por rol -->
             <div class="eco-rol-grid" style="margin-top:.5rem;">
-                <?php foreach (['CAJERA' => 'Cajera', 'VENDEDORA' => 'Vendedora', 'ALMACENERA' => 'Almacenera'] as $cod => $label):
+                <?php foreach ([
+                    'CAJERA' => 'Cajera', 'VENDEDORA' => 'Vendedora', 'ALMACENERA' => 'Almacenera',
+                    'ABASTECIMIENTO' => 'Abastecimiento', 'INVENTARIO' => 'Inventario',
+                    'COMPRAS' => 'Compras', 'AUDITORIA' => 'Auditoría',
+                ] as $cod => $label):
                     $t = $tarifasInfo[$cod] ?? null; ?>
                 <div class="eco-rol-card">
                     <div class="eco-rol-card__num">S/ <?= $t ? number_format((float)$t['monto'], 2, '.', '') : '—' ?></div>
@@ -414,6 +418,39 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
         </table>
     </div>
     <?php endif; ?>
+
+    <!-- ── Resumen de estrellas ──────────────────────── -->
+    <?php
+    $estrellas  = $estrellas ?? ['rojas' => 0, 'azules' => 0, 'diferencia' => 0, 'monto' => 0];
+    $estDif     = (float)($estrellas['diferencia'] ?? 0);
+    $estMontoEc = (float)($estrellas['monto']       ?? 0);
+    $fmtEstEc   = fn($v) => (floor($v) == $v) ? (string)(int)$v : number_format($v, 1);
+    ?>
+    <p class="eco-sec-title">⭐ Estrellas de <?= $mesLabel ?></p>
+    <a href="<?= $basePath ?>/staff/estrellas/resumen?mes=<?= htmlspecialchars($filtroMes) ?>"
+       style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;
+              background:#fff;border:1.5px solid #fbcfe8;border-radius:12px;padding:.8rem 1.1rem;
+              text-decoration:none;margin-bottom:.5rem;">
+        <span style="font-size:.82rem;font-weight:700;">
+            <span style="color:#dc2626;">🔴 <?= (int)$estrellas['rojas'] ?></span>
+            <span style="color:#cbd5e1;"> vs </span>
+            <span style="color:#1d4ed8;">🔵 <?= $fmtEstEc($estrellas['azules']) ?></span>
+        </span>
+        <?php if ($estDif > 0): ?>
+        <span style="font-size:.75rem;font-weight:800;color:#991b1b;background:#fee2e2;border-radius:20px;padding:3px 10px;">
+            ⚠️ S/ <?= number_format(abs($estMontoEc), 2) ?> en contra
+        </span>
+        <?php elseif ($estDif < 0): ?>
+        <span style="font-size:.75rem;font-weight:800;color:#1d4ed8;background:#dbeafe;border-radius:20px;padding:3px 10px;">
+            ✅ S/ <?= number_format(abs($estMontoEc), 2) ?> a favor
+        </span>
+        <?php else: ?>
+        <span style="font-size:.75rem;font-weight:700;color:#64748b;background:#f1f5f9;border-radius:20px;padding:3px 10px;">
+            Parejo
+        </span>
+        <?php endif; ?>
+        <span style="font-size:.72rem;color:#be185d;font-weight:700;">Ver resumen →</span>
+    </a>
 
     <!-- ── Tabla 2: Ingresos por turno trabajado ────── -->
     <?php
