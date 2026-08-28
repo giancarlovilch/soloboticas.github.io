@@ -825,6 +825,26 @@ class AdminController extends Controller
         else $this->error($result, 422);
     }
 
+    /** POST /admin/api/tasa-roja/{id}/eliminar */
+    public function eliminarTasaRoja(int $id): void
+    {
+        $this->middlewareAdmin();
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $result = (new EstrellaRepository())->eliminarTasaRoja($id);
+        if ($result === true) $this->success('Tasa eliminada.');
+        else $this->error($result, 404);
+    }
+
+    /** POST /admin/api/tasa-azul-voto/{id}/eliminar */
+    public function eliminarTasaAzulVoto(int $id): void
+    {
+        $this->middlewareAdmin();
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $result = (new EstrellaRepository())->eliminarTasaAzulVoto($id);
+        if ($result === true) $this->success('Tasa eliminada.');
+        else $this->error($result, 404);
+    }
+
     /** POST /admin/api/tarifa-base/{id}/eliminar */
     public function eliminarTarifaBase(int $id): void
     {

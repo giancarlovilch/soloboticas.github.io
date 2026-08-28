@@ -488,9 +488,12 @@ class CajaRepository
     {
         $stmt = $this->db->prepare(
             "SELECT ms.id_movimiento, ms.monto, ms.numero_operacion, ms.estado,
-                    ms.fecha_movimiento, m.descripcion AS modo_desc, m.id_modo
+                    ms.fecha_movimiento, ms.fecha_revision, ms.observacion_revision,
+                    pr.nombres AS revisor_nombre,
+                    m.descripcion AS modo_desc, m.id_modo
              FROM movimiento_sesion ms
              INNER JOIN modo m ON ms.modo_id = m.id_modo
+             LEFT JOIN postulante pr ON pr.id_postulante = ms.postulante_revision_id
              WHERE ms.sesion_id = :sid AND ms.tipo_movimiento_id = 1
              ORDER BY ms.fecha_movimiento DESC"
         );
@@ -553,14 +556,15 @@ class CajaRepository
         )->execute(['id' => $movId]);
     }
 
-    public function confirmarPagoDigital(int $movId, int $revisorId, string $estado): bool
+    public function confirmarPagoDigital(int $movId, int $revisorId, string $estado, ?string $observacion = null): bool
     {
         $stmt = $this->db->prepare(
             "UPDATE movimiento_sesion
-             SET estado = :est, postulante_revision_id = :rev, fecha_revision = NOW()
+             SET estado = :est, postulante_revision_id = :rev, fecha_revision = NOW(),
+                 observacion_revision = :obs
              WHERE id_movimiento = :id AND tipo_movimiento_id = 1"
         );
-        $stmt->execute(['est' => $estado, 'rev' => $revisorId, 'id' => $movId]);
+        $stmt->execute(['est' => $estado, 'rev' => $revisorId, 'obs' => $observacion, 'id' => $movId]);
         return $stmt->rowCount() > 0;
     }
 
@@ -641,11 +645,11 @@ class CajaRepository
      * que ya dependen del estado de cada tabla.
      */
     public function getAuditoriaMovimientos(
-        string $categoria = '',
-        int    $cajaId    = 0,
-        int    $cajeraId  = 0,
-        string $revisado  = '',
-        string $mes       = ''
+        string $categoria       = '',
+        int    $cajaId          = 0,
+        int    $cajeraId        = 0,
+        string $estadoAuditoria = '',
+        string $mes             = ''
     ): array {
         $params = [];
         $desdeFecha = $hastaFecha = null;
@@ -655,11 +659,20 @@ class CajaRepository
             $hastaFecha = date('Y-m-t', strtotime($desdeFecha));
         }
 
+        // COBROS usa su propio `estado` como fuente de verdad (alimenta el cálculo de caja),
+        // así que su estado de auditoría se deriva de ahí. Las demás categorías usan la columna
+        // independiente `resultado_revision`, que nunca toca el `estado` propio de cada tabla.
+        $estadoCobros = "CASE ms.estado WHEN 'APROBADO' THEN 'REVISADO' WHEN 'RECHAZADO' THEN 'RECHAZADO' ELSE 'PENDIENTE' END";
+        $estadoResto  = fn(string $alias) => "CASE WHEN {$alias}.fecha_revision IS NULL THEN 'PENDIENTE'
+                                                    WHEN {$alias}.resultado_revision = 'RECHAZADO' THEN 'RECHAZADO'
+                                                    ELSE 'REVISADO' END";
+
         $sql = "
             SELECT * FROM (
                 SELECT ms.id_movimiento AS id, 'COBROS' AS categoria,
                        ms.monto, CONCAT(m.descripcion, ' — ', COALESCE(ms.numero_operacion,'—')) AS referencia,
-                       ms.estado, (ms.fecha_revision IS NOT NULL) AS revisado,
+                       ms.estado AS estado_original, {$estadoCobros} AS estado_auditoria,
+                       ms.observacion_revision,
                        ms.fecha_movimiento AS fecha_mov,
                        sc.id_sesion, sc.fecha_operacion,
                        c.id_caja, c.descripcion AS caja_desc, l.descripcion AS local_desc,
@@ -676,7 +689,8 @@ class CajaRepository
 
                 SELECT ms.id_movimiento, 'OTROS',
                        ms.monto, COALESCE(ms.descripcion,'—'),
-                       ms.estado, (ms.fecha_revision IS NOT NULL),
+                       ms.estado, {$estadoResto('ms')},
+                       ms.observacion_revision,
                        ms.fecha_movimiento,
                        sc.id_sesion, sc.fecha_operacion,
                        c.id_caja, c.descripcion, l.descripcion,
@@ -692,7 +706,8 @@ class CajaRepository
 
                 SELECT pp.id_pago_personal, 'PERSONAL',
                        pp.monto, pb.nombres,
-                       pp.estado, (pp.fecha_revision IS NOT NULL),
+                       pp.estado, {$estadoResto('pp')},
+                       pp.observacion_revision,
                        pp.fecha_pago,
                        sc.id_sesion, sc.fecha_operacion,
                        c.id_caja, c.descripcion, l.descripcion,
@@ -708,7 +723,8 @@ class CajaRepository
 
                 SELECT pl.id_pago_local, 'LOCAL',
                        pl.monto, COALESCE(cg.descripcion, pl.numero_operacion, '—'),
-                       pl.estado, (pl.fecha_revision IS NOT NULL),
+                       pl.estado, {$estadoResto('pl')},
+                       pl.observacion_revision,
                        pl.fecha_pago,
                        sc.id_sesion, sc.fecha_operacion,
                        c.id_caja, c.descripcion, l.descripcion,
@@ -724,7 +740,8 @@ class CajaRepository
 
                 SELECT pf.id_pago_factura, 'COMPRAS',
                        pf.monto, COALESCE(pf.numero_comprobante, pf.tipo_documento, '—'),
-                       pf.estado, (pf.fecha_revision IS NOT NULL),
+                       pf.estado, {$estadoResto('pf')},
+                       pf.observacion_revision,
                        pf.fecha_registro,
                        sc.id_sesion, sc.fecha_operacion,
                        c.id_caja, c.descripcion, l.descripcion,
@@ -739,7 +756,8 @@ class CajaRepository
 
                 SELECT pd.id_pago_deposito, 'DEPOSITO',
                        pd.monto, COALESCE(pd.numero_comprobante, '—'),
-                       pd.estado, (pd.fecha_revision IS NOT NULL),
+                       pd.estado, {$estadoResto('pd')},
+                       pd.observacion_revision,
                        pd.fecha_registro,
                        sc.id_sesion, sc.fecha_operacion,
                        c.id_caja, c.descripcion, l.descripcion,
@@ -764,10 +782,9 @@ class CajaRepository
             $sql .= " AND aud.cajera_id = :cajera";
             $params['cajera'] = $cajeraId;
         }
-        if ($revisado === 'SI') {
-            $sql .= " AND aud.revisado = 1";
-        } elseif ($revisado === 'NO') {
-            $sql .= " AND aud.revisado = 0";
+        if (in_array($estadoAuditoria, ['PENDIENTE', 'REVISADO', 'RECHAZADO'], true)) {
+            $sql .= " AND aud.estado_auditoria = :ea";
+            $params['ea'] = $estadoAuditoria;
         }
         if ($desdeFecha) {
             $sql .= " AND aud.fecha_operacion BETWEEN :desde AND :hasta";
@@ -781,26 +798,33 @@ class CajaRepository
         return $stmt->fetchAll();
     }
 
-    /** Marca o desmarca como revisado un registro de auditoría, sin tocar su `estado`. */
-    public function marcarRevisado(string $categoria, int $id, int $revisorId, bool $revisado): bool
+    /**
+     * Aprueba, rechaza o vuelve a pendiente un registro de auditoría, sin tocar su `estado`
+     * de negocio (usa `resultado_revision`, independiente). COBROS no pasa por aquí: su
+     * `estado` ya alimenta el cálculo de caja, así que usa confirmarPagoDigital() en su lugar.
+     */
+    public function revisarAuditoria(string $categoria, int $id, int $revisorId, string $accion, ?string $observacion): bool
     {
-        if (!isset(self::AUDITORIA_TABLAS[$categoria])) return false;
-        [$tabla, $pk, $col] = self::AUDITORIA_TABLAS[$categoria];
+        if (!isset(self::AUDITORIA_TABLAS[$categoria]) || $categoria === 'COBROS') return false;
+        [$tabla, $pk, $colRevisor] = self::AUDITORIA_TABLAS[$categoria];
 
         $where = "{$pk} = :id";
-        if ($tabla === 'movimiento_sesion') {
-            $where .= $categoria === 'COBROS'
-                ? " AND tipo_movimiento_id = 1"
-                : " AND tipo_movimiento_id = 2";
-        }
+        if ($tabla === 'movimiento_sesion') $where .= " AND tipo_movimiento_id = 2";
 
-        $sql = "UPDATE {$tabla} SET {$col} = :rev, fecha_revision = :fr WHERE {$where}";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([
-            'rev' => $revisado ? $revisorId : null,
-            'fr'  => $revisado ? date('Y-m-d H:i:s') : null,
-            'id'  => $id,
-        ]);
+        if ($accion === 'PENDIENTE') {
+            $sql = "UPDATE {$tabla} SET {$colRevisor} = NULL, fecha_revision = NULL,
+                           resultado_revision = NULL, observacion_revision = NULL
+                    WHERE {$where}";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute(['id' => $id]);
+        } else {
+            $resultado = $accion === 'APROBAR' ? 'APROBADO' : 'RECHAZADO';
+            $sql = "UPDATE {$tabla} SET {$colRevisor} = :rev, fecha_revision = NOW(),
+                           resultado_revision = :res, observacion_revision = :obs
+                    WHERE {$where}";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute(['rev' => $revisorId, 'res' => $resultado, 'obs' => $observacion, 'id' => $id]);
+        }
         return $stmt->rowCount() > 0;
     }
 
@@ -1158,19 +1182,23 @@ class CajaRepository
         $stmt = $this->db->prepare(
             "SELECT pp.id_pago_personal AS id, pp.monto,
                     pp.tipo_pago, NULL AS comprobante,
-                    pb.nombres AS descripcion, pp.postulante_beneficiario_id AS ref_id
+                    pb.nombres AS descripcion, pp.postulante_beneficiario_id AS ref_id,
+                    pp.fecha_revision, pp.resultado_revision, pp.observacion_revision,
+                    prev.nombres AS revisor_nombre
              FROM pago_personal pp
              INNER JOIN postulante pb ON pp.postulante_beneficiario_id = pb.id_postulante
+             LEFT JOIN postulante prev ON prev.id_postulante = pp.postulante_revisor_id
              WHERE pp.sesion_id = :sid"
         );
         $stmt->execute(['sid' => $sesionId]);
         $te = $teByMode['PERSONAL'] ?? $fallback('PERSONAL', 'Pago de Personal');
         foreach ($stmt->fetchAll() as $row) {
             $gastos[] = $row + [
-                'tipo_egreso_id' => $te['id_tipo_egreso'],
-                'etiqueta'       => $te['etiqueta'],
-                'modo_ref'       => 'PERSONAL',
-                'tipo_css'       => 'personal',
+                'tipo_egreso_id'    => $te['id_tipo_egreso'],
+                'etiqueta'          => $te['etiqueta'],
+                'modo_ref'          => 'PERSONAL',
+                'categoria_auditoria' => 'PERSONAL',
+                'tipo_css'          => 'personal',
             ];
         }
 
@@ -1178,21 +1206,25 @@ class CajaRepository
         $stmt = $this->db->prepare(
             "SELECT pl.id_pago_local AS id, pl.monto, pl.numero_operacion AS comprobante,
                     l.descripcion, pl.local_id AS ref_id, pl.tipo_egreso_id,
-                    pl.concepto_id, cg.descripcion AS concepto_desc
+                    pl.concepto_id, cg.descripcion AS concepto_desc,
+                    pl.fecha_revision, pl.resultado_revision, pl.observacion_revision,
+                    prev.nombres AS revisor_nombre
              FROM pago_local pl
              INNER JOIN local l ON pl.local_id = l.id_local
              LEFT JOIN concepto_gastos_local cg ON pl.concepto_id = cg.id_concepto
+             LEFT JOIN postulante prev ON prev.id_postulante = pl.revisado_por_id
              WHERE pl.sesion_id = :sid"
         );
         $stmt->execute(['sid' => $sesionId]);
         $teLocal = $teByMode['LOCAL'] ?? $teByMode['CONCEPTO'] ?? $fallback('LOCAL', 'Pago de Local');
         foreach ($stmt->fetchAll() as $row) {
             $gastos[] = array_merge($row, [
-                'tipo_egreso_id' => $teLocal['id_tipo_egreso'],
-                'etiqueta'       => $teLocal['etiqueta'],
-                'modo_ref'       => 'LOCAL',
-                'tipo_css'       => 'concepto',
-                'tipo_pago'      => null,
+                'tipo_egreso_id'    => $teLocal['id_tipo_egreso'],
+                'etiqueta'          => $teLocal['etiqueta'],
+                'modo_ref'          => 'LOCAL',
+                'categoria_auditoria' => 'LOCAL',
+                'tipo_css'          => 'concepto',
+                'tipo_pago'         => null,
             ]);
         }
 
@@ -1200,18 +1232,22 @@ class CajaRepository
         $stmt = $this->db->prepare(
             "SELECT ms.id_movimiento AS id, ms.monto, NULL AS comprobante,
                     ms.descripcion, NULL AS ref_id, NULL AS tipo_pago,
-                    NULL AS concepto_id, NULL AS concepto_desc, NULL AS tipo_documento
+                    NULL AS concepto_id, NULL AS concepto_desc, NULL AS tipo_documento,
+                    ms.fecha_revision, ms.resultado_revision, ms.observacion_revision,
+                    prev.nombres AS revisor_nombre
              FROM movimiento_sesion ms
+             LEFT JOIN postulante prev ON prev.id_postulante = ms.postulante_revision_id
              WHERE ms.sesion_id = :sid AND ms.tipo_movimiento_id = 2"
         );
         $stmt->execute(['sid' => $sesionId]);
         $teLibre = $teByMode['LIBRE'] ?? $fallback('LIBRE', 'Otros pagos');
         foreach ($stmt->fetchAll() as $row) {
             $gastos[] = $row + [
-                'tipo_egreso_id' => $teLibre['id_tipo_egreso'],
-                'etiqueta'       => $teLibre['etiqueta'],
-                'modo_ref'       => 'LIBRE',
-                'tipo_css'       => 'libre',
+                'tipo_egreso_id'    => $teLibre['id_tipo_egreso'],
+                'etiqueta'          => $teLibre['etiqueta'],
+                'modo_ref'          => 'LIBRE',
+                'categoria_auditoria' => 'OTROS',
+                'tipo_css'          => 'libre',
             ];
         }
 
@@ -1219,37 +1255,52 @@ class CajaRepository
         $stmt = $this->db->prepare(
             "SELECT pd.id_pago_deposito AS id, pd.monto, pd.numero_comprobante AS comprobante,
                     NULL AS descripcion, NULL AS ref_id, NULL AS tipo_pago,
-                    NULL AS concepto_id, NULL AS concepto_desc, NULL AS tipo_documento
-             FROM pago_deposito pd WHERE pd.sesion_id = :sid"
+                    NULL AS concepto_id, NULL AS concepto_desc, NULL AS tipo_documento,
+                    pd.fecha_revision, pd.resultado_revision, pd.observacion_revision,
+                    prev.nombres AS revisor_nombre
+             FROM pago_deposito pd
+             LEFT JOIN postulante prev ON prev.id_postulante = pd.revisado_por_id
+             WHERE pd.sesion_id = :sid"
         );
         $stmt->execute(['sid' => $sesionId]);
         $teDeposito = $teByMode['DEPOSITO'] ?? $fallback('DEPOSITO', 'Depósito a KGyR');
         foreach ($stmt->fetchAll() as $row) {
             $gastos[] = $row + [
-                'tipo_egreso_id' => $teDeposito['id_tipo_egreso'],
-                'etiqueta'       => $teDeposito['etiqueta'],
-                'modo_ref'       => 'DEPOSITO',
-                'tipo_css'       => 'personal',
+                'tipo_egreso_id'    => $teDeposito['id_tipo_egreso'],
+                'etiqueta'          => $teDeposito['etiqueta'],
+                'modo_ref'          => 'DEPOSITO',
+                'categoria_auditoria' => 'DEPOSITO',
+                'tipo_css'          => 'personal',
             ];
         }
 
         // Pagos factura/compras
         $stmt = $this->db->prepare(
             "SELECT pf.id_pago_factura AS id, pf.monto, pf.numero_comprobante AS comprobante,
-                    pf.tipo_documento, pf.tipo_documento AS descripcion, NULL AS ref_id
+                    pf.tipo_documento, pf.tipo_documento AS descripcion, NULL AS ref_id,
+                    pf.fecha_revision, pf.resultado_revision, pf.observacion_revision,
+                    prev.nombres AS revisor_nombre
              FROM pago_factura pf
+             LEFT JOIN postulante prev ON prev.id_postulante = pf.revisado_por_id
              WHERE pf.sesion_id = :sid"
         );
         $stmt->execute(['sid' => $sesionId]);
         $teFactura = $teByMode['FACTURA'] ?? $fallback('FACTURA', 'Pago de Facturas');
         foreach ($stmt->fetchAll() as $row) {
             $gastos[] = $row + [
-                'tipo_egreso_id' => $teFactura['id_tipo_egreso'],
-                'etiqueta'       => $teFactura['etiqueta'],
-                'modo_ref'       => 'FACTURA',
-                'tipo_css'       => 'concepto',
-                'tipo_pago'      => null,
+                'tipo_egreso_id'    => $teFactura['id_tipo_egreso'],
+                'etiqueta'          => $teFactura['etiqueta'],
+                'modo_ref'          => 'FACTURA',
+                'categoria_auditoria' => 'COMPRAS',
+                'tipo_css'          => 'concepto',
+                'tipo_pago'         => null,
             ];
+        }
+
+        foreach ($gastos as &$g) {
+            $g['estado_auditoria'] = is_null($g['fecha_revision'])
+                ? 'PENDIENTE'
+                : ($g['resultado_revision'] === 'RECHAZADO' ? 'RECHAZADO' : 'REVISADO');
         }
 
         return $gastos;

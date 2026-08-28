@@ -138,7 +138,8 @@ $router->post('/caja/api/sesion/{id}/editar-cajera',      [CajaController::class
 $router->post('/caja/api/auditar-consistencia',        [CajaController::class, 'auditarConsistencia']);
 $router->get('/caja/pagos-digitales',                    [CajaController::class, 'pagosDigitalesView']);
 $router->get('/caja/auditoria',                          [CajaController::class, 'auditoriaView']);
-$router->post('/caja/api/auditoria/{categoria}/{id}/revisar', [CajaController::class, 'apiMarcarRevisado']);
+$router->post('/caja/api/auditoria/{categoria}/{id}/revisar', [CajaController::class, 'apiRevisarAuditoria']);
+$router->post('/caja/api/reporte/{categoria}/{id}/revisar',   [CajaController::class, 'apiRevisarDesdeReporte']);
 
 // --- Conciliación de cobros por POS (terminales de tarjeta) ---
 $router->get('/caja/conciliacion',                              [TerminalPosController::class, 'vista']);
@@ -261,7 +262,9 @@ $router->post('/admin/api/tarea-limpieza/agregar',        [AdminController::clas
 $router->post('/admin/api/tarea-limpieza/{id}/actualizar',[AdminController::class, 'actualizarTareaLimpieza']);
 $router->post('/admin/api/tarea-limpieza/{id}/toggle',    [AdminController::class, 'toggleTareaLimpieza']);
 $router->post('/admin/api/tasa-roja/agregar',              [AdminController::class, 'addTasaRoja']);
+$router->post('/admin/api/tasa-roja/{id}/eliminar',        [AdminController::class, 'eliminarTasaRoja']);
 $router->post('/admin/api/tasa-azul-voto/agregar',         [AdminController::class, 'addTasaAzulVoto']);
+$router->post('/admin/api/tasa-azul-voto/{id}/eliminar',   [AdminController::class, 'eliminarTasaAzulVoto']);
 $router->post('/admin/api/tarifa-base/agregar',      [AdminController::class, 'addTarifaBase']);
 $router->post('/admin/api/tarifa-base/{id}/eliminar',[AdminController::class, 'eliminarTarifaBase']);
 $router->post('/admin/api/bono/agregar',                   [AdminController::class, 'addBono']);

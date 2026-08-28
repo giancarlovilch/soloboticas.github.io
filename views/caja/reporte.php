@@ -7,6 +7,31 @@ $basePath  = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
 $userName  = $userName ?? $_SESSION['user_name'] ?? 'Usuario';
 $userRol   = $userRol  ?? $_SESSION['user_rol']  ?? 'STAFF';
 $esAdmin   = $userRol === 'ADMIN';
+$puedeAuditar = in_array($userRol, ['ADMIN', 'SUPERVISOR'], true);
+
+// Estado de auditoría (informativo, no toca el cuadre): mismo badge en Egresos y Cobros.
+$estAudLabel = ['PENDIENTE' => 'Pendiente', 'REVISADO' => 'Revisado', 'RECHAZADO' => 'Rechazado'];
+$estAudCls   = [
+    'PENDIENTE' => 'background:#fef3c7;color:#92400e;',
+    'REVISADO'  => 'background:#d1fae5;color:#065f46;',
+    'RECHAZADO' => 'background:#fee2e2;color:#991b1b;',
+];
+$renderAuditoriaCelda = function (string $categoria, int $id, string $ea, ?string $obs = null) use ($puedeAuditar, $estAudLabel, $estAudCls): string {
+    $badge = '<span style="font-size:.72rem;font-weight:700;border-radius:4px;padding:2px 8px;' . $estAudCls[$ea] . '">'
+           . $estAudLabel[$ea] . '</span>';
+    if ($ea === 'RECHAZADO' && !empty($obs)) {
+        $badge .= '<span style="font-size:.66rem;color:#94a3b8;display:block;margin-top:2px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' . htmlspecialchars($obs) . '">💬 ' . htmlspecialchars($obs) . '</span>';
+    }
+    if (!$puedeAuditar || $ea !== 'PENDIENTE') {
+        return $badge;
+    }
+    return $badge . '<div style="margin-top:3px;display:flex;gap:3px;justify-content:center;">'
+        . '<button title="Aprobar" onclick="repAbrirAuditoria(\'' . $categoria . '\',' . $id . ',\'APROBAR\')" '
+        . 'style="border:none;background:#059669;color:#fff;border-radius:4px;width:22px;height:20px;font-size:.72rem;cursor:pointer;line-height:1;">✓</button>'
+        . '<button title="Rechazar" onclick="repAbrirAuditoria(\'' . $categoria . '\',' . $id . ',\'RECHAZAR\')" '
+        . 'style="border:none;background:#dc2626;color:#fff;border-radius:4px;width:22px;height:20px;font-size:.72rem;cursor:pointer;line-height:1;">✕</button>'
+        . '</div>';
+};
 $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
 
 // Conciliación de cobros POS (Culqi) — lotes asignados a este cuadre como sustento
@@ -353,7 +378,7 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
             <p class="caja-empty">Sin egresos registrados en este turno.</p>
         <?php else: ?>
         <table class="caja-table">
-            <thead><tr><th>Tipo</th><th>Detalle</th><th>Comprobante</th><th class="text-right">Monto</th></tr></thead>
+            <thead><tr><th>Tipo</th><th>Detalle</th><th>Comprobante</th><th class="text-right">Monto</th><th class="text-center">Estado</th></tr></thead>
             <tbody>
             <?php
             $tipoPagoLabel = ['MES_ACTUAL' => 'Pago Mes Actual', 'MES_PASADO' => 'Pago Mes Pasado', 'PAGO_EXTRA' => 'Pago Extra'];
@@ -376,6 +401,7 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
                     <td style="font-size:.83rem;"><?= $detGasto ?></td>
                     <td style="font-size:.78rem;color:#64748b;"><?= htmlspecialchars($g['comprobante'] ?? '—') ?></td>
                     <td class="text-right" style="color:#dc2626;font-weight:700;">−<?= $f2($g['monto']) ?></td>
+                    <td class="text-center"><?= $renderAuditoriaCelda($g['categoria_auditoria'], (int)$g['id'], $g['estado_auditoria'], $g['observacion_revision'] ?? null) ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -413,24 +439,16 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
             </thead>
             <tbody>
             <?php
-            $estadoDigital = [
-                'PENDIENTE' => ['label' => 'Pendiente', 'cls' => 'background:#fef3c7;color:#92400e;'],
-                'APROBADO'  => ['label' => 'Aprobado',  'cls' => 'background:#d1fae5;color:#065f46;'],
-                'RECHAZADO' => ['label' => 'Rechazado', 'cls' => 'background:#fee2e2;color:#991b1b;'],
-            ];
+            $mapEstadoCobro = ['APROBADO' => 'REVISADO', 'RECHAZADO' => 'RECHAZADO'];
             foreach ($digitales as $dg):
-                $est = $estadoDigital[$dg['estado']] ?? ['label' => $dg['estado'], 'cls' => ''];
+                $eaCobro = $mapEstadoCobro[$dg['estado']] ?? 'PENDIENTE';
             ?>
                 <tr>
                     <td style="font-size:.78rem;color:#64748b;"><?= date('H:i', strtotime($dg['fecha_movimiento'])) ?></td>
                     <td><strong><?= htmlspecialchars($dg['modo_desc']) ?></strong></td>
                     <td style="font-size:.78rem;"><?= htmlspecialchars($dg['numero_operacion'] ?? '—') ?></td>
                     <td class="text-right"><?= $f2($dg['monto']) ?></td>
-                    <td class="text-center">
-                        <span style="font-size:.72rem;font-weight:700;border-radius:4px;padding:2px 8px;<?= $est['cls'] ?>">
-                            <?= $est['label'] ?>
-                        </span>
-                    </td>
+                    <td class="text-center"><?= $renderAuditoriaCelda('COBROS', (int)$dg['id_movimiento'], $eaCobro, $dg['observacion_revision'] ?? null) ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -816,6 +834,67 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
         <?php endif; ?>
     </section>
 
+    <!-- ── 7b. Auditoría de este cuadre (pública: quién certificó qué) ── -->
+    <?php
+    $categoriasAud = [
+        'COBROS' => 'Cobro electrónico', 'OTROS' => 'Otro pago', 'PERSONAL' => 'Pago de personal',
+        'LOCAL' => 'Pago de local', 'COMPRAS' => 'Pago de compras', 'DEPOSITO' => 'Depósito KGyR',
+    ];
+    $certificaciones = [];
+    foreach ($gastos as $g) {
+        if ($g['estado_auditoria'] === 'PENDIENTE') continue;
+        $certificaciones[] = [
+            'categoria' => $categoriasAud[$g['categoria_auditoria']] ?? $g['categoria_auditoria'],
+            'estado'    => $g['estado_auditoria'],
+            'revisor'   => $g['revisor_nombre'] ?? '—',
+            'fecha'     => $g['fecha_revision'] ?? null,
+            'obs'       => $g['observacion_revision'] ?? null,
+        ];
+    }
+    foreach ($digitales as $dg) {
+        $eaCobro = $mapEstadoCobro[$dg['estado']] ?? 'PENDIENTE';
+        if ($eaCobro === 'PENDIENTE') continue;
+        $certificaciones[] = [
+            'categoria' => $categoriasAud['COBROS'],
+            'estado'    => $eaCobro,
+            'revisor'   => $dg['revisor_nombre'] ?? '—',
+            'fecha'     => $dg['fecha_revision'] ?? null,
+            'obs'       => $dg['observacion_revision'] ?? null,
+        ];
+    }
+    usort($certificaciones, fn($a, $b) => strcmp($b['fecha'] ?? '', $a['fecha'] ?? ''));
+    ?>
+    <section class="caja-card">
+        <h2 class="caja-card__title">
+            🔍 Auditoría de este cuadre
+            <span style="font-size:.72rem;font-weight:500;color:#94a3b8;margin-left:.4rem;">quién revisó cada registro — informativo, no cambia el cuadre</span>
+        </h2>
+        <?php if (empty($certificaciones)): ?>
+        <p class="caja-empty">Aún no hay registros revisados en este cuadre.</p>
+        <?php else: ?>
+        <table class="caja-table">
+            <thead>
+                <tr><th>Categoría</th><th class="text-center">Estado</th><th>Revisado por</th><th>Fecha</th><th>Comentario</th></tr>
+            </thead>
+            <tbody>
+            <?php foreach ($certificaciones as $c): ?>
+            <tr>
+                <td style="font-size:.82rem;"><?= htmlspecialchars($c['categoria']) ?></td>
+                <td class="text-center">
+                    <span style="font-size:.72rem;font-weight:700;border-radius:4px;padding:2px 8px;<?= $estAudCls[$c['estado']] ?>">
+                        <?= $estAudLabel[$c['estado']] ?>
+                    </span>
+                </td>
+                <td style="font-size:.8rem;font-weight:600;"><?= htmlspecialchars($c['revisor']) ?></td>
+                <td style="font-size:.75rem;color:#64748b;white-space:nowrap;"><?= $c['fecha'] ? date('d/m/y H:i', strtotime($c['fecha'])) : '—' ?></td>
+                <td style="font-size:.78rem;color:#64748b;"><?= htmlspecialchars($c['obs'] ?? '—') ?></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+    </section>
+
     <!-- ── 8. Registro de accesos (empadronamiento) ──────────── -->
     <?php
     $tieneVisitas  = !empty($visitas ?? []);
@@ -851,6 +930,76 @@ $totalCorrecciones = count($rectifs ?? []) + count($ajustesEsperado ?? []) + cou
     </section>
 
 </main>
+
+<?php if ($puedeAuditar): ?>
+<!-- ── Modal: aprobar / rechazar desde el cuadre (sin contraseña) ── -->
+<div id="repAuditoriaOv" style="position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:500;display:none;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;padding:1.5rem;width:400px;max-width:94vw;box-shadow:0 20px 60px rgba(0,0,0,.22);">
+        <h3 id="repAudTitulo" style="font-size:.95rem;font-weight:700;margin-bottom:.5rem;color:#1e293b;">Aprobar</h3>
+        <p id="repAudDesc" style="font-size:.78rem;color:#64748b;margin-bottom:.75rem;line-height:1.5;"></p>
+        <div id="repAudFlObs" style="display:none;margin-bottom:.6rem;">
+            <label style="font-size:.75rem;font-weight:600;color:#475569;display:block;margin-bottom:.2rem;">Motivo del rechazo *</label>
+            <textarea id="repAudObs" placeholder="¿Por qué se rechaza este registro?"
+                      style="width:100%;padding:.48rem .7rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;box-sizing:border-box;font-family:inherit;resize:vertical;min-height:60px;"></textarea>
+        </div>
+        <div id="repAudErr" style="font-size:.75rem;color:#dc2626;margin-bottom:.5rem;display:none;"></div>
+        <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+            <button class="caja-btn caja-btn--outline" onclick="repCerrarAuditoria()">Cancelar</button>
+            <button class="caja-btn caja-btn--primary" id="repAudBtn" onclick="repConfirmarAuditoria()">Confirmar</button>
+        </div>
+    </div>
+</div>
+<script>
+let repAudCategoria = '', repAudId = 0, repAudAccion = '';
+
+function repAbrirAuditoria(categoria, id, accion) {
+    repAudCategoria = categoria; repAudId = id; repAudAccion = accion;
+    const esRechazo = accion === 'RECHAZAR';
+    document.getElementById('repAudTitulo').textContent = esRechazo ? 'Rechazar registro' : 'Aprobar registro';
+    document.getElementById('repAudDesc').textContent = esRechazo
+        ? 'Escribe el motivo del rechazo. Es solo informativo: no modifica este cuadre.'
+        : '¿Confirmas que este registro está correcto?';
+    document.getElementById('repAudFlObs').style.display = esRechazo ? 'block' : 'none';
+    document.getElementById('repAudObs').value = '';
+    document.getElementById('repAudErr').style.display = 'none';
+    document.getElementById('repAudBtn').disabled = false;
+    document.getElementById('repAudBtn').textContent = 'Confirmar';
+    document.getElementById('repAuditoriaOv').style.display = 'flex';
+}
+
+function repCerrarAuditoria() {
+    document.getElementById('repAuditoriaOv').style.display = 'none';
+}
+
+async function repConfirmarAuditoria() {
+    const observacion = document.getElementById('repAudObs').value.trim();
+    const errEl = document.getElementById('repAudErr');
+    if (repAudAccion === 'RECHAZAR' && !observacion) {
+        errEl.textContent = 'Escribe el motivo del rechazo.'; errEl.style.display = 'block';
+        return;
+    }
+    const btn = document.getElementById('repAudBtn');
+    btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+        const r = await fetch(`<?= $basePath ?>/caja/api/reporte/${repAudCategoria}/${repAudId}/revisar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accion: repAudAccion, observacion }),
+        });
+        const res = await r.json();
+        if (res.success) {
+            location.reload();
+        } else {
+            errEl.textContent = res.message || 'Error al actualizar.'; errEl.style.display = 'block';
+            btn.disabled = false; btn.textContent = 'Confirmar';
+        }
+    } catch {
+        errEl.textContent = 'Error de conexión.'; errEl.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Confirmar';
+    }
+}
+</script>
+<?php endif; ?>
 
 <script src="<?= $basePath ?>/assets/js/session-guard.js"></script>
 <?php if ($esAdmin): ?>

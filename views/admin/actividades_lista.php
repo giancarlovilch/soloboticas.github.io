@@ -140,14 +140,21 @@ $turnoLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
                     <th>Estrellas rojas / turno</th>
                     <th>Vigente desde</th>
                     <th>Registrado</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
             <?php foreach ($actTasaRojaHistorial as $tr): ?>
-            <tr>
+            <tr id="tr-<?= (int)$tr['id'] ?>">
                 <td style="font-weight:700;color:#dc2626;">🔴 <?= (int)$tr['monto'] ?></td>
                 <td><?= date('d/m/Y', strtotime($tr['fecha_vigencia'])) ?></td>
                 <td style="font-size:.72rem;color:#94a3b8;"><?= date('d/m/Y H:i', strtotime($tr['creado_en'])) ?></td>
+                <td>
+                    <button onclick="trEliminar(<?= (int)$tr['id'] ?>)"
+                            style="background:none;border:1px solid #fecaca;border-radius:6px;padding:4px 9px;font-size:.68rem;font-weight:700;cursor:pointer;color:#dc2626;">
+                        Eliminar
+                    </button>
+                </td>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -196,14 +203,21 @@ $turnoLabel = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
                     <th>Estrellas azules / voto</th>
                     <th>Vigente desde</th>
                     <th>Registrado</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
             <?php foreach ($actTasaAzulVotoHistorial as $ta): ?>
-            <tr>
+            <tr id="ta-<?= (int)$ta['id'] ?>">
                 <td style="font-weight:700;color:#1d4ed8;">🔵 <?= $fmtEst($ta['monto']) ?></td>
                 <td><?= date('d/m/Y', strtotime($ta['fecha_vigencia'])) ?></td>
                 <td style="font-size:.72rem;color:#94a3b8;"><?= date('d/m/Y H:i', strtotime($ta['creado_en'])) ?></td>
+                <td>
+                    <button onclick="taEliminar(<?= (int)$ta['id'] ?>)"
+                            style="background:none;border:1px solid #bfdbfe;border-radius:6px;padding:4px 9px;font-size:.68rem;font-weight:700;cursor:pointer;color:#1d4ed8;">
+                        Eliminar
+                    </button>
+                </td>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -494,6 +508,14 @@ async function trAgregar() {
     else actShowMsg('trMsg', res.message || 'Error.', false);
 }
 
+async function trEliminar(id) {
+    if (!confirm('¿Eliminar esta tasa de estrellas rojas?')) return;
+    const r   = await fetch(actApiUrl(`/admin/api/tasa-roja/${id}/eliminar`), { method: 'POST' });
+    const res = await r.json();
+    if (res.success) document.getElementById(`tr-${id}`)?.remove();
+    else actShowMsg('trMsg', res.message || 'Error.', false);
+}
+
 // ── Tasa de estrellas azules por voto ────────────────────
 async function taAgregar() {
     const data = {
@@ -509,6 +531,14 @@ async function taAgregar() {
     });
     const res = await r.json();
     if (res.success) { actShowMsg('taMsg', 'Tasa guardada.', true); setTimeout(() => location.reload(), 900); }
+    else actShowMsg('taMsg', res.message || 'Error.', false);
+}
+
+async function taEliminar(id) {
+    if (!confirm('¿Eliminar esta tasa de estrellas azules por voto?')) return;
+    const r   = await fetch(actApiUrl(`/admin/api/tasa-azul-voto/${id}/eliminar`), { method: 'POST' });
+    const res = await r.json();
+    if (res.success) document.getElementById(`ta-${id}`)?.remove();
     else actShowMsg('taMsg', res.message || 'Error.', false);
 }
 

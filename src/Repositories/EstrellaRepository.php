@@ -92,6 +92,20 @@ class EstrellaRepository
         return true;
     }
 
+    /**
+     * Elimina un valor vigente de una clave (para corregir un cambio de tasa mal puesto:
+     * al quedar dos fechas de vigencia superpuestas, la más reciente siempre gana y no basta
+     * con "agregar" un valor viejo encima — hay que borrar el que sobra).
+     */
+    private function eliminarParametro(string $clave, int $id): string|bool
+    {
+        $stmt = $this->db->prepare(
+            "DELETE FROM configuracion_estrella WHERE id = :id AND clave = :clave"
+        );
+        $stmt->execute(['id' => $id, 'clave' => $clave]);
+        return $stmt->rowCount() > 0 ? true : 'No se encontró ese registro.';
+    }
+
     // ── Tasa de estrellas rojas por turno ───────────────────
     /** Historial completo de la tasa, la más reciente primero (para el admin) */
     public function getTasaRojaHistorial(): array
@@ -117,6 +131,12 @@ class EstrellaRepository
         return $this->agregarParametro(self::CLAVE_ROJA_TURNO, (float)$monto, $fechaVigencia);
     }
 
+    /** Elimina una tasa de estrellas rojas registrada por error */
+    public function eliminarTasaRoja(int $id): string|bool
+    {
+        return $this->eliminarParametro(self::CLAVE_ROJA_TURNO, $id);
+    }
+
     // ── Estrellas azules por voto emitido ───────────────────
     /** Historial completo de la tasa, la más reciente primero (para el admin) */
     public function getTasaAzulVotoHistorial(): array
@@ -140,6 +160,12 @@ class EstrellaRepository
     {
         if ($monto < 0) return 'El monto no puede ser negativo';
         return $this->agregarParametro(self::CLAVE_AZUL_POR_VOTO, $monto, $fechaVigencia);
+    }
+
+    /** Elimina una tasa de estrellas azules por voto registrada por error */
+    public function eliminarTasaAzulVoto(int $id): string|bool
+    {
+        return $this->eliminarParametro(self::CLAVE_AZUL_POR_VOTO, $id);
     }
 
     // ── Catálogo de tareas ─────────────────────────────────

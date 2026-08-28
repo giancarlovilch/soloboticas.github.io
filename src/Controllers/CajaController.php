@@ -55,6 +55,16 @@ class CajaController extends Controller
         return $id;
     }
 
+    private function requireAdminOrSupervisor(): int
+    {
+        $id = $this->requireAuth();
+        if (!in_array($_SESSION['user_rol'] ?? '', ['ADMIN', 'SUPERVISOR'], true)) {
+            $this->error('Solo administrador o supervisor pueden aprobar/rechazar', 403);
+            exit;
+        }
+        return $id;
+    }
+
     /**
      * Estos endpoints solo se usan desde la pantalla de incidencias para corregir una
      * sesión ya cerrada. Mientras el caso siga abierto (ABIERTO/PARCIAL), cualquier staff
@@ -833,10 +843,10 @@ class CajaController extends Controller
         $filtroCategoria = $_GET['categoria'] ?? '';
         $filtroCaja      = isset($_GET['caja'])   ? (int)$_GET['caja']   : 0;
         $filtroCajera    = isset($_GET['cajera']) ? (int)$_GET['cajera'] : 0;
-        $filtroRevisado  = $_GET['revisado'] ?? '';
+        $filtroEstado    = strtoupper($_GET['estado'] ?? '');
         $filtroMes       = $_GET['mes'] ?? date('Y-m');
 
-        $items   = $this->repo->getAuditoriaMovimientos($filtroCategoria, $filtroCaja, $filtroCajera, $filtroRevisado, $filtroMes);
+        $items   = $this->repo->getAuditoriaMovimientos($filtroCategoria, $filtroCaja, $filtroCajera, $filtroEstado, $filtroMes);
         $cajas   = $this->repo->getCajasActivas();
         $cajeras = $this->repo->getCajerasActivas();
 
@@ -844,16 +854,77 @@ class CajaController extends Controller
     }
 
     // POST /caja/api/auditoria/{categoria}/{id}/revisar
-    public function apiMarcarRevisado(string $categoria, int $id): void
+    public function apiRevisarAuditoria(string $categoria, int $id): void
     {
         $postulanteId = $this->requireAdmin();
-        $data     = $this->getAllInput();
-        $revisado = !empty($data['revisado']);
+        $categoria    = strtoupper($categoria);
+        $data         = $this->getAllInput();
+        $accion       = strtoupper(trim($data['accion'] ?? ''));
+        $observacion  = trim($data['observacion'] ?? '') ?: null;
+        $password     = $data['password'] ?? '';
 
-        $ok = $this->repo->marcarRevisado(strtoupper($categoria), $id, $postulanteId, $revisado);
+        if (!in_array($accion, ['APROBAR', 'RECHAZAR', 'PENDIENTE'], true)) {
+            $this->error('Acción inválida', 422);
+            return;
+        }
+        if ($accion === 'RECHAZAR' && !$observacion) {
+            $this->error('Escribe el motivo del rechazo', 422);
+            return;
+        }
+        if (in_array($accion, ['APROBAR', 'RECHAZAR'], true)) {
+            if (empty($password)) {
+                $this->error('Se requiere tu contraseña para confirmar', 422);
+                return;
+            }
+            require_once __DIR__ . '/../Repositories/AuthRepository.php';
+            $authRepo = new AuthRepository();
+            $user     = $authRepo->findByPostulanteId($postulanteId);
+            if (!$user || !password_verify($password, $user['password'])) {
+                $this->error('Contraseña incorrecta', 403);
+                return;
+            }
+        }
+
+        $this->ejecutarRevisionAuditoria($categoria, $id, $postulanteId, $accion, $observacion);
+    }
+
+    /**
+     * POST /caja/api/reporte/{categoria}/{id}/revisar — aprobar/rechazar directo desde el
+     * cuadre (sin contraseña: admin y supervisor ya están autenticados en su sesión). No
+     * incluye "volver a pendiente" — revertir un rechazo se hace desde /caja/auditoria.
+     */
+    public function apiRevisarDesdeReporte(string $categoria, int $id): void
+    {
+        $postulanteId = $this->requireAdminOrSupervisor();
+        $categoria    = strtoupper($categoria);
+        $data         = $this->getAllInput();
+        $accion       = strtoupper(trim($data['accion'] ?? ''));
+        $observacion  = trim($data['observacion'] ?? '') ?: null;
+
+        if (!in_array($accion, ['APROBAR', 'RECHAZAR'], true)) {
+            $this->error('Acción inválida', 422);
+            return;
+        }
+        if ($accion === 'RECHAZAR' && !$observacion) {
+            $this->error('Escribe el motivo del rechazo', 422);
+            return;
+        }
+
+        $this->ejecutarRevisionAuditoria($categoria, $id, $postulanteId, $accion, $observacion);
+    }
+
+    private function ejecutarRevisionAuditoria(string $categoria, int $id, int $postulanteId, string $accion, ?string $observacion): void
+    {
+        if ($categoria === 'COBROS') {
+            $estado = ['APROBAR' => 'APROBADO', 'RECHAZAR' => 'RECHAZADO', 'PENDIENTE' => 'PENDIENTE'][$accion];
+            $ok = $this->repo->confirmarPagoDigital($id, $postulanteId, $estado, $observacion);
+        } else {
+            $ok = $this->repo->revisarAuditoria($categoria, $id, $postulanteId, $accion, $observacion);
+        }
         if (!$ok) { $this->error('Registro no encontrado', 404); return; }
 
-        $this->success($revisado ? 'Marcado como revisado' : 'Marca de revisado quitada');
+        $mensajes = ['APROBAR' => 'Aprobado', 'RECHAZAR' => 'Rechazado', 'PENDIENTE' => 'Vuelto a pendiente'];
+        $this->success($mensajes[$accion]);
     }
 
     // ── API: catálogos ─────────────────────────────────────
