@@ -34,6 +34,17 @@ $act = [
     'visas'         => $detalle['monto_visas']                  ?? '',
     'bcp'           => $detalle['monto_bcp']                    ?? '',
 ];
+
+// Encuesta de apertura (ficha de desempeño, 1-10) — reemplaza a la antigua encuesta cualitativa
+$svAspectos = [
+    'puntualidad'  => ['label' => '⏰ Puntualidad',          'icono' => '⏰', 'hint' => '¿Llegó puntual a su turno?',              'malo' => '😞', 'bueno' => '😊'],
+    'orden'        => ['label' => '🗂️ Orden',                'icono' => '🗂️', 'hint' => '¿Encontró/dejó su área ordenada?',        'malo' => '😞', 'bueno' => '😊'],
+    'higiene'      => ['label' => '🧼 Higiene',               'icono' => '🧼', 'hint' => '¿Higiene personal impecable?',            'malo' => '😞', 'bueno' => '😊'],
+    'presentacion' => ['label' => '✨ Presentación personal', 'icono' => '✨', 'hint' => '¿Uniforme e imagen impecables?',          'malo' => '😞', 'bueno' => '😊'],
+    'animo'        => ['label' => '🔥 Estado de ánimo',       'icono' => '🔥', 'hint' => '',                                        'malo' => '😠', 'bueno' => '😊'],
+    'uso_celular'  => ['label' => '📵 Alejado del celular',   'icono' => '📵', 'hint' => '¿Se mantuvo alejada del teléfono?',       'malo' => '😞', 'bueno' => '😊'],
+    'confianza'    => ['label' => '🛡️ Confianza / Honestidad','icono' => '🛡️', 'hint' => '¿Trabajó con ética y sin hacer trampa?', 'malo' => '😞', 'bueno' => '😊'],
+];
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -45,20 +56,15 @@ $act = [
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/caja.css">
     <link rel="icon" type="image/x-icon" href="<?= $basePath ?>/assets/img/logo.ico">
     <style>
-        /* ── Encuesta de apertura ── */
-        .sv-block { background:#f8fafc;border-radius:10px;padding:.7rem .85rem;margin-bottom:.65rem;border:1px solid #e8edf2; }
-        .sv-block__hd { font-size:.67rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:.55rem; }
-        .sv-rg { display:flex;gap:.3rem;flex-wrap:wrap; }
-        .sv-row2 { display:grid;grid-template-columns:1fr 1fr;gap:.5rem; }
-        .sv-field { margin-bottom:.6rem; }
-        .sv-field__label { font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:.3rem; }
-        .sv-rb { padding:.38rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;background:#fff;color:#475569;transition:all .13s;line-height:1.3; }
-        .sv-rb small { display:block;font-size:.62rem;font-weight:400;color:#94a3b8; }
-        .sv-rb[data-color="blue"].active   { border-color:#3b82f6;background:#dbeafe;color:#1e40af; }
-        .sv-rb[data-color="green"].active  { border-color:#10b981;background:#d1fae5;color:#065f46; }
-        .sv-rb[data-color="amber"].active  { border-color:#f59e0b;background:#fef3c7;color:#92400e; }
-        .sv-rb[data-color="orange"].active { border-color:#f97316;background:#ffedd5;color:#9a3412; }
-        .sv-rb[data-color="red"].active    { border-color:#ef4444;background:#fee2e2;color:#991b1b; }
+        /* ── Encuesta de apertura (ficha de desempeño, 1-10) ── */
+        .sv-block { background:#f8fafc;border-radius:10px;padding:.7rem .85rem;margin-bottom:.6rem;border:1px solid #e8edf2; }
+        .sv-block--confianza { background:#f5f3ff;border-color:#ddd6fe; }
+        .sv-block__hd { font-size:.78rem;font-weight:800;color:#1e293b;margin-bottom:.5rem;display:flex;align-items:center;justify-content:space-between; }
+        .sv-block__val { font-size:.72rem;font-weight:700;color:#64748b; }
+        .sv-scale { display:flex;gap:3px;flex-wrap:wrap; }
+        .sv-coin { font-size:1.35rem;line-height:1;background:none;border:none;cursor:pointer;opacity:.22;padding:2px;transition:opacity .1s,transform .1s; }
+        .sv-coin.on { opacity:1; }
+        .sv-coin:active { transform:scale(1.2); }
     </style>
 </head>
 <body>
@@ -152,78 +158,34 @@ $act = [
         </button>
     </section>
 
-    <!-- ── Paso 2: Encuesta de apertura para la vendedora ── -->
+    <!-- ── Paso 2: Encuesta de apertura para la vendedora (ficha de desempeño 1-10) ── -->
     <section class="caja-card" id="surveySection" hidden>
         <h2 class="caja-card__title">2. Evaluación de apertura — <span id="surveyVendNombre"></span></h2>
-        <p class="caja-card__desc">Completa la ficha de la vendedora antes de abrir el turno.</p>
+        <p class="caja-card__desc">Califica del 1 al 10 antes de abrir el turno.</p>
 
-        <div class="sv-block">
-            <div class="sv-block__hd">⏰ Puntualidad al ingreso</div>
-            <div class="sv-rg">
-                <button type="button" class="sv-rb" data-color="blue"   data-field="llegada_puntualidad" data-val="MUY_TEMPRANO" onclick="pickSurveyRadio(this)">Muy anticipada <small>+10 min antes</small></button>
-                <button type="button" class="sv-rb" data-color="green"  data-field="llegada_puntualidad" data-val="TEMPRANO"     onclick="pickSurveyRadio(this)">Con anticipación <small>menos de 10 min</small></button>
-                <button type="button" class="sv-rb" data-color="orange" data-field="llegada_puntualidad" data-val="TARDE"        onclick="pickSurveyRadio(this)">Retraso leve <small>menos de 10 min</small></button>
-                <button type="button" class="sv-rb" data-color="red"    data-field="llegada_puntualidad" data-val="MUY_TARDE"    onclick="pickSurveyRadio(this)">Retraso considerable <small>+10 min tarde</small></button>
+        <?php foreach ($svAspectos as $campo => $a):
+            $esConfianza = $campo === 'confianza';
+        ?>
+        <div class="sv-block<?= $esConfianza ? ' sv-block--confianza' : '' ?>">
+            <div class="sv-block__hd">
+                <span><?= $a['label'] ?></span>
+                <span class="sv-block__val" id="sv-val-<?= $campo ?>">—/10</span>
+            </div>
+            <?php if (!empty($a['hint'])): ?>
+            <p style="font-size:.68rem;color:<?= $esConfianza ? '#6d28d9' : '#94a3b8' ?>;margin:-.2rem 0 .45rem;"><?= $a['hint'] ?></p>
+            <?php endif; ?>
+            <div style="display:flex;align-items:center;gap:.4rem;">
+                <?php if (!empty($a['malo'])): ?><span style="font-size:1.25rem;" title="Mal ánimo"><?= $a['malo'] ?></span><?php endif; ?>
+                <div class="sv-scale" data-field="<?= $campo ?>">
+                    <?php for ($i = 1; $i <= 10; $i++): ?>
+                    <button type="button" class="sv-coin" data-field="<?= $campo ?>" data-val="<?= $i ?>"
+                            onclick="pickSurveyScale(this)"><?= $a['icono'] ?></button>
+                    <?php endfor; ?>
+                </div>
+                <?php if (!empty($a['bueno'])): ?><span style="font-size:1.25rem;" title="Buen ánimo"><?= $a['bueno'] ?></span><?php endif; ?>
             </div>
         </div>
-
-        <div class="sv-block">
-            <div class="sv-block__hd">🏪 Estado del área al ingreso</div>
-            <div class="sv-row2">
-                <div class="sv-field">
-                    <span class="sv-field__label">¿Área ordenada?</span>
-                    <div class="sv-rg">
-                        <button type="button" class="sv-rb" data-color="green" data-field="area_ordenada_ingreso" data-val="1" onclick="pickSurveyRadio(this)">Sí</button>
-                        <button type="button" class="sv-rb" data-color="red"   data-field="area_ordenada_ingreso" data-val="0" onclick="pickSurveyRadio(this)">No</button>
-                    </div>
-                </div>
-                <div class="sv-field">
-                    <span class="sv-field__label">¿Área limpia?</span>
-                    <div class="sv-rg">
-                        <button type="button" class="sv-rb" data-color="green" data-field="area_limpia_ingreso" data-val="1" onclick="pickSurveyRadio(this)">Sí</button>
-                        <button type="button" class="sv-rb" data-color="red"   data-field="area_limpia_ingreso" data-val="0" onclick="pickSurveyRadio(this)">No</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="sv-block">
-            <div class="sv-block__hd">👕 Presentación personal</div>
-            <div class="sv-field">
-                <span class="sv-field__label">Higiene personal</span>
-                <div class="sv-rg">
-                    <button type="button" class="sv-rb" data-color="red"   data-field="aseo_personal" data-val="DEFICIENTE" onclick="pickSurveyRadio(this)">Deficiente</button>
-                    <button type="button" class="sv-rb" data-color="amber" data-field="aseo_personal" data-val="ACEPTABLE"  onclick="pickSurveyRadio(this)">Aceptable</button>
-                    <button type="button" class="sv-rb" data-color="green" data-field="aseo_personal" data-val="OPTIMO"     onclick="pickSurveyRadio(this)">Óptimo</button>
-                </div>
-            </div>
-            <div class="sv-field">
-                <span class="sv-field__label">Uniforme e indumentaria</span>
-                <div class="sv-rg">
-                    <button type="button" class="sv-rb" data-color="red"   data-field="vestimenta" data-val="DESCUIDADO"  onclick="pickSurveyRadio(this)">Descuidado</button>
-                    <button type="button" class="sv-rb" data-color="amber" data-field="vestimenta" data-val="PRESENTABLE" onclick="pickSurveyRadio(this)">Presentable</button>
-                    <button type="button" class="sv-rb" data-color="green" data-field="vestimenta" data-val="IMPECABLE"   onclick="pickSurveyRadio(this)">Impecable</button>
-                </div>
-            </div>
-            <div class="sv-row2">
-                <div class="sv-field">
-                    <span class="sv-field__label">Estado de uñas</span>
-                    <div class="sv-rg">
-                        <button type="button" class="sv-rb" data-color="red"   data-field="unas" data-val="DESCUIDADAS" onclick="pickSurveyRadio(this)">Descuidadas</button>
-                        <button type="button" class="sv-rb" data-color="amber" data-field="unas" data-val="ACEPTABLES"  onclick="pickSurveyRadio(this)">Aceptables</button>
-                        <button type="button" class="sv-rb" data-color="green" data-field="unas" data-val="CUIDADAS"    onclick="pickSurveyRadio(this)">Cuidadas</button>
-                    </div>
-                </div>
-                <div class="sv-field">
-                    <span class="sv-field__label">Presentación del cabello</span>
-                    <div class="sv-rg">
-                        <button type="button" class="sv-rb" data-color="red"   data-field="cabello" data-val="SUELTO"   onclick="pickSurveyRadio(this)">Suelto</button>
-                        <button type="button" class="sv-rb" data-color="green" data-field="cabello" data-val="RECOGIDO" onclick="pickSurveyRadio(this)">Recogido</button>
-                        <button type="button" class="sv-rb" data-color="green" data-field="cabello" data-val="MONO"     onclick="pickSurveyRadio(this)">Con moño</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <?php endforeach; ?>
 
         <div class="caja-field" style="max-width:320px;margin-top:.5rem;">
             <label>Tu contraseña (cajera) <span class="req">*</span></label>
@@ -357,14 +319,14 @@ $act = [
                     <label for="act_oper_seguros_bcp">Venta de seguros</label>
                     <input type="number" id="act_oper_seguros_bcp" class="caja-input"
                            min="0" step="1" placeholder="0"
-                           value="<?= isset($detalle['oper_seguros_bcp']) ? (int)$detalle['oper_seguros_bcp'] : 0 ?>">
+                           value="<?= isset($detalle['oper_seguros_bcp']) ? (int)$detalle['oper_seguros_bcp'] : '' ?>">
                     <span class="bcp-ops-hint">1 seguro = 50 operaciones</span>
                 </div>
                 <div class="bcp-ops-box bcp-ops-box--tarjetas">
                     <label for="act_oper_tarjetas_bcp">Venta de tarjetas</label>
                     <input type="number" id="act_oper_tarjetas_bcp" class="caja-input"
                            min="0" step="1" placeholder="0"
-                           value="<?= isset($detalle['oper_tarjetas_bcp']) ? (int)$detalle['oper_tarjetas_bcp'] : 0 ?>">
+                           value="<?= isset($detalle['oper_tarjetas_bcp']) ? (int)$detalle['oper_tarjetas_bcp'] : '' ?>">
                     <span class="bcp-ops-hint">1 tarjeta de crédito (o 1 tarjeta + sticker) = 200 operaciones</span>
                 </div>
             </div>

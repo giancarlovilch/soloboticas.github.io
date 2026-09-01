@@ -7,6 +7,17 @@ $cajera_id        = $cajera_id        ?? 0;
 $cajera_nombre    = $cajera_nombre    ?? '';
 $vendedora_nombre = $vendedora_nombre ?? '';
 $turno_id         = $turno_id         ?? 0;
+
+// Encuesta de apertura (ficha de desempeño, 1-10) — misma versión que /caja/sesion/nueva
+$svAspectos = [
+    'puntualidad'  => ['label' => '⏰ Puntualidad',          'icono' => '⏰', 'hint' => '¿Llegó puntual a su turno?',              'malo' => '😞', 'bueno' => '😊'],
+    'orden'        => ['label' => '🗂️ Orden',                'icono' => '🗂️', 'hint' => '¿Encontró/dejó su área ordenada?',        'malo' => '😞', 'bueno' => '😊'],
+    'higiene'      => ['label' => '🧼 Higiene',               'icono' => '🧼', 'hint' => '¿Higiene personal impecable?',            'malo' => '😞', 'bueno' => '😊'],
+    'presentacion' => ['label' => '✨ Presentación personal', 'icono' => '✨', 'hint' => '¿Uniforme e imagen impecables?',          'malo' => '😞', 'bueno' => '😊'],
+    'animo'        => ['label' => '🔥 Estado de ánimo',       'icono' => '🔥', 'hint' => '',                                        'malo' => '😠', 'bueno' => '😊'],
+    'uso_celular'  => ['label' => '📵 Alejado del celular',   'icono' => '📵', 'hint' => '¿Se mantuvo alejada del teléfono?',       'malo' => '😞', 'bueno' => '😊'],
+    'confianza'    => ['label' => '🛡️ Confianza / Honestidad','icono' => '🛡️', 'hint' => '¿Trabajó con ética y sin hacer trampa?', 'malo' => '😞', 'bueno' => '😊'],
+];
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -69,58 +80,34 @@ $turno_id         = $turno_id         ?? 0;
     </section>
 
     <?php if ($surveyNeeded): ?>
-    <!-- ── Encuesta obligatoria: vendedora evalúa a la cajera ── -->
+    <!-- ── Encuesta obligatoria: vendedora evalúa a la cajera (ficha 1-10) ── -->
     <section class="caja-card" style="border-left:4px solid #0097A7;">
         <h2 class="caja-card__title">📋 Evaluación de apertura — <?= htmlspecialchars($cajera_nombre) ?></h2>
-        <p class="caja-card__desc">Completa la evaluación de la cajera para poder registrar tus ventas.</p>
+        <p class="caja-card__desc">Califica del 1 al 10 para poder registrar tus ventas.</p>
 
-        <div class="sv-block">
-            <div class="sv-block__hd">⏰ Puntualidad al ingreso</div>
-            <div class="sv-rg">
-                <button type="button" class="sv-rb" data-color="blue"   data-field="llegada_puntualidad" data-val="MUY_TEMPRANO" onclick="pickVentasRb(this)">Muy anticipada <small>+10 min antes</small></button>
-                <button type="button" class="sv-rb" data-color="green"  data-field="llegada_puntualidad" data-val="TEMPRANO"     onclick="pickVentasRb(this)">Con anticipación <small>menos de 10 min</small></button>
-                <button type="button" class="sv-rb" data-color="orange" data-field="llegada_puntualidad" data-val="TARDE"        onclick="pickVentasRb(this)">Retraso leve <small>menos de 10 min</small></button>
-                <button type="button" class="sv-rb" data-color="red"    data-field="llegada_puntualidad" data-val="MUY_TARDE"    onclick="pickVentasRb(this)">Retraso considerable <small>+10 min tarde</small></button>
+        <?php foreach ($svAspectos as $campo => $a):
+            $esConfianza = $campo === 'confianza';
+        ?>
+        <div class="sv-block<?= $esConfianza ? ' sv-block--confianza' : '' ?>">
+            <div class="sv-block__hd">
+                <span><?= $a['label'] ?></span>
+                <span class="sv-block__val" id="sv-val-<?= $campo ?>">—/10</span>
+            </div>
+            <?php if (!empty($a['hint'])): ?>
+            <p style="font-size:.68rem;color:<?= $esConfianza ? '#6d28d9' : '#94a3b8' ?>;margin:-.2rem 0 .45rem;"><?= $a['hint'] ?></p>
+            <?php endif; ?>
+            <div style="display:flex;align-items:center;gap:.4rem;">
+                <?php if (!empty($a['malo'])): ?><span style="font-size:1.25rem;" title="Mal ánimo"><?= $a['malo'] ?></span><?php endif; ?>
+                <div class="sv-scale" data-field="<?= $campo ?>">
+                    <?php for ($i = 1; $i <= 10; $i++): ?>
+                    <button type="button" class="sv-coin" data-field="<?= $campo ?>" data-val="<?= $i ?>"
+                            onclick="pickVentasScale(this)"><?= $a['icono'] ?></button>
+                    <?php endfor; ?>
+                </div>
+                <?php if (!empty($a['bueno'])): ?><span style="font-size:1.25rem;" title="Buen ánimo"><?= $a['bueno'] ?></span><?php endif; ?>
             </div>
         </div>
-        <div class="sv-block">
-            <div class="sv-block__hd">🏪 Estado del área</div>
-            <div class="sv-row2">
-                <div class="sv-field"><span class="sv-field__label">¿Área ordenada?</span><div class="sv-rg">
-                    <button type="button" class="sv-rb" data-color="green" data-field="area_ordenada_ingreso" data-val="1" onclick="pickVentasRb(this)">Sí</button>
-                    <button type="button" class="sv-rb" data-color="red"   data-field="area_ordenada_ingreso" data-val="0" onclick="pickVentasRb(this)">No</button>
-                </div></div>
-                <div class="sv-field"><span class="sv-field__label">¿Área limpia?</span><div class="sv-rg">
-                    <button type="button" class="sv-rb" data-color="green" data-field="area_limpia_ingreso" data-val="1" onclick="pickVentasRb(this)">Sí</button>
-                    <button type="button" class="sv-rb" data-color="red"   data-field="area_limpia_ingreso" data-val="0" onclick="pickVentasRb(this)">No</button>
-                </div></div>
-            </div>
-        </div>
-        <div class="sv-block">
-            <div class="sv-block__hd">👕 Presentación personal</div>
-            <div class="sv-field"><span class="sv-field__label">Higiene personal</span><div class="sv-rg">
-                <button type="button" class="sv-rb" data-color="red"   data-field="aseo_personal" data-val="DEFICIENTE" onclick="pickVentasRb(this)">Deficiente</button>
-                <button type="button" class="sv-rb" data-color="amber" data-field="aseo_personal" data-val="ACEPTABLE"  onclick="pickVentasRb(this)">Aceptable</button>
-                <button type="button" class="sv-rb" data-color="green" data-field="aseo_personal" data-val="OPTIMO"     onclick="pickVentasRb(this)">Óptimo</button>
-            </div></div>
-            <div class="sv-field"><span class="sv-field__label">Uniforme e indumentaria</span><div class="sv-rg">
-                <button type="button" class="sv-rb" data-color="red"   data-field="vestimenta" data-val="DESCUIDADO"  onclick="pickVentasRb(this)">Descuidado</button>
-                <button type="button" class="sv-rb" data-color="amber" data-field="vestimenta" data-val="PRESENTABLE" onclick="pickVentasRb(this)">Presentable</button>
-                <button type="button" class="sv-rb" data-color="green" data-field="vestimenta" data-val="IMPECABLE"   onclick="pickVentasRb(this)">Impecable</button>
-            </div></div>
-            <div class="sv-row2">
-                <div class="sv-field"><span class="sv-field__label">Estado de uñas</span><div class="sv-rg">
-                    <button type="button" class="sv-rb" data-color="red"   data-field="unas" data-val="DESCUIDADAS" onclick="pickVentasRb(this)">Descuidadas</button>
-                    <button type="button" class="sv-rb" data-color="amber" data-field="unas" data-val="ACEPTABLES"  onclick="pickVentasRb(this)">Aceptables</button>
-                    <button type="button" class="sv-rb" data-color="green" data-field="unas" data-val="CUIDADAS"    onclick="pickVentasRb(this)">Cuidadas</button>
-                </div></div>
-                <div class="sv-field"><span class="sv-field__label">Presentación del cabello</span><div class="sv-rg">
-                    <button type="button" class="sv-rb" data-color="red"   data-field="cabello" data-val="SUELTO"   onclick="pickVentasRb(this)">Suelto</button>
-                    <button type="button" class="sv-rb" data-color="green" data-field="cabello" data-val="RECOGIDO" onclick="pickVentasRb(this)">Recogido</button>
-                    <button type="button" class="sv-rb" data-color="green" data-field="cabello" data-val="MONO"     onclick="pickVentasRb(this)">Con moño</button>
-                </div></div>
-            </div>
-        </div>
+        <?php endforeach; ?>
     </section>
     <?php endif; ?>
 
@@ -165,13 +152,17 @@ const SURVEY_NEEDED = <?= $surveyNeeded ? 'true' : 'false' ?>;
 const CAJERA_ID     = <?= (int)$cajera_id ?>;
 const TURNO_ID_V    = <?= (int)$turno_id ?>;
 
-/* Encuesta de cajera (vendedora la llena) */
+/* Encuesta de cajera (vendedora la llena) — ficha de desempeño 1-10 */
+const SURVEY_ASPECTOS_V = ['puntualidad','orden','higiene','presentacion','animo','uso_celular','confianza'];
 const _ventasSurvey = {};
-function pickVentasRb(btn) {
+function pickVentasScale(btn) {
     const field = btn.dataset.field;
-    document.querySelectorAll(`.sv-rb[data-field="${field}"]`).forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    _ventasSurvey[field] = btn.dataset.val;
+    const val = parseInt(btn.dataset.val);
+    document.querySelectorAll(`.sv-coin[data-field="${field}"]`).forEach(b => {
+        b.classList.toggle('on', parseInt(b.dataset.val) <= val);
+    });
+    _ventasSurvey[field] = val;
+    document.getElementById(`sv-val-${field}`).textContent = `${val}/10`;
 }
 
 async function submitVentas(sesionId) {
@@ -186,39 +177,60 @@ async function submitVentas(sesionId) {
 
     // Validar encuesta si es requerida
     if (SURVEY_NEEDED) {
-        const required = ['llegada_puntualidad','area_ordenada_ingreso','area_limpia_ingreso',
-                          'aseo_personal','vestimenta','unas','cabello'];
-        if (required.some(f => _ventasSurvey[f] === undefined || _ventasSurvey[f] === '')) {
-            showAlert(msg, 'Completa la evaluación de la cajera antes de confirmar.', 'error');
+        if (SURVEY_ASPECTOS_V.some(f => !_ventasSurvey[f])) {
+            showAlert(msg, 'Completa las 7 preguntas de la evaluación antes de confirmar.', 'error');
             return;
         }
         const pwd = document.getElementById('ventasPwd')?.value?.trim();
         if (!pwd) { showAlert(msg, 'Ingresa tu contraseña para confirmar.', 'error'); return; }
 
         btn.disabled = true; btn.textContent = 'Guardando evaluación...';
+        const fecha = new Date().toLocaleDateString('en-CA');
 
-        // Registrar encuesta de la cajera
-        const surveyPayload = {
-            postulante_id: CAJERA_ID,
-            fecha:         new Date().toLocaleDateString('en-CA'),
-            turno_id:      TURNO_ID_V,
-            seccion:       'ENTRADA',
-            password:      pwd,
-            ..._ventasSurvey,
+        // 1. Ficha de asistencia de la cajera (mantiene el conteo de estrellas rojas / bonos).
+        //    Puntualidad detallada ya no se pide; se deriva del puntaje (>=6 => A TIEMPO).
+        const asistenciaPayload = {
+            postulante_id: CAJERA_ID, fecha, turno_id: TURNO_ID_V,
+            seccion: 'ENTRADA', password: pwd,
         };
+        if (_ventasSurvey['puntualidad'] < 6) asistenciaPayload.llegada_puntualidad = 'TARDE';
+
         try {
             const r1   = await fetch(`${BASE}/staff/api/asistencia/registrar`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body:   JSON.stringify(surveyPayload),
+                body:   JSON.stringify(asistenciaPayload),
             });
             const res1 = await r1.json();
             if (!res1.success) {
-                showAlert(msg, res1.message || 'Error al guardar la evaluación.', 'error');
+                showAlert(msg, res1.message || 'Error al guardar la asistencia.', 'error');
                 btn.disabled = false; btn.textContent = 'Confirmar ventas y calcular cuadre →';
                 return;
             }
         } catch {
-            showAlert(msg, 'Error de conexión al guardar la evaluación.', 'error');
+            showAlert(msg, 'Error de conexión al guardar la asistencia.', 'error');
+            btn.disabled = false; btn.textContent = 'Confirmar ventas y calcular cuadre →';
+            return;
+        }
+
+        // 2. Encuesta de desempeño (nueva ficha cuantitativa, visible en
+        //    /staff/mi-horario?modo=mis-encuestas de la cajera evaluada).
+        const encuestaPayload = {
+            evaluado_id: CAJERA_ID, fecha, turno_id: TURNO_ID_V,
+            password: pwd, ..._ventasSurvey,
+        };
+        try {
+            const rEnc   = await fetch(`${BASE}/staff/api/encuesta/registrar`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body:   JSON.stringify(encuestaPayload),
+            });
+            const resEnc = await rEnc.json();
+            if (!resEnc.success) {
+                showAlert(msg, resEnc.message || 'Error al guardar la encuesta.', 'error');
+                btn.disabled = false; btn.textContent = 'Confirmar ventas y calcular cuadre →';
+                return;
+            }
+        } catch {
+            showAlert(msg, 'Error de conexión al guardar la encuesta.', 'error');
             btn.disabled = false; btn.textContent = 'Confirmar ventas y calcular cuadre →';
             return;
         }
@@ -234,7 +246,7 @@ async function submitVentas(sesionId) {
         });
         const res = await r.json();
         if (res.success) {
-            window.location.href = `${BASE}/caja/reporte/${sesionId}`;
+            window.location.href = `${BASE}/caja`;
         } else {
             showAlert(msg, res.message || 'Error al procesar.', 'error');
             btn.disabled = false; btn.textContent = 'Confirmar ventas y calcular cuadre →';
@@ -253,19 +265,14 @@ function showAlert(el, txt, type) {
 </script>
 
 <style>
-    .sv-block { background:#f8fafc;border-radius:10px;padding:.7rem .85rem;margin-bottom:.65rem;border:1px solid #e8edf2; }
-    .sv-block__hd { font-size:.67rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:.55rem; }
-    .sv-rg { display:flex;gap:.3rem;flex-wrap:wrap; }
-    .sv-row2 { display:grid;grid-template-columns:1fr 1fr;gap:.5rem; }
-    .sv-field { margin-bottom:.6rem; }
-    .sv-field__label { font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:.3rem; }
-    .sv-rb { padding:.38rem .75rem;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;background:#fff;color:#475569;transition:all .13s;line-height:1.3; }
-    .sv-rb small { display:block;font-size:.62rem;font-weight:400;color:#94a3b8; }
-    .sv-rb[data-color="blue"].active   { border-color:#3b82f6;background:#dbeafe;color:#1e40af; }
-    .sv-rb[data-color="green"].active  { border-color:#10b981;background:#d1fae5;color:#065f46; }
-    .sv-rb[data-color="amber"].active  { border-color:#f59e0b;background:#fef3c7;color:#92400e; }
-    .sv-rb[data-color="orange"].active { border-color:#f97316;background:#ffedd5;color:#9a3412; }
-    .sv-rb[data-color="red"].active    { border-color:#ef4444;background:#fee2e2;color:#991b1b; }
+    .sv-block { background:#f8fafc;border-radius:10px;padding:.7rem .85rem;margin-bottom:.6rem;border:1px solid #e8edf2; }
+    .sv-block--confianza { background:#f5f3ff;border-color:#ddd6fe; }
+    .sv-block__hd { font-size:.78rem;font-weight:800;color:#1e293b;margin-bottom:.5rem;display:flex;align-items:center;justify-content:space-between; }
+    .sv-block__val { font-size:.72rem;font-weight:700;color:#64748b; }
+    .sv-scale { display:flex;gap:3px;flex-wrap:wrap; }
+    .sv-coin { font-size:1.35rem;line-height:1;background:none;border:none;cursor:pointer;opacity:.22;padding:2px;transition:opacity .1s,transform .1s; }
+    .sv-coin.on { opacity:1; }
+    .sv-coin:active { transform:scale(1.2); }
 </style>
 </body>
 </html>

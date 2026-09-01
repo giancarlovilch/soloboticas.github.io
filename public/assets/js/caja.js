@@ -238,14 +238,18 @@ async function crearSesion() {
     }
 }
 
-// ── Encuesta de apertura (sesión nueva) ───────────────
+// ── Encuesta de apertura (sesión nueva) — ficha de desempeño 1-10 ──
+const SURVEY_ASPECTOS = ['puntualidad','orden','higiene','presentacion','animo','uso_celular','confianza'];
 const _survey = {};
 
-function pickSurveyRadio(btn) {
+function pickSurveyScale(btn) {
     const field = btn.dataset.field;
-    document.querySelectorAll(`#surveySection .sv-rb[data-field="${field}"]`).forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    _survey[field] = btn.dataset.val;
+    const val = parseInt(btn.dataset.val);
+    document.querySelectorAll(`.sv-coin[data-field="${field}"]`).forEach(b => {
+        b.classList.toggle('on', parseInt(b.dataset.val) <= val);
+    });
+    _survey[field] = val;
+    document.getElementById(`sv-val-${field}`).textContent = `${val}/10`;
 }
 
 function mostrarEncuesta() {
@@ -355,10 +359,8 @@ async function abrirTurno() {
     const msg     = $('sesionMsg');
     const btn     = $('btnAbrirTurno');
 
-    const requiredFields = ['llegada_puntualidad','area_ordenada_ingreso','area_limpia_ingreso',
-                            'aseo_personal','vestimenta','unas','cabello'];
-    if (requiredFields.some(f => !(_survey[f] !== undefined && _survey[f] !== null && _survey[f] !== ''))) {
-        showAlert(msg, 'Completa todos los campos de la evaluación antes de abrir el turno.');
+    if (SURVEY_ASPECTOS.some(f => !_survey[f])) {
+        showAlert(msg, 'Completa las 7 preguntas de la evaluación antes de abrir el turno.');
         return;
     }
     if (!pwd) { showAlert(msg, 'Ingresa tu contraseña para confirmar.'); return; }
@@ -366,35 +368,62 @@ async function abrirTurno() {
     btn.disabled = true;
     btn.textContent = 'Guardando evaluación...';
     hideAlert(msg);
+    const fecha = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
 
-    // 1. Registrar encuesta de la vendedora (cajera la llena)
-    const surveyPayload = {
+    // 1. Ficha de asistencia (mantiene el conteo de estrellas rojas / bonos).
+    //    La puntualidad detallada de la ficha antigua ya no se pide; se deriva
+    //    del puntaje de puntualidad de la nueva encuesta (>=6 => A TIEMPO).
+    const asistenciaPayload = {
         postulante_id: parseInt(vendId),
-        fecha:         new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD
-        turno_id:      parseInt(turnoId),
-        seccion:       'ENTRADA',
-        password:      pwd,
-        ..._survey,
+        fecha, turno_id: parseInt(turnoId),
+        seccion: 'ENTRADA', password: pwd,
     };
+    if (_survey['puntualidad'] < 6) asistenciaPayload.llegada_puntualidad = 'TARDE';
 
     try {
         const r1  = await fetch(`${BASE}/staff/api/asistencia/registrar`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body:   JSON.stringify(surveyPayload),
+            body:   JSON.stringify(asistenciaPayload),
         });
         const res1 = await r1.json();
         if (!res1.success) {
-            showAlert(msg, res1.message || 'Error al guardar la evaluación.');
+            showAlert(msg, res1.message || 'Error al guardar la asistencia.');
             btn.disabled = false; btn.textContent = 'Abrir turno →';
             return;
         }
     } catch {
-        showAlert(msg, 'Error de conexión al guardar la evaluación.');
+        showAlert(msg, 'Error de conexión al guardar la asistencia.');
         btn.disabled = false; btn.textContent = 'Abrir turno →';
         return;
     }
 
-    // 2. Crear la sesión de caja
+    // 2. Encuesta de desempeño (nueva ficha cuantitativa 1-10, la que se ve en
+    //    /staff/mi-horario?modo=mis-encuestas). Reemplaza a la ficha cualitativa.
+    const encuestaPayload = {
+        evaluado_id: parseInt(vendId),
+        fecha, turno_id: parseInt(turnoId),
+        password: pwd,
+        ..._survey,
+    };
+
+    try {
+        const rEnc  = await fetch(`${BASE}/staff/api/encuesta/registrar`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body:   JSON.stringify(encuestaPayload),
+        });
+        const resEnc = await rEnc.json();
+        if (!resEnc.success) {
+            showAlert(msg, resEnc.message || 'Error al guardar la encuesta.');
+            btn.disabled = false; btn.textContent = 'Abrir turno →';
+            return;
+        }
+    } catch {
+        showAlert(msg, 'Error de conexión al guardar la encuesta.');
+        btn.disabled = false; btn.textContent = 'Abrir turno →';
+        return;
+    }
+
+    // 3. Crear la sesión de caja
     btn.textContent = 'Abriendo turno...';
     try {
         const r2  = await fetch(`${BASE}/caja/api/sesion/crear`, {

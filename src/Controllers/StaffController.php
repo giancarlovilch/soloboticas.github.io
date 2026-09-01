@@ -59,7 +59,121 @@ class StaffController extends Controller
         $hastaMes = date('Y-m-t');
         $estrellas = (new EstrellaRepository())->getEstrellas($postulanteId, $desdeMes, $hastaMes);
 
+        $cumpleanhos = $this->getCumpleanhosProximos();
+
+        require_once __DIR__ . '/../Repositories/VotoBcpRepository.php';
+        $votoRepo = new VotoBcpRepository();
+        $mesEncuestaBcp = $votoRepo->getMesEncuestado();
+        $yaVotoEncuestaBcp = $mesEncuestaBcp ? $votoRepo->yaVoto($postulanteId, $mesEncuestaBcp) : false;
+
         require_once __DIR__ . '/../../views/staff/dashboard.php';
+    }
+
+    /** Cumpleaños del personal habilitado y contratado, próximos 2 meses */
+    private function getCumpleanhosProximos(): array
+    {
+        require_once __DIR__ . '/../Core/Database.php';
+        $db = \Database::getConnection();
+
+        $stmt = $db->query(
+            "SELECT p.nombres, p.apellidos, p.fecha_nacimiento
+             FROM postulante p
+             INNER JOIN usuario u ON u.postulante_id = p.id_postulante
+             WHERE u.activo = 1 AND p.etapa_id = 4 AND p.fecha_nacimiento IS NOT NULL"
+        );
+
+        $hoy   = new \DateTime('today');
+        $limite = (clone $hoy)->modify('+2 months');
+        $out   = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $nac  = new \DateTime($r['fecha_nacimiento']);
+            $prox = new \DateTime($hoy->format('Y') . '-' . $nac->format('m-d'));
+            if ($prox < $hoy) $prox->modify('+1 year');
+            if ($prox >= $limite) continue;
+            $dias = (int)$hoy->diff($prox)->format('%a');
+
+            $out[] = [
+                'nombre' => trim($r['nombres'] . ' ' . $r['apellidos']),
+                'dias'   => $dias,
+            ];
+        }
+
+        usort($out, fn($a, $b) => $a['dias'] <=> $b['dias']);
+        return $out;
+    }
+
+    private const MESES_LABEL = [1=>'enero',2=>'febrero',3=>'marzo',4=>'abril',5=>'mayo',6=>'junio',
+        7=>'julio',8=>'agosto',9=>'septiembre',10=>'octubre',11=>'noviembre',12=>'diciembre'];
+
+    /** GET /staff/encuesta-bcp — encuesta anónima mensual sobre uso del agente BCP de las cajeras */
+    public function encuestaBcpView(): void
+    {
+        $postulanteId = $this->getSessionUserId();
+        $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $userName     = $_SESSION['user_name'] ?? 'Colaborador';
+
+        require_once __DIR__ . '/../Repositories/VotoBcpRepository.php';
+        $repo = new VotoBcpRepository();
+        $mes  = $repo->getMesEncuestado();
+
+        if (!$mes) { header('Location: ' . $basePath . '/staff'); exit; }
+        if ($repo->yaVoto($postulanteId, $mes)) {
+            header('Location: ' . $basePath . '/staff/encuesta-bcp/resultados'); exit;
+        }
+
+        [$anio, $nmes] = explode('-', $mes);
+        $mesLabel = self::MESES_LABEL[(int)$nmes] . ' ' . $anio;
+
+        $data     = $repo->getCajerasDelMes($mes, $postulanteId);
+        $cajas    = $data['cajas'];
+        $cajeras  = $data['cajeras'];
+
+        require_once __DIR__ . '/../../views/staff/encuesta_bcp.php';
+    }
+
+    /** POST /staff/api/encuesta-bcp/registrar */
+    public function encuestaBcpRegistrar(): void
+    {
+        $postulanteId = $this->getSessionUserId();
+        $data = $this->getAllInput();
+
+        $password   = trim($data['password'] ?? '');
+        $votos      = $data['votos'] ?? [];
+        $comentario = trim($data['comentario'] ?? '');
+        if (!$password || !is_array($votos)) $this->error('Faltan datos requeridos', 422);
+
+        require_once __DIR__ . '/../Repositories/VotoBcpRepository.php';
+        $repo = new VotoBcpRepository();
+        $mes  = $repo->getMesEncuestado();
+        if (!$mes) $this->error('La encuesta de este mes ya no está disponible', 410);
+
+        $result = $repo->registrarVotos($postulanteId, $mes, $votos, $password, $comentario);
+        if ($result === true) $this->success('Encuesta enviada. ¡Gracias!');
+        else $this->error($result, 400);
+    }
+
+    /** GET /staff/encuesta-bcp/resultados — públicos una vez que ya votaste ese mes */
+    public function encuestaBcpResultados(): void
+    {
+        $postulanteId = $this->getSessionUserId();
+        $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
+        $userName     = $_SESSION['user_name'] ?? 'Colaborador';
+        $isAdmin      = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
+
+        require_once __DIR__ . '/../Repositories/VotoBcpRepository.php';
+        $repo = new VotoBcpRepository();
+        $mes  = $_GET['mes'] ?? $repo->getMesEncuestado();
+
+        if (!$mes || (!$isAdmin && !$repo->yaVoto($postulanteId, $mes))) {
+            header('Location: ' . $basePath . '/staff'); exit;
+        }
+
+        [$anio, $nmes] = explode('-', $mes);
+        $mesLabel    = self::MESES_LABEL[(int)$nmes] . ' ' . $anio;
+        $resultados  = $repo->getResultados($mes);
+        $comentarios = $repo->getComentarios($mes);
+
+        require_once __DIR__ . '/../../views/staff/encuesta_bcp_resultados.php';
     }
 
     /** GET /staff/estrellas — pantalla para ganar estrellas (votar limpieza de un compañero) */
@@ -341,6 +455,10 @@ class StaffController extends Controller
         );
         $stmtDesc->execute(['pid' => $postulanteId, 'desde' => $desde, 'hasta' => $hasta]);
         $descuentosAdj = $stmtDesc->fetchAll();
+
+        // ── 1c. Penalidades (descuentos informativos, ej. encuesta BCP) ──
+        require_once __DIR__ . '/../Repositories/DescuentoRepository.php';
+        $penalidades = (new DescuentoRepository())->listar($filtroMes, $postulanteId);
 
         // ── 2. Slots trabajados del mes (certificados y no certificados) ──
         $stmtSlots = $db->prepare(

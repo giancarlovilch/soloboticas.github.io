@@ -18,7 +18,7 @@ $aspectos = [
                         'hint' => '¿Se presentó con uniforme e imagen impecables?', 'malo' => '😞', 'bueno' => '😊'],
     'animo'        => ['label' => '🔥 Estado de ánimo',      'icono' => '🔥', 'paleta' => $paletaInv,
                         'hint' => '', 'malo' => '😠', 'bueno' => '😊'],
-    'uso_celular'  => ['label' => '📱 Uso de celular',       'icono' => '📱', 'paleta' => $paleta,
+    'uso_celular'  => ['label' => '📵 Alejado del celular',  'icono' => '📵', 'paleta' => $paleta,
                         'hint' => '¿Se mantuvo alejado del teléfono durante su turno?', 'malo' => '😞', 'bueno' => '😊'],
     'confianza'    => ['label' => '🛡️ Confianza / Honestidad','icono' => '🛡️', 'paleta' => $paleta,
                         'hint' => '¿Trabajó con ética, moral y valores, sin hacer trampa?', 'malo' => '😞', 'bueno' => '😊'],
@@ -254,7 +254,7 @@ if ($modo === 'pendientes') {
         <?php foreach ($slotsData as $s):
             $yaCalificado = (bool)$s['id_encuesta'];
             $encData = $yaCalificado ? array_intersect_key($s, array_flip([
-                'puntualidad','orden','higiene','presentacion','animo','uso_celular',
+                'puntualidad','orden','higiene','presentacion','animo','uso_celular','confianza',
             ])) : null;
             $encJson = htmlspecialchars(json_encode($encData), ENT_QUOTES);
             $diasLabel = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
@@ -372,7 +372,7 @@ if ($modo === 'pendientes') {
                 <th class="text-center">🧼 Higiene</th>
                 <th class="text-center">✨ Present.</th>
                 <th class="text-center">🔥 Ánimo</th>
-                <th class="text-center">📱 Celular</th>
+                <th class="text-center">📵 Celular</th>
                 <th class="text-center">🛡️ Confianza</th>
             </tr>
         </thead>

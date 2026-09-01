@@ -340,6 +340,46 @@ foreach ($ecoPagos as $p) {
     </div>
     <?php endif; ?>
 
+    <!-- Tabla penalidades -->
+    <p class="eco-sec-title">Penalidades</p>
+    <?php $ecoPenalidades = $ecoPenalidades ?? []; ?>
+    <?php if (empty($ecoPenalidades)): ?>
+    <div class="eco-empty">Sin penalidades registradas en <?= $mesLabel ?>.</div>
+    <?php else: ?>
+    <div class="eco-table-wrap">
+        <table class="eco-table">
+            <thead>
+                <tr>
+                    <?php if (!$ecoPid): ?><th>Trabajador</th><?php endif; ?>
+                    <th>Tipo</th>
+                    <th class="text-center">Estado</th>
+                    <th>Registrado por</th>
+                    <th>Fecha</th>
+                    <th>Descripción</th>
+                    <th class="text-right">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($ecoPenalidades as $pn): ?>
+            <tr>
+                <?php if (!$ecoPid): ?><td style="font-weight:600;color:#1e293b;"><?= htmlspecialchars($pn['trabajador_nombre']) ?></td><?php endif; ?>
+                <td><span class="eco-badge" style="background:#faf5ff;color:#7c3aed;"><?= htmlspecialchars($pn['tipo']) ?></span></td>
+                <td class="text-center"><span class="eco-badge" style="background:#f1f5f9;color:#475569;"><?= htmlspecialchars($pn['estado']) ?></span></td>
+                <td style="font-size:.78rem;color:#475569;"><?= htmlspecialchars($pn['registrado_por_nombre']) ?></td>
+                <td style="white-space:nowrap;"><?= date('d/m/Y', strtotime($pn['fecha'])) ?></td>
+                <td style="font-size:.78rem;color:#475569;max-width:260px;"><?= htmlspecialchars($pn['descripcion']) ?></td>
+                <td class="text-right"><span class="eco-monto" style="color:#991b1b;">− <?= $f2($pn['monto']) ?></span></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+    <p style="font-size:.72rem;color:#94a3b8;margin-top:-.5rem;">
+        Solo informativo — no se descuenta de nada automáticamente.
+        <a href="<?= $basePath ?>/admin/dashboard?page=penalidades" style="color:#0097A7;font-weight:600;">Gestionar penalidades →</a>
+    </p>
+
     <!-- Tabla ingresos -->
     <p class="eco-sec-title">Ingresos por turno trabajado</p>
     <?php if (empty($ecoIngresos)): ?>

@@ -162,7 +162,35 @@ $estMonto      = (float)($estrellas['monto']      ?? round($estDiferencia * 0.10
     <section class="staff-card staff-clock-card">
         <div class="staff-clock" id="reloj">00:00:00</div>
         <div class="staff-date"><?= $diaLabel ?></div>
+
+        <?php if (!empty($cumpleanhos)): ?>
+        <div class="staff-bday-list">
+            <?php foreach ($cumpleanhos as $b): ?>
+            <div class="staff-bday-row">
+                <span class="staff-bday-nombre"><?= htmlspecialchars($b['nombre']) ?></span>
+                <span class="staff-bday-dias"><?= $b['dias'] === 0 ? 'Hoy' : ($b['dias'] === 1 ? 'Mañana' : $b['dias'] . 'd') ?></span>
+                <span class="staff-bday-sticker"><?= $b['dias'] === 0 ? '🎂' : '' ?></span>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
     </section>
+
+    <!-- ── Encuesta BCP de cajeras (solo últimos/primeros 3 días del mes) ── -->
+    <?php if (!empty($mesEncuestaBcp)):
+        $mesesNomEbcp = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+        [$ebcpAnio, $ebcpNmes] = explode('-', $mesEncuestaBcp);
+        $ebcpMesLabel = $mesesNomEbcp[(int)$ebcpNmes - 1] . ' ' . $ebcpAnio;
+    ?>
+    <a href="<?= $basePath ?>/staff/encuesta-bcp<?= $yaVotoEncuestaBcp ? '/resultados' : '' ?>"
+       class="staff-card" style="display:block;text-align:center;
+              background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fdba74;
+              color:#9a3412;font-weight:700;font-size:.88rem;text-decoration:none;padding:.75rem 1rem;">
+        <?= $yaVotoEncuestaBcp
+            ? '📊 Resultados de ' . htmlspecialchars($ebcpMesLabel)
+            : '🔥 Encuesta de ' . htmlspecialchars($ebcpMesLabel) ?>
+    </a>
+    <?php endif; ?>
 
     <!-- ── Balanza de estrellas del mes ─────────────────── -->
     <section class="estrellas-card">

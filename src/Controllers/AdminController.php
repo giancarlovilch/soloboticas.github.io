@@ -429,12 +429,15 @@ class AdminController extends Controller
             }
             $ecoMesActual = date('Y-m');
 
+            require_once __DIR__ . '/../Repositories/DescuentoRepository.php';
+            $ecoPenalidades = (new DescuentoRepository())->listar($ecoMes, $ecoPid ?: null);
+
             $economiaDatos = compact(
                 'ecoPagos','ecoTrabajadores','ecoMes','ecoMesActual','ecoPid','ecoTipo',
                 'ecoIngresos','ecoTotalIngresos','ecoTotalBonos','ecoEstudioInfo',
                 'ecoTarifasInfo','ecoBonosVInfo','ecoBonosOInfo','ecoBonoEstudioMonto',
                 'ecoBonoServicioMonto','ecoNombreTrabajador','ecoSupervisorPeriodos',
-                'estBonoRef'
+                'estBonoRef','ecoPenalidades'
             );
         }
 
@@ -564,6 +567,46 @@ class AdminController extends Controller
                  ORDER BY (sp.fecha_hasta IS NULL) DESC, sp.fecha_desde DESC"
             )->fetchAll();
             $supervisoresDatos = compact('supTrabajadores', 'supPeriodos');
+        }
+
+        // Datos para la página de la encuesta BCP de cajeras (CRUD admin)
+        $ebcpDatos = null;
+        if ($page === 'encuesta-bcp') {
+            require_once __DIR__ . '/../Repositories/VotoBcpRepository.php';
+            $votoRepo   = new VotoBcpRepository();
+            $ebcpMeses  = $votoRepo->getMesesConVotos();
+            $ebcpMesSel = $_GET['mes'] ?? ($ebcpMeses[0] ?? date('Y-m'));
+            $ebcpVotos  = $votoRepo->getVotosAdmin($ebcpMesSel);
+
+            // El admin también es "personal" y puede votar como cualquier trabajador
+            $ebcpMesActivo   = $votoRepo->getMesEncuestado();
+            $ebcpYoVote      = $ebcpMesActivo ? $votoRepo->yaVoto((int)($_SESSION['user_id'] ?? 0), $ebcpMesActivo) : false;
+            $ebcpComentarios = $votoRepo->getComentariosAdmin($ebcpMesSel);
+            $ebcpRanking     = $votoRepo->getRankingAprobacion($ebcpMesSel);
+
+            $ebcpDatos = compact(
+                'ebcpMeses', 'ebcpMesSel', 'ebcpVotos', 'ebcpMesActivo', 'ebcpYoVote', 'ebcpComentarios', 'ebcpRanking'
+            );
+        }
+
+        // Datos para la página de penalidades/descuentos
+        $penDatos = null;
+        if ($page === 'penalidades') {
+            require_once __DIR__ . '/../Repositories/DescuentoRepository.php';
+            $db = \Database::getConnection();
+            $penRepo = new DescuentoRepository();
+
+            $penTrabajadores = $db->query(
+                "SELECT p.id_postulante AS id, p.nombres AS nombre
+                 FROM postulante p INNER JOIN usuario u ON u.postulante_id = p.id_postulante
+                 WHERE u.activo = 1 ORDER BY p.nombres"
+            )->fetchAll();
+
+            $penMesSel = $_GET['mes'] ?? date('Y-m');
+            if (!preg_match('/^\d{4}-\d{2}$/', $penMesSel)) $penMesSel = date('Y-m');
+            $penLista = $penRepo->listar($penMesSel);
+
+            $penDatos = compact('penTrabajadores', 'penMesSel', 'penLista');
         }
 
         require_once __DIR__ . '/../../views/admin/dashboard.php';
@@ -823,6 +866,85 @@ class AdminController extends Controller
         );
         if ($result === true) $this->success('Tasa guardada.');
         else $this->error($result, 422);
+    }
+
+    /** POST /admin/api/encuesta-bcp/{id}/editar */
+    public function editarVotoBcp(int $id): void
+    {
+        $this->middlewareAdmin();
+        $data = $this->getAllInput();
+
+        require_once __DIR__ . '/../Repositories/VotoBcpRepository.php';
+        $respuestas = [];
+        foreach (array_keys(VotoBcpRepository::PREGUNTAS) as $campo) {
+            $respuestas[$campo] = (int)($data[$campo] ?? 0);
+        }
+        $ok = (new VotoBcpRepository())->actualizarVoto($id, $respuestas);
+        if ($ok) $this->success('Voto actualizado.');
+        else $this->error('Datos inválidos (deben ser del 1 al 10)', 422);
+    }
+
+    /** POST /admin/api/encuesta-bcp/{id}/eliminar */
+    public function eliminarVotoBcp(int $id): void
+    {
+        $this->middlewareAdmin();
+        require_once __DIR__ . '/../Repositories/VotoBcpRepository.php';
+        $ok = (new VotoBcpRepository())->eliminarVoto($id);
+        if ($ok) $this->success('Voto eliminado.');
+        else $this->error('No se pudo eliminar', 404);
+    }
+
+    /** POST /admin/api/encuesta-bcp/comentario/{id}/eliminar */
+    public function eliminarComentarioBcp(int $id): void
+    {
+        $this->middlewareAdmin();
+        require_once __DIR__ . '/../Repositories/VotoBcpRepository.php';
+        $ok = (new VotoBcpRepository())->eliminarComentario($id);
+        if ($ok) $this->success('Comentario eliminado.');
+        else $this->error('No se pudo eliminar', 404);
+    }
+
+    /** POST /admin/api/descuento/crear */
+    public function crearDescuento(): void
+    {
+        $this->middlewareAdmin();
+        $data = $this->getAllInput();
+
+        require_once __DIR__ . '/../Repositories/DescuentoRepository.php';
+        $result = (new DescuentoRepository())->crear(
+            (int)($data['postulante_id'] ?? 0),
+            trim($data['tipo']        ?? ''),
+            trim($data['descripcion'] ?? ''),
+            (float)($data['monto']    ?? 0),
+            trim($data['mes']         ?? ''),
+            (int)($_SESSION['user_id'] ?? 0)
+        );
+        if ($result === true) $this->success('Penalidad registrada.');
+        else $this->error($result, 422);
+    }
+
+    /** POST /admin/api/descuento/{id}/editar */
+    public function editarDescuento(int $id): void
+    {
+        $this->middlewareAdmin();
+        $data = $this->getAllInput();
+
+        require_once __DIR__ . '/../Repositories/DescuentoRepository.php';
+        $result = (new DescuentoRepository())->actualizar(
+            $id, trim($data['descripcion'] ?? ''), (float)($data['monto'] ?? 0)
+        );
+        if ($result === true) $this->success('Penalidad actualizada.');
+        else $this->error($result, 422);
+    }
+
+    /** POST /admin/api/descuento/{id}/eliminar */
+    public function eliminarDescuento(int $id): void
+    {
+        $this->middlewareAdmin();
+        require_once __DIR__ . '/../Repositories/DescuentoRepository.php';
+        $ok = (new DescuentoRepository())->eliminar($id);
+        if ($ok) $this->success('Penalidad eliminada.');
+        else $this->error('No se pudo eliminar', 404);
     }
 
     /** POST /admin/api/tasa-roja/{id}/eliminar */

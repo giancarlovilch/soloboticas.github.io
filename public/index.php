@@ -193,6 +193,9 @@ $router->post('/staff/api/encuesta/registrar', [StaffController::class, 'registr
 $router->post('/staff/api/asistencia/{id}/editar',   [StaffController::class, 'editarAsistencia']);
 $router->post('/staff/api/asistencia/registrar',         [StaffController::class, 'registrarAsistencia']);
 $router->post('/staff/api/asistencia/{id}/revertir',     [StaffController::class, 'revertirFalta']);
+$router->get('/staff/encuesta-bcp',                    [StaffController::class, 'encuestaBcpView']);
+$router->post('/staff/api/encuesta-bcp/registrar',     [StaffController::class, 'encuestaBcpRegistrar']);
+$router->get('/staff/encuesta-bcp/resultados',         [StaffController::class, 'encuestaBcpResultados']);
 $router->get('/staff/economia',           [StaffController::class,       'economia']);
 $router->get('/staff/estrellas',          [StaffController::class,       'estrellas']);
 $router->get('/staff/estrellas/resumen',  [StaffController::class,       'estrellasResumen']);
@@ -273,6 +276,12 @@ $router->post('/admin/api/bono-estudio/agregar',           [AdminController::cla
 $router->post('/admin/api/bono-estudio/{id}/eliminar',     [AdminController::class, 'eliminarBonoEstudio']);
 $router->post('/admin/api/supervisor/agregar',             [AdminController::class, 'addSupervisor']);
 $router->post('/admin/api/supervisor/{id}/eliminar', [AdminController::class, 'eliminarSupervisor']);
+$router->post('/admin/api/encuesta-bcp/{id}/editar',    [AdminController::class, 'editarVotoBcp']);
+$router->post('/admin/api/encuesta-bcp/{id}/eliminar',  [AdminController::class, 'eliminarVotoBcp']);
+$router->post('/admin/api/encuesta-bcp/comentario/{id}/eliminar', [AdminController::class, 'eliminarComentarioBcp']);
+$router->post('/admin/api/descuento/crear',            [AdminController::class, 'crearDescuento']);
+$router->post('/admin/api/descuento/{id}/editar',      [AdminController::class, 'editarDescuento']);
+$router->post('/admin/api/descuento/{id}/eliminar',    [AdminController::class, 'eliminarDescuento']);
 // BBVA/PLIN — Vista admin y API recepción (rutas originales intactas para el celular)
 $router->get('/admin/bbva-pagos',      [PagoBBVAController::class, 'vista']);
 $router->post('/api/bbva/pago',        [PagoBBVAController::class, 'registrar']);

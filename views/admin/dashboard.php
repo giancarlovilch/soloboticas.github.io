@@ -13,6 +13,8 @@ $navActive = [
     'actividades' => ($page === 'actividades'),
     'bonos'       => ($page === 'bonos'),
     'supervisores'=> ($page === 'supervisores'),
+    'encuesta-bcp'=> ($page === 'encuesta-bcp'),
+    'penalidades' => ($page === 'penalidades'),
 ];
 ?>
 
@@ -169,6 +171,20 @@ $navActive = [
                     </a>
                 </li>
 
+                <li class="list__item <?= $navActive['encuesta-bcp'] ? 'list__item--active' : '' ?>">
+                    <a href="?page=encuesta-bcp" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Encuesta BCP</span>
+                    </a>
+                </li>
+
+                <li class="list__item <?= $navActive['penalidades'] ? 'list__item--active' : '' ?>">
+                    <a href="?page=penalidades" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Penalidades</span>
+                    </a>
+                </li>
+
                 <li class="list__item">
                     <a href="<?= $basePath ?>/admin/reportes" class="list__button">
                         <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
@@ -246,6 +262,12 @@ $navActive = [
                         break;
                     case 'supervisores':
                         require_once __DIR__ . '/supervisores_lista.php';
+                        break;
+                    case 'encuesta-bcp':
+                        require_once __DIR__ . '/encuesta_bcp_lista.php';
+                        break;
+                    case 'penalidades':
+                        require_once __DIR__ . '/penalidades_lista.php';
                         break;
                     case 'bancos':
                         require_once __DIR__ . '/bancos.php';

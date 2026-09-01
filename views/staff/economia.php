@@ -419,6 +419,39 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
     </div>
     <?php endif; ?>
 
+    <!-- ── Tabla 2: Penalidades ─────────────────────────── -->
+    <p class="eco-sec-title">PENALIDADES</p>
+    <?php if (empty($penalidades)): ?>
+    <div class="eco-empty">Sin penalidades registradas en <?= $mesLabel ?>.</div>
+    <?php else: ?>
+    <div class="eco-table-wrap">
+        <table class="eco-table">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th class="text-center">Estado</th>
+                    <th>Registrado por</th>
+                    <th>Fecha</th>
+                    <th>Descripción</th>
+                    <th class="text-right">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($penalidades as $pn): ?>
+            <tr>
+                <td><span class="eco-badge" style="background:#faf5ff;color:#7c3aed;"><?= htmlspecialchars($pn['tipo']) ?></span></td>
+                <td class="text-center"><span class="eco-badge" style="background:#f1f5f9;color:#475569;"><?= htmlspecialchars($pn['estado']) ?></span></td>
+                <td style="font-size:.78rem;color:#475569;"><?= htmlspecialchars($pn['registrado_por_nombre']) ?></td>
+                <td style="white-space:nowrap;"><?= date('d/m/Y', strtotime($pn['fecha'])) ?></td>
+                <td style="font-size:.78rem;color:#475569;max-width:280px;"><?= htmlspecialchars($pn['descripcion']) ?></td>
+                <td class="text-right"><span class="eco-monto" style="color:#991b1b;">− <?= $f2($pn['monto']) ?></span></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+
     <!-- ── Resumen de estrellas ──────────────────────── -->
     <?php
     $estrellas  = $estrellas ?? ['rojas' => 0, 'azules' => 0, 'diferencia' => 0, 'monto' => 0];
