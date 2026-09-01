@@ -170,7 +170,7 @@ class StaffController extends Controller
 
         [$anio, $nmes] = explode('-', $mes);
         $mesLabel    = self::MESES_LABEL[(int)$nmes] . ' ' . $anio;
-        $resultados  = $repo->getResultados($mes);
+        $resultados  = $repo->getRankingAprobacion($mes);
         $comentarios = $repo->getComentarios($mes);
 
         require_once __DIR__ . '/../../views/staff/encuesta_bcp_resultados.php';

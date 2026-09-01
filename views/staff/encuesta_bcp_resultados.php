@@ -43,7 +43,7 @@ $comentarios = $comentarios ?? [];
 
 <main class="ebr-wrap">
     <p style="font-size:.8rem;color:#64748b;margin-bottom:1rem;">
-        Promedio (1-10) de la encuesta anónima sobre el manejo del agente BCP. Cuanto más alto, más señales de que
+        Resultado de la encuesta anónima sobre el manejo del agente BCP. Cuanto más alto el %, más señales de que
         podría estar pasando.
     </p>
 
@@ -58,22 +58,22 @@ $comentarios = $comentarios ?? [];
         <thead>
             <tr>
                 <th>Cajera</th>
-                <th class="text-center">Votos</th>
-                <th class="text-center">🔥 Tarjeta propia/empresa</th>
-                <th class="text-center">🔥 Fraccionamiento</th>
-                <th class="text-center">🔥 Irregularidad (síntesis)</th>
-                <th class="text-center">🔥 Apropiación de sobrantes</th>
+                <th class="text-center">%</th>
+                <th class="text-center">Resultado</th>
             </tr>
         </thead>
         <tbody>
         <?php foreach ($resultados as $r): ?>
             <tr>
                 <td style="font-weight:600;color:#1e293b;"><?= htmlspecialchars($r['nombres']) ?></td>
-                <td class="text-center" style="color:#94a3b8;"><?= (int)$r['total_votos'] ?></td>
-                <td class="text-center ebr-num"><?= number_format((float)$r['prom_tarjeta_propia'], 2) ?></td>
-                <td class="text-center ebr-num"><?= number_format((float)$r['prom_fraccionamiento'], 2) ?></td>
-                <td class="text-center ebr-num"><?= number_format((float)$r['prom_irregularidad'], 2) ?></td>
-                <td class="text-center ebr-num"><?= number_format((float)$r['prom_apropiacion_sobrante'], 2) ?></td>
+                <td class="text-center ebr-num"><?= number_format((float)$r['pct_sospecha'], 1) ?>%</td>
+                <td class="text-center">
+                    <?php if ($r['aprobado']): ?>
+                    <span style="background:#d1fae5;color:#065f46;font-size:.72rem;font-weight:700;padding:2px 10px;border-radius:20px;">Aprobado</span>
+                    <?php else: ?>
+                    <span style="background:#fee2e2;color:#991b1b;font-size:.72rem;font-weight:700;padding:2px 10px;border-radius:20px;">Desaprobado</span>
+                    <?php endif; ?>
+                </td>
             </tr>
         <?php endforeach; ?>
         </tbody>
