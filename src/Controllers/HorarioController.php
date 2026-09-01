@@ -185,7 +185,7 @@ class HorarioController extends Controller
         $userName      = $_SESSION['user_name'] ?? 'Usuario';
         $esAdmin       = $this->isAdmin();
 
-        $semanas       = $this->repo->getSemanasHistorial(20);
+        $semanas       = $this->repo->getSemanasHistorial(3);
         $semanaId      = isset($_GET['semana']) ? (int)$_GET['semana'] : ($semanas[0]['id_semana'] ?? null);
         $semana        = $semanaId ? $this->repo->getSemanaById($semanaId) : null;
         $semanaProxima = $this->repo->getSemanaProxima();

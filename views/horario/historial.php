@@ -72,16 +72,47 @@ if ($semana) {
     <?php else: ?>
 
     <!-- ── Navegación ─────────────────────────────────────── -->
+    <?php
+        $idxActual = null;
+        foreach ($semanas as $idx => $s) {
+            if ($semana && (int)$s['id_semana'] === (int)$semana['id_semana']) { $idxActual = $idx; break; }
+        }
+        $semAnterior  = ($idxActual !== null && isset($semanas[$idxActual + 1])) ? $semanas[$idxActual + 1] : null;
+        $semSiguiente = ($idxActual !== null && $idxActual > 0) ? $semanas[$idxActual - 1] : null;
+    ?>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
 
+        <?php if ($semAnterior): ?>
+        <a href="?semana=<?= $semAnterior['id_semana'] ?>" class="hor-btn-siguiente" style="background:linear-gradient(135deg,#475569,#64748b);box-shadow:0 4px 16px rgba(71,85,105,.35);">
+            <span style="font-size:1.3rem;">◀</span>
+            <div style="flex:1;">
+                <div>Semana anterior</div>
+                <div class="hor-btn-siguiente__sub">
+                    <?= date('d/m', strtotime($semAnterior['fecha_inicio'])) ?> – <?= date('d/m', strtotime($semAnterior['fecha_fin'])) ?>
+                </div>
+            </div>
+        </a>
+        <?php else: ?>
         <div class="hor-btn-pagina-actual">
             <span style="font-size:1.3rem;">◀</span>
             <div style="flex:1;">
                 <div>Semanas anteriores</div>
-                <div class="hor-btn-pagina-actual__sub">Página actual</div>
+                <div class="hor-btn-pagina-actual__sub">No hay más</div>
             </div>
         </div>
+        <?php endif; ?>
 
+        <?php if ($semSiguiente): ?>
+        <a href="?semana=<?= $semSiguiente['id_semana'] ?>" class="hor-btn-siguiente">
+            <div style="flex:1;">
+                <div>Semana siguiente</div>
+                <div class="hor-btn-siguiente__sub">
+                    <?= date('d/m', strtotime($semSiguiente['fecha_inicio'])) ?> – <?= date('d/m', strtotime($semSiguiente['fecha_fin'])) ?>
+                </div>
+            </div>
+            <span style="font-size:1.3rem;">▶</span>
+        </a>
+        <?php else: ?>
         <a href="<?= $basePath ?>/horario" class="hor-btn-siguiente">
             <div style="flex:1;">
                 <div>Semana actual</div>
@@ -89,6 +120,7 @@ if ($semana) {
             </div>
             <span style="font-size:1.3rem;">▶</span>
         </a>
+        <?php endif; ?>
 
     </div>
 
