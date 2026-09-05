@@ -230,6 +230,8 @@ require_once __DIR__ . '/../src/Controllers/ReporteController.php';
 
 // --- LECTOR DE PAGOS BBVA/PLIN (app móvil) ---
 require_once __DIR__ . '/../src/Controllers/PagoBBVAController.php';
+require_once __DIR__ . '/../src/Controllers/ProductoReferenciaController.php';
+require_once __DIR__ . '/../src/Controllers/VentaEmergenciaController.php';
 require_once __DIR__ . '/../src/Controllers/PlinController.php';
 $router->get('/admin/reportes',         [ReporteController::class, 'index']);
 $router->get('/admin/reportes/arqueos',    [ReporteController::class, 'arqueos']);
@@ -287,6 +289,23 @@ $router->get('/admin/bbva-pagos',      [PagoBBVAController::class, 'vista']);
 $router->post('/api/bbva/pago',        [PagoBBVAController::class, 'registrar']);
 $router->post('/api/bbva/pagos/lote',  [PagoBBVAController::class, 'registrarLote']);
 $router->get('/api/bbva/pagos',        [PagoBBVAController::class, 'listar']);
+
+// --- SINCRONIZACIÓN DE PRODUCTOS (Softpharma -> web, referencia offline) ---
+$router->post('/api/productos-referencia/sincronizar', [ProductoReferenciaController::class, 'sincronizar']);
+
+// --- VENTAS DE EMERGENCIA (cuando el ERP falla) ---
+$router->get('/ventas-emergencia',                     [VentaEmergenciaController::class, 'registrarView']);
+$router->get('/ventas-emergencia/historial',           [VentaEmergenciaController::class, 'historialView']);
+$router->get('/ventas-emergencia/api/productos',       [VentaEmergenciaController::class, 'apiBuscarProductos']);
+$router->post('/ventas-emergencia/api/registrar',      [VentaEmergenciaController::class, 'apiRegistrar']);
+$router->post('/ventas-emergencia/api/{id}/marcar-descargada', [VentaEmergenciaController::class, 'apiMarcarDescargada']);
+$router->post('/ventas-emergencia/api/{id}/anular',    [VentaEmergenciaController::class, 'apiAnular']);
+$router->get('/ventas-emergencia/{id}/imprimir',       [VentaEmergenciaController::class, 'imprimirView']);
+
+// --- RESUMEN ADMIN DE VENTAS DE EMERGENCIA ---
+$router->get('/admin/ventas-emergencia',                        [VentaEmergenciaController::class, 'adminResumenView']);
+$router->post('/admin/ventas-emergencia/api/{id}/reactivar',    [VentaEmergenciaController::class, 'apiReactivar']);
+$router->post('/admin/ventas-emergencia/api/{id}/eliminar',     [VentaEmergenciaController::class, 'apiEliminar']);
 
 // PLIN — Visor público de transacciones
 $router->get('/plin',            [PlinController::class, 'index']);

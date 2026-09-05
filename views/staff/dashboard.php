@@ -176,6 +176,15 @@ $estMonto      = (float)($estrellas['monto']      ?? round($estDiferencia * 0.10
         <?php endif; ?>
     </section>
 
+    <!-- ── Venta de Emergencia (ERP caído) — visible siempre, máxima llamada de atención ── -->
+    <a href="<?= $basePath ?>/ventas-emergencia" style="display:flex;align-items:center;justify-content:center;gap:.55rem;
+              background:#0a1e4d;border:2px solid #0a1e4d;border-radius:14px;
+              color:#ffffff;font-weight:800;font-size:.95rem;text-decoration:none;
+              padding:.85rem 1rem;letter-spacing:.04em;text-transform:uppercase;
+              box-shadow:0 0 0 3px rgba(10,30,77,.18);">
+        🚨 Sistema de Venta de Emergencia
+    </a>
+
     <!-- ── Encuesta BCP de cajeras (solo últimos/primeros 3 días del mes) ── -->
     <?php if (!empty($mesEncuestaBcp)):
         $mesesNomEbcp = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];

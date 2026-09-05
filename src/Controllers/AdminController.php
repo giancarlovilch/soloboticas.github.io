@@ -68,6 +68,8 @@ class AdminController extends Controller
 
         // Resumen de estrellas del mes (widget del home)
         $homeEstrellas = null;
+        // Últimas corridas de sincronización de productos (widget del home)
+        $homeSyncLog = [];
         if ($page === 'home') {
             require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
             $rows = (new EstrellaRepository())->getEstrellasTodos(date('Y-m-01'), date('Y-m-t'));
@@ -79,6 +81,17 @@ class AdminController extends Controller
                 'rojas' => $totRojas, 'azules' => $totAzules,
                 'en_riesgo' => array_slice($enRiesgo, 0, 5), 'total_personal' => count($rows),
             ];
+
+            require_once __DIR__ . '/../Core/Database.php';
+            $homeSyncLog = \Database::getConnection()->query("
+                SELECT sl.id, sl.id_local, l.descripcion AS local_nombre,
+                       sl.total_productos, sl.productos_nuevos, sl.duracion_ms,
+                       sl.estado, sl.mensaje, sl.creado_en
+                FROM producto_referencia_sync_log sl
+                INNER JOIN local l ON l.id_local = sl.id_local
+                ORDER BY sl.creado_en DESC
+                LIMIT 12
+            ")->fetchAll();
         }
 
         // Si la página es update, cargamos el detalle y los catálogos reales[cite: 14]

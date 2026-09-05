@@ -136,6 +136,13 @@ $navActive = [
                     </a>
                 </li>
 
+                <li class="list__item">
+                    <a href="<?= $basePath ?>/admin/ventas-emergencia" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Ventas Emergencia</span>
+                    </a>
+                </li>
+
                 <li class="list__item <?= $navActive['asistencias'] ? 'list__item--active' : '' ?>">
                     <a href="?page=asistencias" class="list__button">
                         <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">

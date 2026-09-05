@@ -1,0 +1,113 @@
+/* Módulo de Ventas de Emergencia — espacio de productividad: denso, ancho completo */
+
+.ve-main {
+    max-width: 90%;
+    margin: 0.75rem auto;
+    display: flex; flex-direction: column; gap: .6rem;
+}
+
+.ve-toolbar {
+    display: flex; gap: .75rem; align-items: flex-end; flex-wrap: wrap;
+}
+.ve-toolbar .caja-field label { font-size: 0.66rem; margin-bottom: .15rem; }
+.ve-toolbar .caja-input { padding: .4rem .6rem; font-size: 0.82rem; }
+
+/* ── Selector de LOCAL — grande y llamativo, para no confundir de tienda ── */
+.ve-local-picker { display: flex; gap: .6rem; }
+.ve-local-btn {
+    flex: 1; padding: .9rem .5rem; border-radius: 10px; cursor: pointer;
+    font-size: 1.15rem; font-weight: 800; letter-spacing: .02em; text-align: center;
+    border: 3px solid var(--cj-border); background: #f8fafc; color: #94a3b8;
+    transition: all .12s;
+}
+.ve-local-btn:hover { background: #f1f5f9; }
+.ve-local-btn.is-active {
+    background: #0a1e4d; border-color: #0a1e4d; color: #fff;
+    box-shadow: 0 0 0 3px rgba(10,30,77,.18);
+    transform: scale(1.02);
+}
+
+.ve-buscador { position: relative; }
+.ve-resultados {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
+    background: #fff; border: 1.5px solid var(--cj-border); border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    max-height: calc(100vh - 80px); overflow-y: auto;
+}
+.ve-resultado-header, .ve-resultado-item {
+    display: grid; grid-template-columns: 120px 1fr 85px 60px;
+    gap: .6rem; align-items: center; padding: .35rem .6rem;
+}
+.ve-resultado-header {
+    background: #f1f5f9; color: var(--cj-muted); font-size: 0.64rem;
+    text-transform: uppercase; letter-spacing: .04em; font-weight: 700;
+    position: sticky; top: 0;
+}
+.ve-resultado-item { cursor: pointer; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; }
+.ve-resultado-item:last-child { border-bottom: none; }
+.ve-resultado-item:hover { background: var(--cj-teal-lt); }
+.ve-resultado-item__cod    { font-size: 0.72rem; color: var(--cj-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve-resultado-item__nombre { font-weight: 600; color: var(--cj-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-resultado-item__precio { font-weight: 700; color: var(--cj-teal); white-space: nowrap; font-size: 0.78rem; text-align: right; }
+.ve-resultado-item__stock  { color: var(--cj-muted); text-align: right; white-space: nowrap; }
+.ve-resultado-item--sin-stock .ve-resultado-item__stock { color: var(--cj-red); }
+.ve-resultado-vacio { padding: .6rem; font-size: 0.78rem; color: var(--cj-muted); text-align: center; }
+
+/* ── Tabla del ticket (carrito) — densa ────────────────── */
+.ve-table-wrap { overflow-x: auto; border: 1px solid var(--cj-border); border-radius: 8px; background: #fff; }
+.ve-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.ve-table th {
+    text-align: left; padding: .4rem .55rem; background: #f1f5f9; color: var(--cj-muted);
+    font-size: 0.66rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 700;
+    border-bottom: 1px solid var(--cj-border); position: sticky; top: 0;
+}
+.ve-table td { padding: .3rem .55rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.ve-table tbody tr:hover { background: #fafafa; }
+.ve-col-num { text-align: right; }
+.ve-table .ve-input {
+    width: 100%; max-width: 90px; padding: .25rem .4rem; border: 1px solid var(--cj-border);
+    border-radius: 5px; font-size: 0.78rem; text-align: right; font-variant-numeric: tabular-nums;
+}
+.ve-table .ve-input:focus { border-color: var(--cj-teal); outline: none; }
+/* Semáforo de margen — el precio de costo nunca se muestra, solo el color */
+.ve-table .ve-input--precio-amarillo { border-color: var(--cj-warn); background: var(--cj-warn-bg); color: var(--cj-warn); font-weight: 700; }
+.ve-table .ve-input--precio-rojo     { border-color: var(--cj-red);  background: var(--cj-red-bg);  color: var(--cj-red);  font-weight: 700; }
+.ve-cod   { font-size: 0.72rem; color: var(--cj-muted); white-space: nowrap; }
+.ve-nombre { font-weight: 600; color: var(--cj-dark); }
+.ve-stock { color: var(--cj-muted); }
+.ve-subtotal { font-weight: 700; color: var(--cj-dark); }
+.ve-cart-empty { padding: 1.25rem; text-align: center; color: var(--cj-muted); font-size: 0.82rem; }
+
+.ve-remove {
+    background: none; border: none; color: #94a3b8; font-size: 0.95rem;
+    cursor: pointer; border-radius: 4px; padding: 1px 5px; line-height: 1;
+}
+.ve-remove:hover { background: var(--cj-red-bg); color: var(--cj-red); }
+
+/* ── Footer sticky con total y acciones ────────────────── */
+.ve-footer {
+    position: sticky; bottom: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    background: #fff; border: 1px solid var(--cj-border); border-radius: 8px;
+    padding: .55rem .75rem; margin-top: .25rem;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+}
+.ve-footer__actions { display: flex; gap: .5rem; }
+.ve-footer__total { font-size: 0.85rem; color: var(--cj-muted); }
+.ve-footer__total strong { font-size: 1.15rem; color: var(--cj-teal); margin-left: .4rem; font-variant-numeric: tabular-nums; }
+
+.badge-descargado    { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.68rem; font-weight: 700; background: var(--cj-ok-bg); color: #065f46; }
+.badge-pendiente-erp { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.68rem; font-weight: 700; background: var(--cj-warn-bg); color: var(--cj-warn); }
+
+/* ── Barra de estado del ticket — grande, imposible de no ver ────────── */
+.ve-estado-bar {
+    padding: .55rem 1rem; font-size: 0.9rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .03em; text-align: center;
+}
+.ve-estado-bar--pendiente  { background: var(--cj-warn-bg); color: #92400e; }
+.ve-estado-bar--descargado { background: var(--cj-ok-bg);   color: #065f46; }
+.ve-estado-bar--anulada    { background: #1e1e1e;           color: #f87171; }
+
+@media (max-width: 720px) {
+    .ve-table { font-size: 0.72rem; }
+}
