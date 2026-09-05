@@ -76,9 +76,19 @@ async function veBuscarProductos(q) {
     try {
         const r   = await fetch(`${BASE}/ventas-emergencia/api/productos?id_local=${idLocal}&q=${encodeURIComponent(q)}`);
         const res = await r.json();
-        const productos = (res.data && res.data.productos) || [];
 
         cont.innerHTML = '';
+
+        if (!res.success) {
+            // No confundir un error real con "no hay resultados" — se muestra el mensaje del servidor.
+            cont.innerHTML = `<div class="ve-resultado-vacio" style="color:var(--cj-red);font-weight:600;">
+                ⚠️ ${veEsc(res.message || 'Error al buscar productos')}
+            </div>`;
+            cont.hidden = false;
+            return;
+        }
+
+        const productos = (res.data && res.data.productos) || [];
 
         if (productos.length === 0) {
             cont.innerHTML = '<div class="ve-resultado-vacio">Sin resultados</div>';
