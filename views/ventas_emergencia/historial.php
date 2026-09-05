@@ -1,5 +1,5 @@
 <?php
-/** @var array $ventas */ /** @var array $detalles */ /** @var int $miId */
+/** @var array $ventas */ /** @var array $detalles */ /** @var array $vendedores */ /** @var int $miId */
 $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
 $userName = $userName ?? $_SESSION['user_name'] ?? 'Usuario';
 $userRol  = $userRol  ?? $_SESSION['user_rol']  ?? 'STAFF';
@@ -7,8 +7,9 @@ $esAdmin  = $userRol === 'ADMIN';
 
 $locales = [2 => 'Local 2 (SB2)', 3 => 'Local 3 (SB3)', 4 => 'Local 4 (SB4)'];
 
-$filtroLocal = isset($_GET['local']) ? (int) $_GET['local'] : 0;
-$filtroFecha = $_GET['fecha'] ?? date('Y-m-d');
+$filtroLocal      = isset($_GET['local']) ? (int) $_GET['local'] : 0;
+$filtroFecha      = $_GET['fecha'] ?? date('Y-m-d');
+$filtroVendedorId = isset($_GET['vendedor']) ? (int) $_GET['vendedor'] : 0;
 
 $activas       = array_filter($ventas, fn($v) => $v['estado'] !== 'ANULADA');
 $totalDia      = array_sum(array_column($activas, 'total'));
@@ -41,164 +42,181 @@ $pendientesErp = count(array_filter($activas, fn($v) => empty($v['descargado_en'
     </div>
 </header>
 
-<main class="caja-main">
+<main class="ve-main">
 
-    <div style="display:flex;gap:1rem;flex-wrap:wrap;">
-        <div class="caja-card" style="flex:1;min-width:180px;text-align:center;">
-            <p style="font-size:0.68rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Total del día</p>
-            <p style="font-size:1.6rem;font-weight:700;color:#059669;">S/ <?= number_format($totalDia, 2) ?></p>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+        <div class="ve-stat">
+            <span class="ve-stat__label">Total del día</span>
+            <span class="ve-stat__valor" style="color:#059669;">S/ <?= number_format($totalDia, 2) ?></span>
         </div>
-        <div class="caja-card" style="flex:1;min-width:180px;text-align:center;">
-            <p style="font-size:0.68rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Tickets</p>
-            <p style="font-size:1.6rem;font-weight:700;color:#1e293b;"><?= count($activas) ?></p>
+        <div class="ve-stat">
+            <span class="ve-stat__label">Tickets</span>
+            <span class="ve-stat__valor"><?= count($activas) ?></span>
         </div>
-        <div class="caja-card" style="flex:1;min-width:180px;text-align:center;">
-            <p style="font-size:0.68rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Pendientes de pasar al ERP</p>
-            <p style="font-size:1.6rem;font-weight:700;color:#d97706;"><?= $pendientesErp ?></p>
+        <div class="ve-stat">
+            <span class="ve-stat__label">Pendientes de pasar al ERP</span>
+            <span class="ve-stat__valor" style="color:#d97706;"><?= $pendientesErp ?></span>
         </div>
     </div>
 
-    <section class="caja-card">
-        <form method="get" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem;">
-            <div class="caja-field">
-                <label>Fecha</label>
-                <input type="date" name="fecha" class="caja-input" value="<?= htmlspecialchars($filtroFecha) ?>">
-            </div>
-            <div class="caja-field">
-                <label>Local</label>
-                <select name="local" class="caja-input">
-                    <option value="0">Todos</option>
-                    <?php foreach ($locales as $id => $nombre): ?>
-                        <option value="<?= $id ?>" <?= $filtroLocal === $id ? 'selected' : '' ?>><?= htmlspecialchars($nombre) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <button type="submit" class="caja-btn caja-btn--primary">Filtrar</button>
-        </form>
-
-        <?php if (empty($ventas)): ?>
-            <div class="ve-cart-empty">No hay ventas de emergencia registradas para este filtro.</div>
-        <?php else: ?>
-            <div style="display:flex;flex-direction:column;gap:1rem;">
-                <?php foreach ($ventas as $v):
-                    $anulada     = $v['estado'] === 'ANULADA';
-                    $puedeAnular = !$anulada && ($esAdmin || (int) $v['postulante_vendedor_id'] === (int) $miId);
-                ?>
-                    <div class="caja-card caja-card--info" style="padding:0;overflow:hidden;<?= $anulada ? 'opacity:.7;' : '' ?>">
-
-                        <?php if ($anulada): ?>
-                            <div class="ve-estado-bar ve-estado-bar--anulada">
-                                🚫 ANULADA <?= $v['anulado_en'] ? '· ' . date('d/m/Y H:i', strtotime($v['anulado_en'])) : '' ?>
-                            </div>
-                        <?php elseif ($v['descargado_en']): ?>
-                            <div class="ve-estado-bar ve-estado-bar--descargado">
-                                ✅ DESCARGADO AL ERP · <?= date('d/m/Y H:i', strtotime($v['descargado_en'])) ?>
-                            </div>
-                        <?php else: ?>
-                            <div class="ve-estado-bar ve-estado-bar--pendiente">
-                                ⏳ PENDIENTE DE PASAR AL ERP
-                            </div>
-                        <?php endif; ?>
-
-                        <div style="padding:1.5rem;">
-                        <div class="caja-card__header-row">
-                            <div>
-                                <p class="caja-card__caja">Ticket #<?= $v['id'] ?> — <?= htmlspecialchars($v['local_nombre']) ?></p>
-                                <p class="caja-card__meta">
-                                    Vendedor: <?= htmlspecialchars($v['vendedor_nombre']) ?> ·
-                                    <?= date('d/m/Y H:i', strtotime($v['creado_en'])) ?>
-                                </p>
-                            </div>
-                            <div style="text-align:right;">
-                                <p style="font-size:1.3rem;font-weight:700;color:var(--cj-dark);">S/ <?= number_format($v['total'], 2) ?></p>
-                            </div>
-                        </div>
-
-                        <div class="caja-table-wrap">
-                            <table class="caja-table">
-                                <thead>
-                                    <tr><th>Código</th><th>Producto</th><th>Cant.</th><th>P. Unit</th><th>Subtotal</th></tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($detalles[$v['id']] ?? [] as $d): ?>
-                                        <tr>
-                                            <td><?= htmlspecialchars($d['cod_producto']) ?></td>
-                                            <td><?= htmlspecialchars($d['nombre_producto']) ?></td>
-                                            <td><?= rtrim(rtrim(number_format($d['cantidad'], 2), '0'), '.') ?></td>
-                                            <td>S/ <?= number_format($d['precio_venta'], 2) ?></td>
-                                            <td>S/ <?= number_format($d['subtotal'], 2) ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="caja-card__actions">
-                            <a href="<?= $basePath ?>/ventas-emergencia/<?= $v['id'] ?>/imprimir" target="_blank" class="caja-btn caja-btn--outline">
-                                🖨️ Imprimir
-                            </a>
-                            <?php if (!$anulada): ?>
-                                <button type="button" class="caja-btn caja-btn--outline ve-toggle-descarga" data-id="<?= $v['id'] ?>">
-                                    <?= $v['descargado_en'] ? 'Marcar como pendiente' : 'Marcar como descargado en ERP' ?>
-                                </button>
-                            <?php endif; ?>
-                            <?php if ($puedeAnular): ?>
-                                <button type="button" class="caja-btn ve-anular" data-id="<?= $v['id'] ?>"
-                                        style="background:var(--cj-red-bg);color:var(--cj-red);border:1px solid #fecaca;">
-                                    🚫 Anular
-                                </button>
-                            <?php endif; ?>
-                        </div>
-                        </div>
-                    </div>
+    <form method="get" class="ve-filtros">
+        <div class="caja-field">
+            <label>Fecha</label>
+            <input type="date" name="fecha" class="caja-input" value="<?= htmlspecialchars($filtroFecha) ?>">
+        </div>
+        <div class="caja-field">
+            <label>Local</label>
+            <select name="local" class="caja-input">
+                <option value="0">Todos</option>
+                <?php foreach ($locales as $id => $nombre): ?>
+                    <option value="<?= $id ?>" <?= $filtroLocal === $id ? 'selected' : '' ?>><?= htmlspecialchars($nombre) ?></option>
                 <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
-    </section>
+            </select>
+        </div>
+        <div class="caja-field">
+            <label>Vendedor</label>
+            <select name="vendedor" class="caja-input">
+                <option value="0">Todos</option>
+                <?php foreach ($vendedores as $vd): ?>
+                    <option value="<?= $vd['id_postulante'] ?>" <?= $filtroVendedorId === (int) $vd['id_postulante'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($vd['nombres']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <button type="submit" class="caja-btn caja-btn--primary">Filtrar</button>
+    </form>
+
+    <?php if (empty($ventas)): ?>
+        <div class="ve-cart-empty">No hay ventas de emergencia registradas para este filtro.</div>
+    <?php else: ?>
+        <div class="ve-table-wrap">
+            <table class="ve-table">
+                <thead>
+                    <tr>
+                        <th>Ticket</th>
+                        <th>Hora</th>
+                        <th>Local</th>
+                        <th>Vendedor</th>
+                        <th class="ve-col-num">Total</th>
+                        <th>Estado</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($ventas as $v):
+                        $anulada     = $v['estado'] === 'ANULADA';
+                        $puedeAnular = !$anulada && ($esAdmin || (int) $v['postulante_vendedor_id'] === (int) $miId);
+                    ?>
+                        <tr class="ve-fila-ticket <?= $anulada ? 've-fila-ticket--anulada' : '' ?>" data-toggle="det-<?= $v['id'] ?>">
+                            <td>#<?= $v['id'] ?></td>
+                            <td><?= date('d/m H:i', strtotime($v['creado_en'])) ?></td>
+                            <td><?= htmlspecialchars($v['local_nombre']) ?></td>
+                            <td><?= htmlspecialchars($v['vendedor_nombre']) ?></td>
+                            <td class="ve-col-num" style="font-weight:700;">S/ <?= number_format($v['total'], 2) ?></td>
+                            <td>
+                                <?php if ($anulada): ?>
+                                    <span class="ve-pill ve-pill--anulada">ANULADA</span>
+                                <?php elseif ($v['descargado_en']): ?>
+                                    <span class="ve-pill ve-pill--ok">DESCARGADO</span>
+                                <?php else: ?>
+                                    <span class="ve-pill ve-pill--pendiente">PENDIENTE</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="ve-col-num">
+                                <button type="button" class="ve-link-detalle" data-toggle-btn="det-<?= $v['id'] ?>">Ver detalle ▾</button>
+                            </td>
+                        </tr>
+                        <tr id="det-<?= $v['id'] ?>" class="ve-fila-detalle" hidden>
+                            <td colspan="7">
+                                <table class="ve-table ve-table--detalle">
+                                    <thead>
+                                        <tr><th>Código</th><th>Producto</th><th class="ve-col-num">Cant.</th><th class="ve-col-num">P. Unit</th><th class="ve-col-num">Subtotal</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($detalles[$v['id']] ?? [] as $d): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($d['cod_producto']) ?></td>
+                                                <td><?= htmlspecialchars($d['nombre_producto']) ?></td>
+                                                <td class="ve-col-num"><?= rtrim(rtrim(number_format($d['cantidad'], 2), '0'), '.') ?></td>
+                                                <td class="ve-col-num">S/ <?= number_format($d['precio_venta'], 2) ?></td>
+                                                <td class="ve-col-num">S/ <?= number_format($d['subtotal'], 2) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                                <div class="ve-fila-detalle__acciones">
+                                    <a href="<?= $basePath ?>/ventas-emergencia/<?= $v['id'] ?>/imprimir" target="_blank" class="caja-btn caja-btn--outline">
+                                        🖨️ Imprimir
+                                    </a>
+                                    <?php if (!$anulada): ?>
+                                        <button type="button" class="caja-btn caja-btn--outline ve-toggle-descarga" data-id="<?= $v['id'] ?>">
+                                            <?= $v['descargado_en'] ? 'Marcar como pendiente' : 'Marcar como descargado en ERP' ?>
+                                        </button>
+                                    <?php endif; ?>
+                                    <?php if ($puedeAnular): ?>
+                                        <button type="button" class="caja-btn ve-anular" data-id="<?= $v['id'] ?>"
+                                                style="background:var(--cj-red-bg);color:var(--cj-red);border:1px solid #fecaca;">
+                                            🚫 Anular
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
 
 </main>
 
 <script>
 const BASE = '<?= $basePath ?>';
 
+document.querySelectorAll('[data-toggle-btn]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const row = document.getElementById(btn.dataset.toggleBtn);
+        row.hidden = !row.hidden;
+        btn.textContent = row.hidden ? 'Ver detalle ▾' : 'Ocultar ▴';
+    });
+});
+document.querySelectorAll('.ve-fila-ticket').forEach(tr => {
+    tr.addEventListener('click', () => {
+        const row = document.getElementById(tr.dataset.toggle);
+        const btn = tr.querySelector('[data-toggle-btn]');
+        row.hidden = !row.hidden;
+        if (btn) btn.textContent = row.hidden ? 'Ver detalle ▾' : 'Ocultar ▴';
+    });
+});
+
 document.querySelectorAll('.ve-toggle-descarga').forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const id = btn.dataset.id;
         btn.disabled = true;
         try {
             const r = await fetch(`${BASE}/ventas-emergencia/api/${id}/marcar-descargada`, { method: 'POST' });
             const res = await r.json();
-            if (res.success) {
-                window.location.reload();
-            } else {
-                alert(res.message || 'Error al actualizar');
-                btn.disabled = false;
-            }
-        } catch (err) {
-            alert('Error de red: ' + err.message);
-            btn.disabled = false;
-        }
+            if (res.success) window.location.reload();
+            else { alert(res.message || 'Error al actualizar'); btn.disabled = false; }
+        } catch (err) { alert('Error de red: ' + err.message); btn.disabled = false; }
     });
 });
 
 document.querySelectorAll('.ve-anular').forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         if (!confirm('¿Anular este ticket? Quedará marcado como ANULADO pero no se borra.')) return;
         const id = btn.dataset.id;
         btn.disabled = true;
         try {
             const r = await fetch(`${BASE}/ventas-emergencia/api/${id}/anular`, { method: 'POST' });
             const res = await r.json();
-            if (res.success) {
-                window.location.reload();
-            } else {
-                alert(res.message || 'Error al anular');
-                btn.disabled = false;
-            }
-        } catch (err) {
-            alert('Error de red: ' + err.message);
-            btn.disabled = false;
-        }
+            if (res.success) window.location.reload();
+            else { alert(res.message || 'Error al anular'); btn.disabled = false; }
+        } catch (err) { alert('Error de red: ' + err.message); btn.disabled = false; }
     });
 });
 </script>

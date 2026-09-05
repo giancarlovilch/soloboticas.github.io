@@ -2,10 +2,18 @@
 
 date_default_timezone_set('America/Lima');
 
-// Timeout de sesión: 8 horas de inactividad (cubre un turno completo)
+// Timeout de sesión: 3 horas de inactividad.
+// OJO: sin fijar esto, PHP borra el archivo de sesión en el servidor según su
+// propio valor por defecto (session.gc_maxlifetime, casi siempre ~24 minutos en
+// hosting compartido) sin importar el chequeo de abajo — por eso se deslogueaban
+// mucho antes de lo que la app pretendía dar.
+$sessionLifetime = 3 * 3600; // 10800 segundos
+ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
+session_set_cookie_params($sessionLifetime);
+
 session_start();
 if (isset($_SESSION['user_id'])) {
-    if (isset($_SESSION['_last_act']) && (time() - $_SESSION['_last_act']) > 28800) {
+    if (isset($_SESSION['_last_act']) && (time() - $_SESSION['_last_act']) > $sessionLifetime) {
         session_unset();
         session_destroy();
         session_start();

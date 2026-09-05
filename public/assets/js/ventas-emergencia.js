@@ -83,22 +83,29 @@ async function veBuscarProductos(q) {
         if (productos.length === 0) {
             cont.innerHTML = '<div class="ve-resultado-vacio">Sin resultados</div>';
         } else {
+            const clsActivo = (loc) => String(loc) === String(idLocal) ? ' ve-col-local--activo' : '';
             cont.innerHTML = `
                 <div class="ve-resultado-header">
-                    <span>Código</span><span>Nombre</span><span style="text-align:right;">Precio</span><span style="text-align:right;">Stock</span>
+                    <span>Código</span><span>Nombre</span><span style="text-align:right;">Precio</span>
+                    <span class="ve-col-local${clsActivo(2)}">L2</span>
+                    <span class="ve-col-local${clsActivo(3)}">L3</span>
+                    <span class="ve-col-local${clsActivo(4)}">L4</span>
                 </div>
             `;
             productos.forEach(p => {
-                const stock = parseFloat(p.stock);
+                const stockActual = parseFloat(p.stock_actual) || 0;
                 const item = document.createElement('div');
-                item.className = 've-resultado-item' + (stock <= 0 ? ' ve-resultado-item--sin-stock' : '');
+                item.className = 've-resultado-item' + (stockActual <= 0 ? ' ve-resultado-item--sin-stock' : '');
+                const stockCelda = (v) => (v === null || v === undefined) ? '—' : parseFloat(v);
                 item.innerHTML = `
                     <span class="ve-resultado-item__cod">${veEsc(p.cod_producto)}</span>
                     <span class="ve-resultado-item__nombre">${veEsc(p.nombre_producto)}</span>
                     <span class="ve-resultado-item__precio">${veFmt(parseFloat(p.precio_venta))}</span>
-                    <span class="ve-resultado-item__stock">${stock}</span>
+                    <span class="ve-col-local${clsActivo(2)}">${stockCelda(p.stock_2)}</span>
+                    <span class="ve-col-local${clsActivo(3)}">${stockCelda(p.stock_3)}</span>
+                    <span class="ve-col-local${clsActivo(4)}">${stockCelda(p.stock_4)}</span>
                 `;
-                item.addEventListener('click', () => veAgregarAlCarrito(p));
+                item.addEventListener('click', () => veAgregarAlCarrito(p, stockActual));
                 cont.appendChild(item);
             });
         }
@@ -116,7 +123,7 @@ document.addEventListener('click', (e) => {
 });
 
 // ── Carrito ─────────────────────────────────────────────
-function veAgregarAlCarrito(p) {
+function veAgregarAlCarrito(p, stockActual) {
     const existente = veCarrito.find(i => i.cod_producto === p.cod_producto);
     if (existente) {
         existente.cantidad += 1;
@@ -126,7 +133,7 @@ function veAgregarAlCarrito(p) {
             nombre_producto: p.nombre_producto,
             precio_piso: parseFloat(p.precio_piso) || 0,
             precio_venta: parseFloat(p.precio_venta),
-            stock: parseFloat(p.stock),
+            stock: stockActual ?? 0,
             cantidad: 1,
         });
     }
@@ -140,9 +147,15 @@ function veAgregarAlCarrito(p) {
 function veClasePrecio(item) {
     if (!item.precio_piso || item.precio_piso <= 0) return '';
     const margen = (item.precio_venta - item.precio_piso) / item.precio_piso;
-    if (margen <= 0.0001) return 've-input--precio-rojo';
-    if (margen < 0.10) return 've-input--precio-amarillo';
-    return '';
+    if (margen <= 0) return 've-input--precio-rojo';
+    if (margen < 0.10) return 've-input--precio-naranja';
+    return 've-input--precio-azul';
+}
+
+// Rojo si la cantidad supera el stock de referencia — solo aviso, NUNCA bloquea
+// (el stock puede estar desactualizado y igual se puede vender/descargar).
+function veClaseCantidad(item) {
+    return item.cantidad > item.stock ? 've-input--cantidad-rojo' : '';
 }
 
 function veRenderCarrito() {
@@ -162,11 +175,11 @@ function veRenderCarrito() {
             <td class="ve-cod">${veEsc(item.cod_producto)}</td>
             <td class="ve-nombre">${veEsc(item.nombre_producto)}</td>
             <td class="ve-col-num">
-                <input type="number" class="ve-input ${veClasePrecio(item)}" min="${item.precio_piso}" step="0.01"
+                <input type="number" class="ve-input ${veClasePrecio(item)}" step="0.01"
                        value="${item.precio_venta}" data-idx="${idx}" data-role="precio">
             </td>
             <td class="ve-col-num">
-                <input type="number" class="ve-input" min="0.01" step="0.01"
+                <input type="number" class="ve-input ${veClaseCantidad(item)}" min="1" step="1"
                        value="${item.cantidad}" data-idx="${idx}" data-role="cantidad">
             </td>
             <td class="ve-col-num ve-subtotal">${veFmt(subtotal)}</td>
@@ -178,25 +191,22 @@ function veRenderCarrito() {
 
     cont.querySelectorAll('input[data-role="cantidad"]').forEach(inp => {
         inp.addEventListener('input', (e) => {
-            const idx = parseInt(e.target.dataset.idx, 10);
-            veCarrito[idx].cantidad = parseFloat(e.target.value) || 0;
+            const idx  = parseInt(e.target.dataset.idx, 10);
+            const item = veCarrito[idx];
+            item.cantidad = parseInt(e.target.value, 10) || 0;
+            e.target.className = 've-input ' + veClaseCantidad(item);
             veActualizarSubtotalFila(idx);
         });
     });
     cont.querySelectorAll('input[data-role="precio"]').forEach(inp => {
+        // Solo color de referencia (rojo/naranja/azul) — no se fuerza ni se corrige
+        // lo que la vendedora escribe; el límite real se valida al guardar (servidor).
         inp.addEventListener('input', (e) => {
-            const idx = parseInt(e.target.dataset.idx, 10);
+            const idx  = parseInt(e.target.dataset.idx, 10);
             const item = veCarrito[idx];
-            const costo = item.precio_piso;
-            let val = parseFloat(e.target.value);
+            const val  = parseFloat(e.target.value);
 
-            if (isNaN(val)) val = costo;
-            if (val < costo) {
-                val = costo;
-                e.target.value = costo;
-            }
-
-            item.precio_venta = val;
+            item.precio_venta = isNaN(val) ? 0 : val;
             e.target.className = 've-input ' + veClasePrecio(item);
             veActualizarSubtotalFila(idx);
         });

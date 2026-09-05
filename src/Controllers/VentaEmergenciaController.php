@@ -80,8 +80,9 @@ class VentaEmergenciaController extends Controller
         $userName     = $_SESSION['user_name'] ?? 'Usuario';
         $userRol      = $_SESSION['user_rol']  ?? 'STAFF';
 
-        $filtroLocal = isset($_GET['local']) ? (int) $_GET['local'] : 0;
-        $filtroFecha = $_GET['fecha'] ?? date('Y-m-d');
+        $filtroLocal      = isset($_GET['local']) ? (int) $_GET['local'] : 0;
+        $filtroFecha      = $_GET['fecha'] ?? date('Y-m-d');
+        $filtroVendedorId = isset($_GET['vendedor']) ? (int) $_GET['vendedor'] : 0;
 
         $where  = [];
         $params = [];
@@ -93,6 +94,10 @@ class VentaEmergenciaController extends Controller
         if ($filtroFecha) {
             $where[] = 'DATE(ve.creado_en) = :fecha';
             $params[':fecha'] = $filtroFecha;
+        }
+        if ($filtroVendedorId) {
+            $where[] = 've.postulante_vendedor_id = :vendedor';
+            $params[':vendedor'] = $filtroVendedorId;
         }
         $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
@@ -125,6 +130,14 @@ class VentaEmergenciaController extends Controller
             }
         }
 
+        // Vendedores para el filtro (solo quienes ya tienen ventas registradas).
+        $vendedores = $this->db->query("
+            SELECT DISTINCT p.id_postulante, p.nombres
+            FROM venta_emergencia ve
+            INNER JOIN postulante p ON p.id_postulante = ve.postulante_vendedor_id
+            ORDER BY p.nombres ASC
+        ")->fetchAll();
+
         require_once __DIR__ . '/../../views/ventas_emergencia/historial.php';
     }
 
@@ -146,25 +159,36 @@ class VentaEmergenciaController extends Controller
             return;
         }
 
-        // precio_piso: el costo real, salvo que esté en 0 (dato no confiable en Softpharma
-        // para productos sin compras registradas) — en ese caso el piso es el precio de catálogo.
+        // $idLocal ya viene validado contra LOCALES_VALIDOS, así que es seguro
+        // incrustarlo literal en el SQL (evita repetir el mismo parámetro con nombre,
+        // que MySQL no soporta con PDO::ATTR_EMULATE_PREPARES => false).
+        //
+        // precio_venta/precio_piso son del local ELEGIDO (con el que se va a vender);
+        // stock_2/stock_3/stock_4 son de los 3 locales a la vez, para no tener que
+        // cambiar de local para saber cuánto hay en cada tienda.
         $stmt = $this->db->prepare("
-            SELECT cod_producto, nombre_producto, precio_venta, stock,
-                   CASE WHEN precio_costo > 0 THEN precio_costo ELSE precio_venta END AS precio_piso
+            SELECT cod_producto, nombre_producto,
+                   MAX(CASE WHEN id_local = {$idLocal} THEN precio_venta END) AS precio_venta,
+                   MAX(CASE WHEN id_local = {$idLocal}
+                            THEN (CASE WHEN precio_costo > 0 THEN precio_costo ELSE precio_venta END)
+                       END) AS precio_piso,
+                   MAX(CASE WHEN id_local = 2 THEN stock END) AS stock_2,
+                   MAX(CASE WHEN id_local = 3 THEN stock END) AS stock_3,
+                   MAX(CASE WHEN id_local = 4 THEN stock END) AS stock_4,
+                   MAX(CASE WHEN id_local = {$idLocal} THEN stock END) AS stock_actual
             FROM producto_referencia
-            WHERE id_local = :id_local
-              AND (cod_producto LIKE :q1 OR nombre_producto LIKE :q2)
-            ORDER BY (stock > 0) DESC, nombre_producto ASC
+            WHERE cod_producto LIKE :q1 OR nombre_producto LIKE :q2
+            GROUP BY cod_producto, nombre_producto
+            ORDER BY (stock_actual > 0) DESC, nombre_producto ASC
             LIMIT 20
         ");
         $like = '%' . $q . '%';
         $stmt->execute([
-            ':id_local' => $idLocal,
-            ':q1'       => $like,
-            ':q2'       => $like,
+            ':q1' => $like,
+            ':q2' => $like,
         ]);
 
-        $this->success('OK', ['productos' => $stmt->fetchAll()]);
+        $this->success('OK', ['productos' => $stmt->fetchAll(), 'id_local' => $idLocal]);
     }
 
     // ---------------------------------------------------------------
@@ -191,7 +215,7 @@ class VentaEmergenciaController extends Controller
 
         foreach ($items as $it) {
             $cod = trim((string) ($it['cod_producto'] ?? ''));
-            $cant = (float) ($it['cantidad'] ?? 0);
+            $cant = (int) ($it['cantidad'] ?? 0);
             $precio = (float) ($it['precio_venta'] ?? 0);
 
             if ($cod === '' || $cant <= 0) {

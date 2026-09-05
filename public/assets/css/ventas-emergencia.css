@@ -35,8 +35,8 @@
     max-height: calc(100vh - 80px); overflow-y: auto;
 }
 .ve-resultado-header, .ve-resultado-item {
-    display: grid; grid-template-columns: 120px 1fr 85px 60px;
-    gap: .6rem; align-items: center; padding: .35rem .6rem;
+    display: grid; grid-template-columns: 120px 1fr 75px 46px 46px 46px;
+    column-gap: .9rem; row-gap: 0; align-items: center; padding: .35rem .6rem;
 }
 .ve-resultado-header {
     background: #f1f5f9; color: var(--cj-muted); font-size: 0.64rem;
@@ -49,9 +49,17 @@
 .ve-resultado-item__cod    { font-size: 0.72rem; color: var(--cj-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ve-resultado-item__nombre { font-weight: 600; color: var(--cj-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ve-resultado-item__precio { font-weight: 700; color: var(--cj-teal); white-space: nowrap; font-size: 0.78rem; text-align: right; }
-.ve-resultado-item__stock  { color: var(--cj-muted); text-align: right; white-space: nowrap; }
-.ve-resultado-item--sin-stock .ve-resultado-item__stock { color: var(--cj-red); }
 .ve-resultado-vacio { padding: .6rem; font-size: 0.78rem; color: var(--cj-muted); text-align: center; }
+
+/* Columnas de stock por local — la del local elegido se resalta en azul marino
+   para comparar de un vistazo sin tener que cambiar de local. */
+.ve-col-local { text-align: center; color: var(--cj-muted); white-space: nowrap; }
+.ve-resultado-header .ve-col-local--activo { color: #0a1e4d; }
+.ve-resultado-item .ve-col-local--activo {
+    color: #fff; background: #0a1e4d; border-radius: 5px;
+    font-weight: 800; padding: 2px 4px;
+    box-shadow: 0 0 0 3px rgba(10,30,77,.20);
+}
 
 /* ── Tabla del ticket (carrito) — densa ────────────────── */
 .ve-table-wrap { overflow-x: auto; border: 1px solid var(--cj-border); border-radius: 8px; background: #fff; }
@@ -69,9 +77,14 @@
     border-radius: 5px; font-size: 0.78rem; text-align: right; font-variant-numeric: tabular-nums;
 }
 .ve-table .ve-input:focus { border-color: var(--cj-teal); outline: none; }
-/* Semáforo de margen — el precio de costo nunca se muestra, solo el color */
-.ve-table .ve-input--precio-amarillo { border-color: var(--cj-warn); background: var(--cj-warn-bg); color: var(--cj-warn); font-weight: 700; }
-.ve-table .ve-input--precio-rojo     { border-color: var(--cj-red);  background: var(--cj-red-bg);  color: var(--cj-red);  font-weight: 700; }
+/* Semáforo de margen — el precio de costo nunca se muestra, solo el color.
+   Es solo informativo: no corrige ni bloquea lo que se escribe. */
+.ve-table .ve-input--precio-rojo    { border-color: var(--cj-red);  background: var(--cj-red-bg);  color: var(--cj-red);  font-weight: 700; }
+.ve-table .ve-input--precio-naranja { border-color: #ea580c; background: #fff1e6; color: #ea580c; font-weight: 700; }
+.ve-table .ve-input--precio-azul    { border-color: var(--cj-blue); background: var(--cj-blue-bg); color: var(--cj-blue); font-weight: 700; }
+
+/* Cantidad por encima del stock de referencia — solo aviso, nunca bloquea */
+.ve-table .ve-input--cantidad-rojo { border-color: var(--cj-red); background: var(--cj-red-bg); color: var(--cj-red); font-weight: 700; }
 .ve-cod   { font-size: 0.72rem; color: var(--cj-muted); white-space: nowrap; }
 .ve-nombre { font-weight: 600; color: var(--cj-dark); }
 .ve-stock { color: var(--cj-muted); }
@@ -99,14 +112,38 @@
 .badge-descargado    { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.68rem; font-weight: 700; background: var(--cj-ok-bg); color: #065f46; }
 .badge-pendiente-erp { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.68rem; font-weight: 700; background: var(--cj-warn-bg); color: var(--cj-warn); }
 
-/* ── Barra de estado del ticket — grande, imposible de no ver ────────── */
-.ve-estado-bar {
-    padding: .55rem 1rem; font-size: 0.9rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: .03em; text-align: center;
+/* ── Historial — enfocado en productividad: tabla densa, filtros en línea ── */
+.ve-stat {
+    background: #fff; border: 1px solid var(--cj-border); border-radius: 8px;
+    padding: .5rem .9rem; display: flex; flex-direction: column; gap: .1rem;
 }
-.ve-estado-bar--pendiente  { background: var(--cj-warn-bg); color: #92400e; }
-.ve-estado-bar--descargado { background: var(--cj-ok-bg);   color: #065f46; }
-.ve-estado-bar--anulada    { background: #1e1e1e;           color: #f87171; }
+.ve-stat__label { font-size: 0.62rem; color: var(--cj-muted); text-transform: uppercase; letter-spacing: .05em; }
+.ve-stat__valor { font-size: 1.15rem; font-weight: 800; color: var(--cj-dark); }
+
+.ve-filtros { display: flex; gap: .6rem; align-items: flex-end; flex-wrap: wrap; }
+.ve-filtros .caja-field label { font-size: 0.64rem; margin-bottom: .1rem; }
+.ve-filtros .caja-input { padding: .35rem .55rem; font-size: 0.8rem; }
+
+.ve-pill {
+    display: inline-block; padding: 2px 9px; border-radius: 20px;
+    font-size: 0.66rem; font-weight: 800; letter-spacing: .02em;
+}
+.ve-pill--ok        { background: var(--cj-ok-bg);   color: #065f46; }
+.ve-pill--pendiente { background: var(--cj-warn-bg); color: #92400e; }
+.ve-pill--anulada   { background: #1e1e1e; color: #f87171; }
+
+.ve-fila-ticket { cursor: pointer; }
+.ve-fila-ticket:hover { background: #f8fafc; }
+.ve-fila-ticket--anulada { opacity: .6; }
+.ve-fila-detalle td { background: #f8fafc; padding: .6rem .8rem; }
+.ve-link-detalle {
+    background: none; border: 1px solid var(--cj-border); border-radius: 6px;
+    color: var(--cj-teal); font-size: 0.72rem; font-weight: 600; cursor: pointer;
+    padding: 3px 9px;
+}
+.ve-link-detalle:hover { background: var(--cj-teal-lt); }
+.ve-table--detalle { font-size: 0.74rem; margin-bottom: .5rem; }
+.ve-fila-detalle__acciones { display: flex; gap: .5rem; }
 
 @media (max-width: 720px) {
     .ve-table { font-size: 0.72rem; }

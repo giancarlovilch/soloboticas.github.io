@@ -18,7 +18,7 @@ class JWTHelper
         $header  = self::b64e(json_encode(['typ' => 'JWT', 'alg' => 'HS256']));
         $payload = self::b64e(json_encode(array_merge($data, [
             'iat' => time(),
-            'exp' => time() + (8 * 3600),
+            'exp' => time() + (3 * 3600),
         ])));
 
         $sig = self::b64e(hash_hmac('sha256', "$header.$payload", self::secret(), true));
