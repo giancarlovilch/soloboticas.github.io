@@ -176,113 +176,153 @@ class StaffController extends Controller
         require_once __DIR__ . '/../../views/staff/encuesta_bcp_resultados.php';
     }
 
-    /** GET /staff/estrellas — pantalla para ganar estrellas (votar limpieza de un compañero) */
-    public function estrellas(): void
-    {
-        $postulanteId = $this->getSessionUserId();
-        $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
-        $userName     = $_SESSION['user_name']   ?? 'Colaborador';
-
-        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
-        $repo  = new EstrellaRepository();
-        $fecha = date('Y-m-d');
-
-        $misLocales = $repo->getMisLocalesTurnoHoy($postulanteId, $fecha);
-        $locales    = !empty($misLocales) ? $misLocales : $repo->getLocalesTurnoHoy($fecha);
-        $tareas     = $repo->getTareas();
-
-        require_once __DIR__ . '/../../views/staff/estrellas.php';
-    }
-
-    /** GET /staff/estrellas/resumen — reporte mensual propio (sin nombres de quién calificó) */
-    public function estrellasResumen(): void
+    /**
+     * GET /staff/limpieza — Sistema de Limpieza: autoasignación diaria (pestaña
+     * "Ganar estrellas") + ranking mensual y balance rojas/azules (pestaña "Ranking").
+     * Reemplaza las antiguas /staff/estrellas (voto entre compañeros) y /staff/estrellas/resumen.
+     */
+    public function limpieza(): void
     {
         $postulanteId = $this->getSessionUserId();
         $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
         $userName     = $_SESSION['user_name'] ?? 'Colaborador';
-
-        $filtroMes = $_GET['mes'] ?? date('Y-m');
-        if (!preg_match('/^\d{4}-\d{2}$/', $filtroMes)) $filtroMes = date('Y-m');
-        [$anio, $nmes] = explode('-', $filtroMes);
-        $desde = "{$anio}-{$nmes}-01";
-        $hasta = date('Y-m-t', strtotime($desde));
-        $mesActual = date('Y-m');
+        $isAdmin      = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
+        $tabInicial   = ($_GET['tab'] ?? '') === 'ranking' ? 'ranking' : 'asignar';
 
         require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
         $repo = new EstrellaRepository();
 
-        $estrellas = $repo->getEstrellas($postulanteId, $desde, $hasta);
-        $detalleTareas = $repo->getDetalleTareasRecibidas($postulanteId, $desde, $hasta);
-        $detalleVotos  = $repo->getDetalleVotosEmitidos($postulanteId, $desde, $hasta);
-        $detalleTurnos = $repo->getDetalleTurnos($postulanteId, $desde, $hasta);
+        // ── Ganar estrellas: mes en curso, de hoy hacia atrás ──
+        $hoy          = date('Y-m-d');
+        $primerDiaMes = date('Y-m-01');
+        $locales      = $repo->getLocalesLimpieza();
+        $tareas       = $repo->getTareas();
+        $turnos       = $repo->getTurnos();
+        $staffActivo  = $repo->getStaffActivo();
+        $matrizValores = $repo->getMatrizValores();
 
-        require_once __DIR__ . '/../../views/staff/estrellas_resumen.php';
+        $mapaRegistros = [];
+        foreach ($repo->getRegistrosLimpieza($primerDiaMes, $hoy) as $r) {
+            $clave = $r['local_id'] . '_' . $r['tarea_id'] . '_' . $r['turno_id'] . '_' . $r['fecha'];
+            $mapaRegistros[$clave] = ['id' => (int)$r['postulante_id'], 'nombre' => $r['nombre'], 'legado' => false];
+        }
+        // Turnos ya cubiertos por el sistema de votos anterior: se muestran como ocupados
+        // también, para no dejar re-asignar (y duplicar) un turno que ya sumó estrellas.
+        // Se guarda cada voto individual (no solo el nombre) para poder borrarlos uno por uno
+        // si alguien marcó una limpieza que en realidad no pasó.
+        $legadoPorSlot = [];
+        foreach ($repo->getSlotsLegado($primerDiaMes, $hoy) as $r) {
+            $clave = $r['local_id'] . '_' . $r['tarea_id'] . '_' . $r['turno_id'] . '_' . $r['fecha'];
+            $legadoPorSlot[$clave][] = [
+                'id_voto' => (int)$r['id_voto'],
+                'nombre' => $r['nombre'],
+                'calificacion' => (int)$r['calificacion'],
+                'votante_nombre' => $r['votante_nombre'],
+            ];
+        }
+        foreach ($legadoPorSlot as $clave => $votos) {
+            if (isset($mapaRegistros[$clave])) continue;
+            $nombresUnicos = array_values(array_unique(array_map(fn($v) => explode(' ', $v['nombre'])[0], $votos)));
+            $mapaRegistros[$clave] = [
+                'id' => null,
+                'nombre' => implode(' + ', $nombresUnicos),
+                'legado' => true,
+                'votos' => $votos,
+            ];
+        }
+
+        // Cada día son 2 filas: turno mañana y turno tarde.
+        $dias = [];
+        for ($d = $hoy; $d >= $primerDiaMes; $d = date('Y-m-d', strtotime($d . ' -1 day'))) {
+            foreach ($turnos as $tn) {
+                $dias[] = ['fecha' => $d, 'turno_id' => (int)$tn['id_turno'], 'turno_desc' => $tn['descripcion']];
+            }
+        }
+
+        // ── Ranking: mes navegable ──
+        $filtroMes = $_GET['mes'] ?? date('Y-m');
+        if (!preg_match('/^\d{4}-\d{2}$/', $filtroMes)) $filtroMes = date('Y-m');
+        [$anio, $nmes] = explode('-', $filtroMes);
+        $desdeMes  = "{$anio}-{$nmes}-01";
+        $hastaMes  = date('Y-m-t', strtotime($desdeMes));
+        $mesActual = date('Y-m');
+
+        $ranking       = $repo->getRankingLimpieza($desdeMes, $hastaMes);
+        $estrellas     = $repo->getEstrellas($postulanteId, $desdeMes, $hastaMes);
+        $detalleTareas = $repo->getDetalleTareasRecibidas($postulanteId, $desdeMes, $hastaMes);
+        $detalleTurnos = $repo->getDetalleTurnos($postulanteId, $desdeMes, $hastaMes);
+
+        require_once __DIR__ . '/../../views/staff/limpieza.php';
     }
 
-    /** GET /staff/api/estrellas/companeros?local_id= */
-    public function apiEstrellasCompaneros(): void
+    /** POST /staff/api/limpieza/asignar — autoasignarse (o, si eres admin, asignar a otra persona) */
+    public function apiLimpiezaAsignar(): void
     {
         $postulanteId = $this->getSessionUserId();
-        $localId = (int)($_GET['local_id'] ?? 0);
-        $turnoId = (int)($_GET['turno_id'] ?? 0);
-        if (!$localId || !$turnoId) $this->error('local_id y turno_id requeridos', 400);
-
-        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
-        $this->success('OK', (new EstrellaRepository())->getCompaneros($localId, $turnoId, $postulanteId, date('Y-m-d')));
-    }
-
-    /** GET /staff/api/estrellas/dia?local_id=&turno_id= — estrellas entregadas hoy en ese local/turno */
-    public function apiEstrellasDia(): void
-    {
-        $viewerId = $this->getSessionUserId();
-        $localId = (int)($_GET['local_id'] ?? 0);
-        $turnoId = (int)($_GET['turno_id'] ?? 0);
-        if (!$localId || !$turnoId) $this->error('local_id y turno_id requeridos', 400);
-
-        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
-        $this->success('OK', (new EstrellaRepository())->getVotosDelDia($localId, $turnoId, date('Y-m-d'), $viewerId));
-    }
-
-    /** POST /staff/api/estrellas/reportar — denunciar un voto como falso */
-    public function apiEstrellasReportar(): void
-    {
-        $reportanteId = $this->getSessionUserId();
+        $isAdmin      = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
         $data = $this->getAllInput();
 
-        $votoId   = (int)($data['voto_id'] ?? 0);
+        $tareaId  = (int)($data['tarea_id'] ?? 0);
+        $localId  = (int)($data['local_id'] ?? 0);
+        $turnoId  = (int)($data['turno_id'] ?? 0);
+        $fecha    = trim($data['fecha'] ?? '');
         $password = trim($data['password'] ?? '');
-        if (!$votoId || !$password) $this->error('Faltan datos requeridos', 422);
+        $asignarA = isset($data['postulante_id']) && $data['postulante_id'] !== ''
+            ? (int)$data['postulante_id'] : null;
+
+        if (!$tareaId || !$localId || !$turnoId || !$fecha || !$password) $this->error('Faltan datos requeridos', 422);
 
         require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
-        $result = (new EstrellaRepository())->reportarVoto($votoId, $reportanteId, $password);
+        $result = (new EstrellaRepository())->asignarLimpieza(
+            $postulanteId, $tareaId, $localId, $turnoId, $fecha, $password, $isAdmin, $asignarA
+        );
 
-        if (is_array($result)) $this->success('Denuncia registrada.', $result);
+        if (is_array($result)) $this->success('¡Registrado!', $result);
         else $this->error($result, 400);
     }
 
-    /** POST /staff/api/estrellas/votar */
-    public function apiEstrellasVotar(): void
+    /** POST /staff/api/limpieza/quitar — solo admin: deja el casillero libre de nuevo */
+    public function apiLimpiezaQuitar(): void
     {
-        $votanteId = $this->getSessionUserId();
+        $adminId = $this->getSessionUserId();
+        $isAdmin = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
+        if (!$isAdmin) $this->error('Solo un administrador puede quitar una asignación', 403);
+
         $data = $this->getAllInput();
+        $tareaId  = (int)($data['tarea_id'] ?? 0);
+        $localId  = (int)($data['local_id'] ?? 0);
+        $turnoId  = (int)($data['turno_id'] ?? 0);
+        $fecha    = trim($data['fecha'] ?? '');
+        $password = trim($data['password'] ?? '');
 
-        $beneficiarioId = (int)($data['beneficiario_id'] ?? 0);
-        $tareaId        = (int)($data['tarea_id']        ?? 0);
-        $localId        = (int)($data['local_id']        ?? 0);
-        $turnoId        = (int)($data['turno_id']        ?? 0);
-        $calificacion   = (int)($data['calificacion']    ?? 0);
-        $password       = trim($data['password']          ?? '');
-
-        if (!$beneficiarioId || !$tareaId || !$localId || !$turnoId || !$calificacion || !$password) {
-            $this->error('Faltan datos requeridos', 422);
-        }
+        if (!$tareaId || !$localId || !$turnoId || !$fecha || !$password) $this->error('Faltan datos requeridos', 422);
 
         require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
-        $result = (new EstrellaRepository())->registrarVoto(
-            $votanteId, $beneficiarioId, $tareaId, $localId, $turnoId, $calificacion, date('Y-m-d'), $password
+        $result = (new EstrellaRepository())->quitarAsignacionLimpieza(
+            $adminId, $tareaId, $localId, $turnoId, $fecha, $password
         );
 
-        if (is_array($result)) $this->success('¡Estrellas registradas!', $result);
+        if ($result === true) $this->success('Asignación quitada.');
+        else $this->error($result, 400);
+    }
+
+    /** POST /staff/api/limpieza/eliminar-legado — solo admin: borra un voto del sistema anterior */
+    public function apiLimpiezaEliminarLegado(): void
+    {
+        $adminId = $this->getSessionUserId();
+        $isAdmin = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
+        if (!$isAdmin) $this->error('Solo un administrador puede eliminar un registro', 403);
+
+        $data = $this->getAllInput();
+        $votoId   = (int)($data['voto_id'] ?? 0);
+        $password = trim($data['password'] ?? '');
+
+        if (!$votoId || !$password) $this->error('Faltan datos requeridos', 422);
+
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $result = (new EstrellaRepository())->eliminarVotoLegado($adminId, $votoId, $password);
+
+        if ($result === true) $this->success('Registro eliminado.');
         else $this->error($result, 400);
     }
 

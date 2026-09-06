@@ -228,8 +228,8 @@ $estMonto      = (float)($estrellas['monto']      ?? round($estDiferencia * 0.10
         <p class="estrellas-msg">⚠️ Las rojas van ganando. Gana azules para emparejar la balanza.</p>
         <?php endif; ?>
         <div class="estrellas-actions">
-            <a href="<?= $basePath ?>/staff/estrellas" class="estrellas-cta">⭐ Ganar estrellas</a>
-            <a href="<?= $basePath ?>/staff/estrellas/resumen" class="estrellas-cta estrellas-cta--ghost">📋 Resumen</a>
+            <a href="<?= $basePath ?>/staff/limpieza" class="estrellas-cta">🧹 Ganar estrellas</a>
+            <a href="<?= $basePath ?>/staff/limpieza?tab=ranking" class="estrellas-cta estrellas-cta--ghost">🏆 Ranking</a>
         </div>
     </section>
 

@@ -90,7 +90,7 @@ class AdminController extends Controller
                 FROM producto_referencia_sync_log sl
                 INNER JOIN local l ON l.id_local = sl.id_local
                 ORDER BY sl.creado_en DESC
-                LIMIT 12
+                LIMIT 3
             ")->fetchAll();
         }
 
@@ -472,14 +472,15 @@ class AdminController extends Controller
             $actTareasLimpieza   = $estrellaRepo->getTareasTodas();
             $actTasaRojaHistorial = $estrellaRepo->getTasaRojaHistorial();
             $actTasaRojaVigente   = $estrellaRepo->getTasaRojaVigente();
-            $actTasaAzulVotoHistorial = $estrellaRepo->getTasaAzulVotoHistorial();
-            $actTasaAzulVotoVigente   = $estrellaRepo->getTasaAzulVotoVigente();
+            $actLocalesLimpieza     = $estrellaRepo->getLocalesLimpieza();
+            $actMatrizValores       = $estrellaRepo->getMatrizValores();
+            $actValoresLocalHistorial = $estrellaRepo->getValoresLocalHistorial();
+            $actVotosLegado         = $estrellaRepo->getSlotsLegado($actDesde, $actHasta);
 
             // Reporte detallado de un trabajador puntual (equivalente admin de /staff/estrellas/resumen)
             $actTrabajadorId = isset($_GET['trabajador']) ? (int)$_GET['trabajador'] : 0;
             $actTrabajadorNombre = null;
             $actDetalleTareas = [];
-            $actDetalleVotos  = [];
             $actDetalleTurnos = [];
             $actDetalleEstrellas = null;
             if ($actTrabajadorId > 0) {
@@ -489,7 +490,6 @@ class AdminController extends Controller
                 if ($actTrabajadorNombre !== null) {
                     $actDetalleEstrellas = $estrellaRepo->getEstrellas($actTrabajadorId, $actDesde, $actHasta);
                     $actDetalleTareas    = $estrellaRepo->getDetalleTareasRecibidas($actTrabajadorId, $actDesde, $actHasta);
-                    $actDetalleVotos     = $estrellaRepo->getDetalleVotosEmitidos($actTrabajadorId, $actDesde, $actHasta);
                     $actDetalleTurnos    = $estrellaRepo->getDetalleTurnos($actTrabajadorId, $actDesde, $actHasta);
                 } else {
                     $actTrabajadorId = 0;
@@ -499,9 +499,9 @@ class AdminController extends Controller
             $actividadesDatos = compact(
                 'actMes','actMesActual','actDesde','actHasta',
                 'actEstrellas','actTareasLimpieza','actTasaRojaHistorial','actTasaRojaVigente',
-                'actTasaAzulVotoHistorial','actTasaAzulVotoVigente',
+                'actLocalesLimpieza','actMatrizValores','actValoresLocalHistorial','actVotosLegado',
                 'actTrabajadorId','actTrabajadorNombre','actDetalleEstrellas',
-                'actDetalleTareas','actDetalleVotos','actDetalleTurnos'
+                'actDetalleTareas','actDetalleTurnos'
             );
         }
 
@@ -853,6 +853,42 @@ class AdminController extends Controller
         $this->success('Estado actualizado.');
     }
 
+    /** POST /admin/api/valor-local/agregar — valor en estrellas de una actividad en un local puntual */
+    public function addValorLocal(): void
+    {
+        $this->middlewareAdmin();
+        $data = $this->getAllInput();
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $result = (new EstrellaRepository())->agregarValorLocal(
+            (int)($data['tarea_id'] ?? 0),
+            (int)($data['local_id'] ?? 0),
+            (int)($data['estrellas'] ?? -1),
+            $data['fecha_vigencia'] ?? ''
+        );
+        if ($result === true) $this->success('Valor guardado.');
+        else $this->error($result, 422);
+    }
+
+    /** POST /admin/api/valor-local/{id}/eliminar */
+    public function eliminarValorLocal(int $id): void
+    {
+        $this->middlewareAdmin();
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $result = (new EstrellaRepository())->eliminarValorLocal($id);
+        if ($result === true) $this->success('Valor eliminado.');
+        else $this->error($result, 404);
+    }
+
+    /** POST /admin/api/voto-legado/{id}/eliminar — borra un voto del sistema anterior (limpieza marcada por error) */
+    public function eliminarVotoLegado(int $id): void
+    {
+        $this->middlewareAdmin();
+        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
+        $result = (new EstrellaRepository())->eliminarVoto($id);
+        if ($result === true) $this->success('Registro eliminado.');
+        else $this->error($result, 404);
+    }
+
     /** POST /admin/api/tasa-roja/agregar */
     public function addTasaRoja(): void
     {
@@ -861,20 +897,6 @@ class AdminController extends Controller
         require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
         $result = (new EstrellaRepository())->agregarTasaRoja(
             (int)($data['monto'] ?? -1),
-            $data['fecha_vigencia'] ?? ''
-        );
-        if ($result === true) $this->success('Tasa guardada.');
-        else $this->error($result, 422);
-    }
-
-    /** POST /admin/api/tasa-azul-voto/agregar */
-    public function addTasaAzulVoto(): void
-    {
-        $this->middlewareAdmin();
-        $data = $this->getAllInput();
-        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
-        $result = (new EstrellaRepository())->agregarTasaAzulVoto(
-            (float)($data['monto'] ?? -1),
             $data['fecha_vigencia'] ?? ''
         );
         if ($result === true) $this->success('Tasa guardada.');
@@ -966,16 +988,6 @@ class AdminController extends Controller
         $this->middlewareAdmin();
         require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
         $result = (new EstrellaRepository())->eliminarTasaRoja($id);
-        if ($result === true) $this->success('Tasa eliminada.');
-        else $this->error($result, 404);
-    }
-
-    /** POST /admin/api/tasa-azul-voto/{id}/eliminar */
-    public function eliminarTasaAzulVoto(int $id): void
-    {
-        $this->middlewareAdmin();
-        require_once __DIR__ . '/../Repositories/EstrellaRepository.php';
-        $result = (new EstrellaRepository())->eliminarTasaAzulVoto($id);
         if ($result === true) $this->success('Tasa eliminada.');
         else $this->error($result, 404);
     }

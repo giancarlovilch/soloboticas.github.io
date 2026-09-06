@@ -460,7 +460,7 @@ $f2 = fn($v) => 'S/ ' . number_format((float)$v, 2, '.', ',');
     $fmtEstEc   = fn($v) => (floor($v) == $v) ? (string)(int)$v : number_format($v, 1);
     ?>
     <p class="eco-sec-title">⭐ Estrellas de <?= $mesLabel ?></p>
-    <a href="<?= $basePath ?>/staff/estrellas/resumen?mes=<?= htmlspecialchars($filtroMes) ?>"
+    <a href="<?= $basePath ?>/staff/limpieza?tab=ranking&mes=<?= htmlspecialchars($filtroMes) ?>"
        style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;
               background:#fff;border:1.5px solid #fbcfe8;border-radius:12px;padding:.8rem 1.1rem;
               text-decoration:none;margin-bottom:.5rem;">

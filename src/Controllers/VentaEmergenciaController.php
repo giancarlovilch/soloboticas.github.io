@@ -166,19 +166,25 @@ class VentaEmergenciaController extends Controller
         // precio_venta/precio_piso son del local ELEGIDO (con el que se va a vender);
         // stock_2/stock_3/stock_4 son de los 3 locales a la vez, para no tener que
         // cambiar de local para saber cuánto hay en cada tienda.
+        // Subconsulta a propósito: MariaDB (a diferencia de MySQL) no permite usar el
+        // alias de un MAX(...) dentro de una expresión en ORDER BY ("reference to group
+        // function"). Al envolverlo en una subconsulta, stock_actual llega a la consulta
+        // externa como una columna normal y el ORDER BY funciona en ambos motores.
         $stmt = $this->db->prepare("
-            SELECT cod_producto, nombre_producto,
-                   MAX(CASE WHEN id_local = {$idLocal} THEN precio_venta END) AS precio_venta,
-                   MAX(CASE WHEN id_local = {$idLocal}
-                            THEN (CASE WHEN precio_costo > 0 THEN precio_costo ELSE precio_venta END)
-                       END) AS precio_piso,
-                   MAX(CASE WHEN id_local = 2 THEN stock END) AS stock_2,
-                   MAX(CASE WHEN id_local = 3 THEN stock END) AS stock_3,
-                   MAX(CASE WHEN id_local = 4 THEN stock END) AS stock_4,
-                   MAX(CASE WHEN id_local = {$idLocal} THEN stock END) AS stock_actual
-            FROM producto_referencia
-            WHERE cod_producto LIKE :q1 OR nombre_producto LIKE :q2
-            GROUP BY cod_producto, nombre_producto
+            SELECT * FROM (
+                SELECT cod_producto, nombre_producto,
+                       MAX(CASE WHEN id_local = {$idLocal} THEN precio_venta END) AS precio_venta,
+                       MAX(CASE WHEN id_local = {$idLocal}
+                                THEN (CASE WHEN precio_costo > 0 THEN precio_costo ELSE precio_venta END)
+                           END) AS precio_piso,
+                       MAX(CASE WHEN id_local = 2 THEN stock END) AS stock_2,
+                       MAX(CASE WHEN id_local = 3 THEN stock END) AS stock_3,
+                       MAX(CASE WHEN id_local = 4 THEN stock END) AS stock_4,
+                       MAX(CASE WHEN id_local = {$idLocal} THEN stock END) AS stock_actual
+                FROM producto_referencia
+                WHERE cod_producto LIKE :q1 OR nombre_producto LIKE :q2
+                GROUP BY cod_producto, nombre_producto
+            ) AS t
             ORDER BY (stock_actual > 0) DESC, nombre_producto ASC
             LIMIT 20
         ");

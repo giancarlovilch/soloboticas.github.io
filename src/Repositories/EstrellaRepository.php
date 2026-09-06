@@ -3,12 +3,15 @@
 require_once __DIR__ . '/../Core/Database.php';
 
 /**
- * Sistema de estrellas: rojas = asistencia automática, azules = tareas de limpieza
- * votadas por un compañero. Independiente de las fichas de entrada/salida.
+ * Sistema de estrellas: rojas = asistencia automática, azules = tareas de limpieza.
+ * Independiente de las fichas de entrada/salida.
  *
- * Un solo voto ya otorga el valor completo de la calificación (sin promediar).
- * El control de fraude es el sistema de denuncias: si 2 personas ajenas al voto
- * lo denuncian, se sanciona automáticamente a beneficiario y votante.
+ * Las azules se autoasignan (tabla limpieza_registro): cada quien se anota la
+ * actividad que hizo en un local y fecha; el primero que la ocupa se la queda
+ * congelada, solo un admin puede reasignarla. El voto entre compañeros
+ * (estrella_voto/estrella_reporte/estrella_ajuste) es el sistema anterior — se
+ * deja de usar para registros nuevos, pero sigue sumando en los cálculos para
+ * no perder lo ya ganado antes del cambio.
  */
 class EstrellaRepository
 {
@@ -22,21 +25,13 @@ class EstrellaRepository
     private const CLAVE_ROJA_TURNO           = 'EST_ROJA_POR_TURNO';
     private const CLAVE_BASE_ROJAS           = 'BASE_ROJAS';
     private const CLAVE_BASE_AZULES          = 'BASE_AZULES';
-    private const CLAVE_AZUL_POR_VOTO        = 'EST_AZUL_POR_VOTO';
     private const CLAVE_SOL_POR_ESTRELLA     = 'SOL_POR_ESTRELLA';
-    private const CLAVE_MAX_REPORTES_SANCION = 'MAX_REPORTES_SANCION';
-    private const CLAVE_PENALTY_BENEFICIARIO = 'PENALTY_BENEFICIARIO';
-    private const CLAVE_PENALTY_VOTANTE      = 'PENALTY_VOTANTE';
 
     private const DEFAULTS = [
         self::CLAVE_ROJA_TURNO           => 2,
         self::CLAVE_BASE_ROJAS           => 50,
         self::CLAVE_BASE_AZULES          => 50,
-        self::CLAVE_AZUL_POR_VOTO        => 1,
         self::CLAVE_SOL_POR_ESTRELLA     => 0.10,
-        self::CLAVE_MAX_REPORTES_SANCION => 2,
-        self::CLAVE_PENALTY_BENEFICIARIO => -50,
-        self::CLAVE_PENALTY_VOTANTE      => -100,
     ];
 
     public function __construct()
@@ -137,37 +132,6 @@ class EstrellaRepository
         return $this->eliminarParametro(self::CLAVE_ROJA_TURNO, $id);
     }
 
-    // ── Estrellas azules por voto emitido ───────────────────
-    /** Historial completo de la tasa, la más reciente primero (para el admin) */
-    public function getTasaAzulVotoHistorial(): array
-    {
-        $stmt = $this->db->prepare(
-            "SELECT id, valor AS monto, fecha_vigencia, creado_en FROM configuracion_estrella
-             WHERE clave = :clave ORDER BY fecha_vigencia DESC, id DESC"
-        );
-        $stmt->execute(['clave' => self::CLAVE_AZUL_POR_VOTO]);
-        return $stmt->fetchAll();
-    }
-
-    /** Tasa vigente hoy (para mostrarla como "el default actual") */
-    public function getTasaAzulVotoVigente(): float
-    {
-        return $this->getParametro(self::CLAVE_AZUL_POR_VOTO, date('Y-m-d'));
-    }
-
-    /** Agrega una nueva tasa de estrellas azules por voto vigente desde una fecha */
-    public function agregarTasaAzulVoto(float $monto, string $fechaVigencia): string|bool
-    {
-        if ($monto < 0) return 'El monto no puede ser negativo';
-        return $this->agregarParametro(self::CLAVE_AZUL_POR_VOTO, $monto, $fechaVigencia);
-    }
-
-    /** Elimina una tasa de estrellas azules por voto registrada por error */
-    public function eliminarTasaAzulVoto(int $id): string|bool
-    {
-        return $this->eliminarParametro(self::CLAVE_AZUL_POR_VOTO, $id);
-    }
-
     // ── Catálogo de tareas ─────────────────────────────────
     public function getTareas(): array
     {
@@ -229,223 +193,353 @@ class EstrellaRepository
         return true;
     }
 
-    // ── Contexto para votar: local+turno y compañeros del día ──
+    // ── Valor de cada actividad por local (ej. barrer en Local 3 vale doble) ──
     /**
-     * Combos (local, turno) donde el propio usuario puede reconocer hoy: ambos turnos
-     * de cada local donde tiene horario, no solo el que le tocó a él/ella (en locales
-     * chicos de 2 personas, así puede reconocer al que trabajó en el otro turno).
+     * Estrellas que vale una actividad en un local puntual, en una fecha dada. Si nunca
+     * se configuró un valor especial para ese local, cae al valor base de la actividad
+     * (tarea_limpieza.estrellas_max) — así un local sin overrides funciona igual que antes.
      */
-    public function getMisLocalesTurnoHoy(int $postulanteId, string $fecha): array
+    public function getValorTarea(int $tareaId, int $localId, string $fecha): int
     {
         $stmt = $this->db->prepare(
-            "SELECT DISTINCT l.id_local AS local_id, l.descripcion AS local_desc,
-                    t.id_turno AS turno_id, t.descripcion AS turno_desc
-             FROM horario_slot hs
-             INNER JOIN local l ON l.id_local = hs.local_id
-             CROSS JOIN turno t
-             WHERE hs.postulante_id = :pid AND hs.fecha_dia = :fecha AND t.activo = 1
-             ORDER BY l.descripcion, t.id_turno"
+            "SELECT estrellas, fecha_vigencia FROM valor_local_tarea
+             WHERE tarea_id = :t AND local_id = :l ORDER BY fecha_vigencia ASC"
         );
-        $stmt->execute(['pid' => $postulanteId, 'fecha' => $fecha]);
-        return $stmt->fetchAll();
-    }
+        $stmt->execute(['t' => $tareaId, 'l' => $localId]);
+        $filas = $stmt->fetchAll();
 
-    /** Combos (local, turno) con alguien programado hoy (fallback si el usuario no tiene turno hoy) */
-    public function getLocalesTurnoHoy(string $fecha): array
-    {
-        $stmt = $this->db->prepare(
-            "SELECT DISTINCT l.id_local AS local_id, l.descripcion AS local_desc,
-                    t.id_turno AS turno_id, t.descripcion AS turno_desc
-             FROM horario_slot hs
-             INNER JOIN local l ON l.id_local = hs.local_id
-             INNER JOIN turno t ON t.id_turno = hs.turno_id
-             WHERE hs.fecha_dia = :fecha AND hs.postulante_id IS NOT NULL
-             ORDER BY l.descripcion, t.id_turno"
-        );
-        $stmt->execute(['fecha' => $fecha]);
-        return $stmt->fetchAll();
+        $tarea = $this->getTarea($tareaId);
+        $valor = (int)($tarea['estrellas_max'] ?? 0);
+        foreach ($filas as $f) {
+            if ($f['fecha_vigencia'] <= $fecha) $valor = (int)$f['estrellas'];
+            else break;
+        }
+        return $valor;
     }
 
     /**
-     * Compañeros con turno hoy en el local+turno elegido (excluyendo al propio usuario),
-     * con la cantidad de estrellas ya recibidas hoy (para mostrar "ya tiene encuestas").
+     * Matriz [tarea_id][local_id] => valor vigente hoy, para la tabla resumen del admin.
+     * Incluye todas las tareas (activas o no) y todos los locales de limpieza.
      */
-    public function getCompaneros(int $localId, int $turnoId, int $excludeId, string $fecha): array
+    public function getMatrizValores(): array
     {
-        $stmt = $this->db->prepare(
-            "SELECT DISTINCT p.id_postulante AS id, p.nombres AS nombre, rh.descripcion AS rol_desc,
-                    (SELECT COUNT(*) FROM estrella_voto ev
-                      WHERE ev.beneficiario_id = p.id_postulante AND ev.local_id = :lid2
-                        AND ev.turno_id = :tid2 AND ev.fecha = :fecha2) AS votos_hoy
-             FROM horario_slot hs
-             INNER JOIN postulante p   ON p.id_postulante   = hs.postulante_id
-             INNER JOIN rol_horario rh ON rh.id_rol_horario = hs.rol_horario_id
-             WHERE hs.local_id = :lid AND hs.turno_id = :tid AND hs.fecha_dia = :fecha
-               AND hs.postulante_id != :excl
-             ORDER BY p.nombres"
-        );
-        $stmt->execute([
-            'lid' => $localId, 'tid' => $turnoId, 'fecha' => $fecha, 'excl' => $excludeId,
-            'lid2' => $localId, 'tid2' => $turnoId, 'fecha2' => $fecha,
-        ]);
-        $rows = $stmt->fetchAll();
-        foreach ($rows as &$r) $r['votos_hoy'] = (int)$r['votos_hoy'];
-        return $rows;
+        $hoy = date('Y-m-d');
+        $matriz = [];
+        foreach ($this->getTareasTodas() as $t) {
+            foreach ($this->getLocalesLimpieza() as $l) {
+                $matriz[(int)$t['id_tarea']][(int)$l['id_local']] = $this->getValorTarea((int)$t['id_tarea'], (int)$l['id_local'], $hoy);
+            }
+        }
+        return $matriz;
     }
 
-    private function yaVoto(int $votanteId, int $beneficiarioId, int $tareaId, string $fecha, int $turnoId): bool
+    /** Historial completo de valores por local (todas las tareas y locales), el más reciente primero */
+    public function getValoresLocalHistorial(): array
+    {
+        return $this->db->query(
+            "SELECT vlt.id, vlt.estrellas, vlt.fecha_vigencia, vlt.creado_en,
+                    tl.descripcion AS tarea, l.descripcion AS local_desc
+             FROM valor_local_tarea vlt
+             INNER JOIN tarea_limpieza tl ON tl.id_tarea = vlt.tarea_id
+             INNER JOIN local l           ON l.id_local  = vlt.local_id
+             ORDER BY vlt.fecha_vigencia DESC, vlt.id DESC"
+        )->fetchAll();
+    }
+
+    /** Agrega un nuevo valor vigente desde una fecha para una actividad en un local */
+    public function agregarValorLocal(int $tareaId, int $localId, int $estrellas, string $fechaVigencia): string|bool
+    {
+        if ($estrellas < 0) return 'El monto no puede ser negativo';
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVigencia)) return 'Fecha inválida';
+        if (!$this->getTarea($tareaId)) return 'Actividad no válida';
+
+        $localCheck = $this->db->prepare("SELECT 1 FROM local WHERE id_local = :id");
+        $localCheck->execute(['id' => $localId]);
+        if (!$localCheck->fetchColumn()) return 'Local no válido';
+
+        $this->db->prepare(
+            "INSERT INTO valor_local_tarea (tarea_id, local_id, estrellas, fecha_vigencia)
+             VALUES (:t, :l, :est, :fecha)"
+        )->execute(['t' => $tareaId, 'l' => $localId, 'est' => $estrellas, 'fecha' => $fechaVigencia]);
+        return true;
+    }
+
+    /** Elimina un valor por local registrado por error (mismo criterio que las otras tasas) */
+    public function eliminarValorLocal(int $id): string|bool
+    {
+        $stmt = $this->db->prepare("DELETE FROM valor_local_tarea WHERE id = :id");
+        $stmt->execute(['id' => $id]);
+        return $stmt->rowCount() > 0 ? true : 'No se encontró ese registro.';
+    }
+
+    // ── Locales y staff para el sistema de limpieza ────────
+    /** Locales donde se hace limpieza (Administración queda excluida por estar inactiva) */
+    public function getLocalesLimpieza(): array
+    {
+        return $this->db->query(
+            "SELECT id_local, descripcion FROM local WHERE activo = 1 ORDER BY id_local"
+        )->fetchAll();
+    }
+
+    /** Staff activo, para el selector de reasignación del admin */
+    public function getStaffActivo(): array
+    {
+        return $this->db->query(
+            "SELECT p.id_postulante AS id, p.nombres AS nombre
+             FROM postulante p INNER JOIN usuario u ON u.postulante_id = p.id_postulante
+             WHERE u.activo = 1 ORDER BY p.nombres ASC"
+        )->fetchAll();
+    }
+
+    // ── Autoasignación de limpieza (reemplaza el voto entre compañeros) ──
+    /** Turnos activos (mañana/tarde), para las dos filas de cada día en la cuadrícula */
+    public function getTurnos(): array
+    {
+        return $this->db->query(
+            "SELECT id_turno, descripcion FROM turno WHERE activo = 1 ORDER BY id_turno"
+        )->fetchAll();
+    }
+
+    /** Registros de limpieza ya asignados en un rango, para armar la tabla del mes */
+    public function getRegistrosLimpieza(string $desde, string $hasta): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT lr.fecha, lr.local_id, lr.tarea_id, lr.turno_id, lr.postulante_id, p.nombres AS nombre
+             FROM limpieza_registro lr
+             INNER JOIN postulante p ON p.id_postulante = lr.postulante_id
+             WHERE lr.fecha BETWEEN :desde AND :hasta"
+        );
+        $stmt->execute(['desde' => $desde, 'hasta' => $hasta]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Slots (tarea+local+turno+fecha) ya cubiertos por el sistema anterior de votos entre
+     * compañeros, en un rango. Aunque el voto viejo ya distinguía por turno, a veces dos
+     * voluntarios distintos calificaron a dos personas distintas en el mismo turno — para
+     * esos pocos casos se listan todos los beneficiarios. Sirve para: (1) que la cuadrícula
+     * muestre esos turnos como ya ocupados en vez de libres, y (2) evitar que alguien vuelva
+     * a autoasignarse un turno que ya sumó estrellas (eso lo contaría dos veces en el ranking).
+     */
+    public function getSlotsLegado(string $desde, string $hasta): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT ev.id_voto, ev.local_id, ev.tarea_id, ev.turno_id, ev.fecha,
+                    ev.beneficiario_id, p.nombres AS nombre, ev.calificacion, pv.nombres AS votante_nombre,
+                    l.descripcion AS local_desc, tl.descripcion AS tarea_desc, t.descripcion AS turno_desc
+             FROM estrella_voto ev
+             INNER JOIN postulante p     ON p.id_postulante  = ev.beneficiario_id
+             INNER JOIN postulante pv    ON pv.id_postulante = ev.votante_id
+             INNER JOIN local l          ON l.id_local       = ev.local_id
+             INNER JOIN tarea_limpieza tl ON tl.id_tarea      = ev.tarea_id
+             INNER JOIN turno t          ON t.id_turno       = ev.turno_id
+             WHERE ev.fecha BETWEEN :desde AND :hasta AND ev.sancionado = 0
+             ORDER BY ev.fecha DESC, ev.id_voto DESC"
+        );
+        $stmt->execute(['desde' => $desde, 'hasta' => $hasta]);
+        return $stmt->fetchAll();
+    }
+
+    /** Existe algún voto (no sancionado) del sistema anterior para ese slot exacto */
+    private function existeSlotLegado(int $tareaId, int $localId, int $turnoId, string $fecha): bool
     {
         $stmt = $this->db->prepare(
             "SELECT 1 FROM estrella_voto
-             WHERE votante_id = :vid AND beneficiario_id = :bid AND tarea_id = :tid
-               AND fecha = :fecha AND turno_id = :turno"
+             WHERE tarea_id = :t AND local_id = :l AND turno_id = :turno AND fecha = :f AND sancionado = 0 LIMIT 1"
         );
-        $stmt->execute(['vid' => $votanteId, 'bid' => $beneficiarioId, 'tid' => $tareaId, 'fecha' => $fecha, 'turno' => $turnoId]);
+        $stmt->execute(['t' => $tareaId, 'l' => $localId, 'turno' => $turnoId, 'f' => $fecha]);
         return (bool)$stmt->fetchColumn();
     }
 
     /**
-     * Registra el voto de un compañero sobre una tarea de limpieza. Un solo voto ya
-     * otorga el valor completo de la calificación — el control de abuso es el
-     * sistema de denuncias, no exigir una segunda confirmación.
+     * Elimina un voto del sistema anterior (ej. alguien marcó que un compañero limpió y
+     * no era cierto), pidiendo la contraseña de quien lo borra — para cuando se hace desde
+     * el portal de staff. Al borrarlo, ese beneficiario deja de sumar esas estrellas
+     * automáticamente (el balance se recalcula solo, no hace falta un ajuste aparte).
      */
-    public function registrarVoto(
-        int $votanteId, int $beneficiarioId, int $tareaId, int $localId, int $turnoId,
-        int $calificacion, string $fecha, string $password
+    public function eliminarVotoLegado(int $adminId, int $votoId, string $password): string|bool
+    {
+        $stmt = $this->db->prepare("SELECT password FROM usuario WHERE postulante_id = :pid LIMIT 1");
+        $stmt->execute(['pid' => $adminId]);
+        $hash = $stmt->fetchColumn();
+        if (!$hash || !password_verify($password, $hash)) return 'Contraseña incorrecta';
+
+        return $this->eliminarVoto($votoId);
+    }
+
+    /** Igual que arriba, pero sin pedir contraseña — para el panel de admin (ya gateado por sesión) */
+    public function eliminarVoto(int $votoId): string|bool
+    {
+        $stmt = $this->db->prepare("DELETE FROM estrella_voto WHERE id_voto = :id");
+        $stmt->execute(['id' => $votoId]);
+        return $stmt->rowCount() > 0 ? true : 'No se encontró ese registro.';
+    }
+
+    /**
+     * Autoasignación de una actividad de limpieza (barrer, trapear, ...) para un local,
+     * turno y fecha. Cada (tarea, local, turno, fecha) es un solo casillero: una vez
+     * ocupado queda congelado, solo un admin puede reasignarlo (a sí mismo o a otra persona).
+     */
+    public function asignarLimpieza(
+        int $postulanteId, int $tareaId, int $localId, int $turnoId, string $fecha,
+        string $password, bool $isAdmin, ?int $asignarA = null
     ): array|string {
         $stmt = $this->db->prepare("SELECT password FROM usuario WHERE postulante_id = :pid LIMIT 1");
-        $stmt->execute(['pid' => $votanteId]);
+        $stmt->execute(['pid' => $postulanteId]);
         $hash = $stmt->fetchColumn();
         if (!$hash || !password_verify($password, $hash)) return 'Contraseña incorrecta';
 
-        if ($votanteId === $beneficiarioId) return 'No puedes darte estrellas a ti mismo';
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) return 'Fecha inválida';
 
         $tarea = $this->getTarea($tareaId);
-        if (!$tarea) return 'Tarea no válida';
-        if ($calificacion < 1 || $calificacion > (int)$tarea['estrellas_max']) {
-            return "La calificación debe estar entre 1 y {$tarea['estrellas_max']}";
+        if (!$tarea) return 'Actividad no válida';
+
+        $localCheck = $this->db->prepare("SELECT 1 FROM local WHERE id_local = :id AND activo = 1");
+        $localCheck->execute(['id' => $localId]);
+        if (!$localCheck->fetchColumn()) return 'Local no válido';
+
+        $turnoCheck = $this->db->prepare("SELECT 1 FROM turno WHERE id_turno = :id AND activo = 1");
+        $turnoCheck->execute(['id' => $turnoId]);
+        if (!$turnoCheck->fetchColumn()) return 'Turno no válido';
+
+        $hoy = date('Y-m-d');
+        $primerDiaMes = date('Y-m-01');
+        if (!$isAdmin && ($fecha < $primerDiaMes || $fecha > $hoy)) {
+            return 'Solo puedes registrar días de este mes, hasta hoy';
+        }
+        if ($isAdmin && $fecha > $hoy) {
+            return 'No puedes registrar un día que aún no llega';
         }
 
-        $checkSlot = $this->db->prepare(
-            "SELECT 1 FROM horario_slot
-             WHERE postulante_id = :pid AND local_id = :lid AND turno_id = :turno AND fecha_dia = :fecha LIMIT 1"
-        );
-        $checkSlot->execute(['pid' => $beneficiarioId, 'lid' => $localId, 'turno' => $turnoId, 'fecha' => $fecha]);
-        if (!$checkSlot->fetchColumn()) return 'Ese compañero no tiene turno hoy en ese local/turno';
+        // Cualquiera puede elegir quién hizo la limpieza (no solo autoasignarse) siempre que
+        // el casillero esté libre — confirma con su propia contraseña, no la de esa persona.
+        // Reasignar un casillero YA ocupado sigue siendo exclusivo de un administrador
+        // (se valida más abajo, al revisar si el slot ya existe).
+        $beneficiarioId = $asignarA ?? $postulanteId;
 
-        if ($this->yaVoto($votanteId, $beneficiarioId, $tareaId, $fecha, $turnoId)) {
-            return 'Ya calificaste esta actividad de este compañero en este turno';
+        $checkPost = $this->db->prepare("SELECT 1 FROM postulante WHERE id_postulante = :id");
+        $checkPost->execute(['id' => $beneficiarioId]);
+        if (!$checkPost->fetchColumn()) return 'Trabajador no válido';
+
+        $existe = $this->db->prepare(
+            "SELECT id_registro FROM limpieza_registro
+             WHERE tarea_id = :t AND local_id = :l AND turno_id = :turno AND fecha = :f"
+        );
+        $existe->execute(['t' => $tareaId, 'l' => $localId, 'turno' => $turnoId, 'f' => $fecha]);
+        $idExistente = $existe->fetchColumn();
+
+        if ($idExistente && !$isAdmin) {
+            return 'Ya se registró esta actividad ese turno — solo un administrador puede cambiarlo';
         }
 
-        $ins = $this->db->prepare(
-            "INSERT INTO estrella_voto (beneficiario_id, votante_id, tarea_id, local_id, turno_id, fecha, calificacion)
-             VALUES (:bid, :vid, :tid, :lid, :turno, :fecha, :calif)"
-        );
-        $ins->execute([
-            'bid' => $beneficiarioId, 'vid' => $votanteId, 'tid' => $tareaId,
-            'lid' => $localId, 'turno' => $turnoId, 'fecha' => $fecha, 'calif' => $calificacion,
-        ]);
+        // Ese slot ya sumó estrellas por el sistema de votos anterior: no se puede volver
+        // a asignar (ni el admin), porque duplicaría el conteo en el ranking del mes.
+        if (!$idExistente && $this->existeSlotLegado($tareaId, $localId, $turnoId, $fecha)) {
+            return 'Ese turno ya quedó registrado por el sistema anterior de votos — no se puede volver a asignar';
+        }
 
-        return ['ok' => true, 'estrellas_otorgadas' => $calificacion, 'tarea' => $tarea];
+        $estrellas = $this->getValorTarea($tareaId, $localId, $fecha);
+
+        if ($idExistente) {
+            $this->db->prepare(
+                "UPDATE limpieza_registro
+                 SET postulante_id = :pid, estrellas = :est, registrado_por = :reg, fecha_registro = CURRENT_TIMESTAMP
+                 WHERE id_registro = :id"
+            )->execute(['pid' => $beneficiarioId, 'est' => $estrellas, 'reg' => $postulanteId, 'id' => $idExistente]);
+        } else {
+            $this->db->prepare(
+                "INSERT INTO limpieza_registro (tarea_id, local_id, turno_id, fecha, postulante_id, estrellas, registrado_por)
+                 VALUES (:t, :l, :turno, :f, :pid, :est, :reg)"
+            )->execute(['t' => $tareaId, 'l' => $localId, 'turno' => $turnoId, 'f' => $fecha, 'pid' => $beneficiarioId, 'est' => $estrellas, 'reg' => $postulanteId]);
+        }
+
+        $nombreStmt = $this->db->prepare("SELECT nombres FROM postulante WHERE id_postulante = :id");
+        $nombreStmt->execute(['id' => $beneficiarioId]);
+
+        return [
+            'ok' => true, 'estrellas' => $estrellas, 'tarea' => $tarea,
+            'postulante_id' => $beneficiarioId, 'nombre' => $nombreStmt->fetchColumn(),
+        ];
     }
 
-    // ── Auditoría del día y denuncias ──────────────────────
     /**
-     * Estrellas entregadas hoy en un local+turno, con el estado de denuncias de cada una
-     * (para el bloque "Estrellas entregadas hoy" con botón de denunciar).
+     * Quita una autoasignación puesta por error, dejando el casillero libre de nuevo.
+     * Exclusivo de un administrador. No aplica a los registros "legado" del sistema de
+     * votos anterior (esos viven en otra tabla, con otra forma) — si el casillero no
+     * existe en limpieza_registro, no hay nada que quitar desde acá.
      */
-    public function getVotosDelDia(int $localId, int $turnoId, string $fecha, int $viewerId): array
-    {
-        $stmt = $this->db->prepare(
-            "SELECT ev.id_voto, ev.calificacion, ev.sancionado,
-                    ev.beneficiario_id, pb.nombres AS beneficiario_nombre,
-                    ev.votante_id, pv.nombres AS votante_nombre,
-                    tl.descripcion AS tarea,
-                    (SELECT COUNT(*) FROM estrella_reporte er WHERE er.voto_id = ev.id_voto) AS reportes,
-                    EXISTS(SELECT 1 FROM estrella_reporte er2
-                            WHERE er2.voto_id = ev.id_voto AND er2.reportante_id = :viewer) AS ya_reporte
-             FROM estrella_voto ev
-             INNER JOIN postulante pb ON pb.id_postulante = ev.beneficiario_id
-             INNER JOIN postulante pv ON pv.id_postulante = ev.votante_id
-             INNER JOIN tarea_limpieza tl ON tl.id_tarea = ev.tarea_id
-             WHERE ev.local_id = :lid AND ev.turno_id = :tid AND ev.fecha = :fecha
-             ORDER BY ev.fecha_registro DESC"
-        );
-        $stmt->execute(['lid' => $localId, 'tid' => $turnoId, 'fecha' => $fecha, 'viewer' => $viewerId]);
-        $rows = $stmt->fetchAll();
-        foreach ($rows as &$r) {
-            $r['reportes']    = (int)$r['reportes'];
-            $r['ya_reporte']  = (bool)$r['ya_reporte'];
-            $r['sancionado']  = (bool)$r['sancionado'];
-            $r['puede_denunciar'] = !$r['sancionado'] && !$r['ya_reporte']
-                && $viewerId !== (int)$r['beneficiario_id'] && $viewerId !== (int)$r['votante_id'];
-        }
-        return $rows;
-    }
-
-    /**
-     * Denuncia un voto por falso (alguien dice que limpió y no era cierto). Solo puede
-     * denunciar quien no es parte del voto. Al llegar a 2 denuncias se sanciona
-     * automáticamente: -50 al beneficiario, -100 a quien otorgó el voto falso.
-     */
-    public function reportarVoto(int $votoId, int $reportanteId, string $password): array|string
-    {
+    public function quitarAsignacionLimpieza(
+        int $adminId, int $tareaId, int $localId, int $turnoId, string $fecha, string $password
+    ): string|bool {
         $stmt = $this->db->prepare("SELECT password FROM usuario WHERE postulante_id = :pid LIMIT 1");
-        $stmt->execute(['pid' => $reportanteId]);
+        $stmt->execute(['pid' => $adminId]);
         $hash = $stmt->fetchColumn();
         if (!$hash || !password_verify($password, $hash)) return 'Contraseña incorrecta';
 
-        $voto = $this->db->prepare("SELECT * FROM estrella_voto WHERE id_voto = :id");
-        $voto->execute(['id' => $votoId]);
-        $voto = $voto->fetch();
-        if (!$voto) return 'Registro no encontrado';
-        if ((int)$voto['sancionado']) return 'Este registro ya fue sancionado';
-        if ($reportanteId === (int)$voto['beneficiario_id'] || $reportanteId === (int)$voto['votante_id']) {
-            return 'No puedes denunciar un voto en el que participas';
+        $stmt = $this->db->prepare(
+            "DELETE FROM limpieza_registro WHERE tarea_id = :t AND local_id = :l AND turno_id = :turno AND fecha = :f"
+        );
+        $stmt->execute(['t' => $tareaId, 'l' => $localId, 'turno' => $turnoId, 'f' => $fecha]);
+        return $stmt->rowCount() > 0 ? true : 'No había ninguna asignación registrada ahí.';
+    }
+
+    /**
+     * Ranking mensual de limpieza: cuántas veces se anotó cada quien en cada actividad,
+     * de mayor a menor total (incluye a todo el staff activo, aunque tenga 0, para que
+     * se note quién no está limpiando). Suma también los votos históricos del sistema
+     * anterior por compañeros, para no perder lo ya ganado en el mes de transición.
+     */
+    public function getRankingLimpieza(string $desde, string $hasta): array
+    {
+        $desdeEf = $this->epochFloor($desde);
+        $staff = $this->getStaffActivo();
+
+        $conteo = [];
+        $stmt = $this->db->prepare(
+            "SELECT lr.postulante_id AS pid, tl.codigo, COUNT(*) AS n
+             FROM limpieza_registro lr INNER JOIN tarea_limpieza tl ON tl.id_tarea = lr.tarea_id
+             WHERE lr.fecha BETWEEN :desde AND :hasta GROUP BY lr.postulante_id, tl.codigo"
+        );
+        $stmt->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
+        foreach ($stmt->fetchAll() as $r) {
+            $conteo[(int)$r['pid']][$r['codigo']] = ($conteo[(int)$r['pid']][$r['codigo']] ?? 0) + (int)$r['n'];
         }
 
-        $check = $this->db->prepare("SELECT 1 FROM estrella_reporte WHERE voto_id = :vid AND reportante_id = :rid");
-        $check->execute(['vid' => $votoId, 'rid' => $reportanteId]);
-        if ($check->fetchColumn()) return 'Ya denunciaste este registro';
-
-        $this->db->prepare(
-            "INSERT INTO estrella_reporte (voto_id, reportante_id) VALUES (:vid, :rid)"
-        )->execute(['vid' => $votoId, 'rid' => $reportanteId]);
-
-        $count = $this->db->prepare("SELECT COUNT(*) FROM estrella_reporte WHERE voto_id = :vid");
-        $count->execute(['vid' => $votoId]);
-        $reportes = (int)$count->fetchColumn();
-
-        $hoy = date('Y-m-d');
-        $maxReportes = (int)$this->getParametro(self::CLAVE_MAX_REPORTES_SANCION, $hoy);
-
-        $sancionado = false;
-        if ($reportes >= $maxReportes) {
-            $this->db->prepare("UPDATE estrella_voto SET sancionado = 1 WHERE id_voto = :id")->execute(['id' => $votoId]);
-
-            $penaltyBeneficiario = $this->getParametro(self::CLAVE_PENALTY_BENEFICIARIO, $hoy);
-            $penaltyVotante      = $this->getParametro(self::CLAVE_PENALTY_VOTANTE, $hoy);
-
-            $this->db->prepare(
-                "INSERT INTO estrella_ajuste (postulante_id, estrellas, motivo, voto_id, fecha)
-                 VALUES (:pid, :est, :motivo, :vid, :fecha)"
-            )->execute([
-                'pid' => $voto['beneficiario_id'], 'est' => $penaltyBeneficiario,
-                'motivo' => 'Sanción: recibió estrellas por una actividad denunciada como falsa',
-                'vid' => $votoId, 'fecha' => $hoy,
-            ]);
-            $this->db->prepare(
-                "INSERT INTO estrella_ajuste (postulante_id, estrellas, motivo, voto_id, fecha)
-                 VALUES (:pid, :est, :motivo, :vid, :fecha)"
-            )->execute([
-                'pid' => $voto['votante_id'], 'est' => $penaltyVotante,
-                'motivo' => 'Sanción: otorgó estrellas por una actividad denunciada como falsa',
-                'vid' => $votoId, 'fecha' => $hoy,
-            ]);
-            $sancionado = true;
+        $stmtVoto = $this->db->prepare(
+            "SELECT ev.beneficiario_id AS pid, tl.codigo, COUNT(*) AS n
+             FROM estrella_voto ev INNER JOIN tarea_limpieza tl ON tl.id_tarea = ev.tarea_id
+             WHERE ev.fecha BETWEEN :desde AND :hasta AND ev.sancionado = 0
+             GROUP BY ev.beneficiario_id, tl.codigo"
+        );
+        $stmtVoto->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
+        foreach ($stmtVoto->fetchAll() as $r) {
+            $conteo[(int)$r['pid']][$r['codigo']] = ($conteo[(int)$r['pid']][$r['codigo']] ?? 0) + (int)$r['n'];
         }
 
-        return ['ok' => true, 'reportes' => $reportes, 'maximo' => $maxReportes, 'sancionado' => $sancionado];
+        $tareas = $this->getTareas();
+        $out = [];
+        foreach ($staff as $s) {
+            $pid = (int)$s['id'];
+            $fila = $conteo[$pid] ?? [];
+            $total = 0;
+            $porTarea = [];
+            foreach ($tareas as $t) {
+                $n = $fila[$t['codigo']] ?? 0;
+                $porTarea[$t['codigo']] = $n;
+                $total += $n;
+            }
+            $out[] = ['id' => $pid, 'nombre' => $s['nombre'], 'tareas' => $porTarea, 'total' => $total];
+        }
+
+        usort($out, fn($a, $b) => $b['total'] <=> $a['total'] ?: strcmp($a['nombre'], $b['nombre']));
+
+        $posicion = 0; $anterior = null; $rango = 0;
+        foreach ($out as &$fila) {
+            $posicion++;
+            if ($fila['total'] !== $anterior) { $rango = $posicion; $anterior = $fila['total']; }
+            $fila['pos'] = $rango;
+        }
+        return $out;
     }
 
     // ── Balance de estrellas ────────────────────────────────
@@ -475,19 +569,12 @@ class EstrellaRepository
         $stmtGanadas->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
         $azulesTareas = (float)$stmtGanadas->fetchColumn();
 
-        $stmtVotos = $this->db->prepare(
-            "SELECT fecha, COUNT(*) AS n FROM estrella_voto
-             WHERE votante_id = :pid AND fecha BETWEEN :desde AND :hasta GROUP BY fecha"
+        $stmtAutoasignadas = $this->db->prepare(
+            "SELECT COALESCE(SUM(estrellas), 0) FROM limpieza_registro
+             WHERE postulante_id = :pid AND fecha BETWEEN :desde AND :hasta"
         );
-        $stmtVotos->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
-        $tasasAzul = $this->getParametrosOrdenados(self::CLAVE_AZUL_POR_VOTO);
-        $votosEmitidos = 0;
-        $azulesVotos = 0;
-        foreach ($stmtVotos->fetchAll() as $r) {
-            $n = (int)$r['n'];
-            $votosEmitidos += $n;
-            $azulesVotos   += $n * $this->resolverParametro($tasasAzul, self::CLAVE_AZUL_POR_VOTO, $r['fecha']);
-        }
+        $stmtAutoasignadas->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
+        $azulesTareas += (float)$stmtAutoasignadas->fetchColumn();
 
         $stmtAjustes = $this->db->prepare(
             "SELECT COALESCE(SUM(estrellas), 0) FROM estrella_ajuste
@@ -499,15 +586,13 @@ class EstrellaRepository
         $baseRojas  = $this->getParametro(self::CLAVE_BASE_ROJAS, $desdeEf);
         $baseAzules = $this->getParametro(self::CLAVE_BASE_AZULES, $desdeEf);
         $rojas  = $baseRojas  + $rojasTareas;
-        $azules = round($baseAzules + $azulesTareas + $azulesVotos + $azulesAjustes, 1);
+        $azules = round($baseAzules + $azulesTareas + $azulesAjustes, 1);
         $diferencia = $rojas - $azules;
 
         return [
             'turnos'         => $turnos,
             'rojas'          => $rojas,
-            'votos_emitidos' => $votosEmitidos,
             'azules_tareas'  => round($azulesTareas, 1),
-            'azules_votos'   => $azulesVotos,
             'azules_ajustes' => $azulesAjustes,
             'azules'         => $azules,
             'diferencia'     => round($diferencia, 1),
@@ -520,11 +605,7 @@ class EstrellaRepository
     {
         $desdeEf = $this->epochFloor($desde);
 
-        $staff = $this->db->query(
-            "SELECT p.id_postulante AS id, p.nombres AS nombre
-             FROM postulante p INNER JOIN usuario u ON u.postulante_id = p.id_postulante
-             WHERE u.activo = 1 ORDER BY p.nombres ASC"
-        )->fetchAll();
+        $staff = $this->getStaffActivo();
 
         $turnosMap = [];
         $rojasTareasMap = [];
@@ -557,18 +638,17 @@ class EstrellaRepository
             $ganadasMap[$pid][$codigo] = ($ganadasMap[$pid][$codigo] ?? 0) + 1;
         }
 
-        $azulesVotosMap = [];
-        $stmtV = $this->db->prepare(
-            "SELECT votante_id, fecha, COUNT(*) AS votos FROM estrella_voto
-             WHERE fecha BETWEEN :desde AND :hasta GROUP BY votante_id, fecha"
+        $stmtAuto = $this->db->prepare(
+            "SELECT lr.postulante_id AS pid, tl.codigo, lr.estrellas
+             FROM limpieza_registro lr INNER JOIN tarea_limpieza tl ON tl.id_tarea = lr.tarea_id
+             WHERE lr.fecha BETWEEN :desde AND :hasta"
         );
-        $stmtV->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
-        $tasasAzul = $this->getParametrosOrdenados(self::CLAVE_AZUL_POR_VOTO);
-        foreach ($stmtV->fetchAll() as $r) {
-            $pid = (int)$r['votante_id'];
-            $n = (int)$r['votos'];
-            $azulesVotosMap[$pid] = ($azulesVotosMap[$pid] ?? 0)
-                + $n * $this->resolverParametro($tasasAzul, self::CLAVE_AZUL_POR_VOTO, $r['fecha']);
+        $stmtAuto->execute(['desde' => $desdeEf, 'hasta' => $hasta]);
+        foreach ($stmtAuto->fetchAll() as $g) {
+            $pid = (int)$g['pid'];
+            $ganadasMap[$pid]['total'] = ($ganadasMap[$pid]['total'] ?? 0) + (int)$g['estrellas'];
+            $codigo = $g['codigo'];
+            $ganadasMap[$pid][$codigo] = ($ganadasMap[$pid][$codigo] ?? 0) + 1;
         }
 
         $ajustesMap = [];
@@ -588,10 +668,9 @@ class EstrellaRepository
             $pid          = (int)$s['id'];
             $turnos       = $turnosMap[$pid] ?? 0;
             $azulesTareas = round($ganadasMap[$pid]['total'] ?? 0, 1);
-            $azulesVotos  = $azulesVotosMap[$pid] ?? 0;
             $azulesAjustes = $ajustesMap[$pid] ?? 0;
             $rojas        = $baseRojas  + ($rojasTareasMap[$pid] ?? 0);
-            $azules       = round($baseAzules + $azulesTareas + $azulesVotos + $azulesAjustes, 1);
+            $azules       = round($baseAzules + $azulesTareas + $azulesAjustes, 1);
             $diferencia   = $rojas - $azules;
             $out[] = [
                 'id'            => $pid,
@@ -599,7 +678,6 @@ class EstrellaRepository
                 'turnos'        => $turnos,
                 'rojas'         => $rojas,
                 'azules_tareas' => $azulesTareas,
-                'azules_votos'  => $azulesVotos,
                 'azules_ajustes'=> $azulesAjustes,
                 'azules'        => $azules,
                 'diferencia'    => round($diferencia, 1),
@@ -618,48 +696,34 @@ class EstrellaRepository
     {
         $desdeEf = $this->epochFloor($desde);
         $stmt = $this->db->prepare(
-            "SELECT tl.descripcion AS tarea, tl.estrellas_max, ev.fecha, l.descripcion AS local_desc,
-                    t.descripcion AS turno_desc, ev.calificacion AS azules, ev.sancionado
-             FROM estrella_voto ev
-             INNER JOIN tarea_limpieza tl ON tl.id_tarea = ev.tarea_id
-             INNER JOIN local l           ON l.id_local  = ev.local_id
-             INNER JOIN turno t           ON t.id_turno  = ev.turno_id
-             WHERE ev.beneficiario_id = :pid AND ev.fecha BETWEEN :desde AND :hasta
-             ORDER BY ev.fecha DESC"
+            "SELECT tarea, estrellas_max, fecha, local_desc, turno_desc, azules, sancionado FROM (
+                SELECT tl.descripcion AS tarea, tl.estrellas_max, ev.fecha, l.descripcion AS local_desc,
+                       t.descripcion AS turno_desc, ev.calificacion AS azules, ev.sancionado
+                FROM estrella_voto ev
+                INNER JOIN tarea_limpieza tl ON tl.id_tarea = ev.tarea_id
+                INNER JOIN local l           ON l.id_local  = ev.local_id
+                INNER JOIN turno t           ON t.id_turno  = ev.turno_id
+                WHERE ev.beneficiario_id = :pid1 AND ev.fecha BETWEEN :desde1 AND :hasta1
+
+                UNION ALL
+
+                SELECT tl.descripcion AS tarea, tl.estrellas_max, lr.fecha, l.descripcion AS local_desc,
+                       NULL AS turno_desc, lr.estrellas AS azules, 0 AS sancionado
+                FROM limpieza_registro lr
+                INNER JOIN tarea_limpieza tl ON tl.id_tarea  = lr.tarea_id
+                INNER JOIN local l           ON l.id_local   = lr.local_id
+                WHERE lr.postulante_id = :pid2 AND lr.fecha BETWEEN :desde2 AND :hasta2
+            ) x
+            ORDER BY fecha DESC"
         );
-        $stmt->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
+        $stmt->execute([
+            'pid1' => $postulanteId, 'desde1' => $desdeEf, 'hasta1' => $hasta,
+            'pid2' => $postulanteId, 'desde2' => $desdeEf, 'hasta2' => $hasta,
+        ]);
         $rows = $stmt->fetchAll();
         foreach ($rows as &$r) {
             $r['sancionado'] = (bool)$r['sancionado'];
             $r['azules']     = $r['sancionado'] ? 0 : (int)$r['azules'];
-        }
-        return $rows;
-    }
-
-    /**
-     * Detalle de los votos que el propio usuario emitió calificando a compañeros
-     * (fuente de "1 azul por voto" — la única azul que no viene de tareas propias ni ajustes,
-     * y que por eso no aparece en "Actividades reconocidas" del resumen del staff).
-     */
-    public function getDetalleVotosEmitidos(int $postulanteId, string $desde, string $hasta): array
-    {
-        $desdeEf = $this->epochFloor($desde);
-        $stmt = $this->db->prepare(
-            "SELECT ev.fecha, pb.nombres AS beneficiario_nombre, tl.descripcion AS tarea,
-                    ev.calificacion, l.descripcion AS local_desc, t.descripcion AS turno_desc
-             FROM estrella_voto ev
-             INNER JOIN postulante pb     ON pb.id_postulante = ev.beneficiario_id
-             INNER JOIN tarea_limpieza tl ON tl.id_tarea      = ev.tarea_id
-             INNER JOIN local l           ON l.id_local       = ev.local_id
-             INNER JOIN turno t           ON t.id_turno       = ev.turno_id
-             WHERE ev.votante_id = :pid AND ev.fecha BETWEEN :desde AND :hasta
-             ORDER BY ev.fecha DESC"
-        );
-        $stmt->execute(['pid' => $postulanteId, 'desde' => $desdeEf, 'hasta' => $hasta]);
-        $rows = $stmt->fetchAll();
-        $tasasAzul = $this->getParametrosOrdenados(self::CLAVE_AZUL_POR_VOTO);
-        foreach ($rows as &$r) {
-            $r['azul_ganado'] = $this->resolverParametro($tasasAzul, self::CLAVE_AZUL_POR_VOTO, $r['fecha']);
         }
         return $rows;
     }
