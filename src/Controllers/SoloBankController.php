@@ -53,12 +53,13 @@ class SoloBankController extends Controller
         }
 
         $this->repo->upsertVale([
-            'codigo' => trim($d['codigo']),
-            'caja'   => trim($d['caja']),
-            'fecha'  => trim($d['fecha']),
-            'turno'  => trim($d['turno'] ?? 'Tarde'),
-            'total'  => (float) ($d['total']  ?? 0),
-            'conteo' => (int)   ($d['conteo'] ?? 0),
+            'codigo'    => trim($d['codigo']),
+            'cierre_id' => isset($d['cierre_id']) ? (int) $d['cierre_id'] : null,
+            'caja'      => trim($d['caja']),
+            'fecha'     => trim($d['fecha']),
+            'turno'     => trim($d['turno'] ?? 'Tarde'),
+            'total'     => (float) ($d['total']  ?? 0),
+            'conteo'    => (int)   ($d['conteo'] ?? 0),
         ]);
 
         $this->success('Vale recibido');

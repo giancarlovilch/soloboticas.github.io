@@ -33,6 +33,24 @@ class SoloBankRepository
                 INDEX idx_fecha  (fecha)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
+        // Numero de cierre de Python (ej. 1047) — el codigo (UUID) ya identifica
+        // el cierre de forma unica, pero no es legible a simple vista. Guardar
+        // tambien el numero permite cruzar visualmente "cierre #1047 en Python"
+        // con "este vale en la web" sin tener que copiar/pegar el UUID.
+        // MySQL no soporta "ADD COLUMN IF NOT EXISTS" (a diferencia de MariaDB),
+        // asi que se verifica manualmente contra INFORMATION_SCHEMA.
+        $existe = $this->db->query("
+            SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'solobank_vales'
+               AND COLUMN_NAME = 'cierre_id_python'
+        ")->fetchColumn();
+        if (!$existe) {
+            $this->db->exec("
+                ALTER TABLE solobank_vales
+                ADD COLUMN cierre_id_python INT NULL AFTER codigo
+            ");
+        }
     }
 
     public function upsertVale(array $d): void
@@ -46,9 +64,14 @@ class SoloBankRepository
         if ($existing) {
             $this->db->prepare("
                 UPDATE solobank_vales
-                   SET total = :total, conteo = :conteo, actualizado_en = NOW()
+                   SET total = :total, conteo = :conteo, cierre_id_python = :cierre_id, actualizado_en = NOW()
                  WHERE codigo = :codigo
-            ")->execute(['total' => $d['total'], 'conteo' => $d['conteo'], 'codigo' => $d['codigo']]);
+            ")->execute([
+                'total'     => $d['total'],
+                'conteo'    => $d['conteo'],
+                'cierre_id' => $d['cierre_id'] ?? null,
+                'codigo'    => $d['codigo'],
+            ]);
 
             // Si ya fue usado en caja, actualizar también el movimiento y recalcular
             // el cuadre — si no, el total interno cambia pero la web sigue mostrando
@@ -65,15 +88,16 @@ class SoloBankRepository
             }
         } else {
             $this->db->prepare("
-                INSERT INTO solobank_vales (codigo, caja, fecha, turno, total, conteo)
-                VALUES (:codigo, :caja, :fecha, :turno, :total, :conteo)
+                INSERT INTO solobank_vales (codigo, cierre_id_python, caja, fecha, turno, total, conteo)
+                VALUES (:codigo, :cierre_id, :caja, :fecha, :turno, :total, :conteo)
             ")->execute([
-                'codigo' => $d['codigo'],
-                'caja'   => $d['caja'],
-                'fecha'  => $d['fecha'],
-                'turno'  => $d['turno']  ?? 'Tarde',
-                'total'  => $d['total'],
-                'conteo' => $d['conteo'],
+                'codigo'    => $d['codigo'],
+                'cierre_id' => $d['cierre_id'] ?? null,
+                'caja'      => $d['caja'],
+                'fecha'     => $d['fecha'],
+                'turno'     => $d['turno']  ?? 'Tarde',
+                'total'     => $d['total'],
+                'conteo'    => $d['conteo'],
             ]);
         }
     }

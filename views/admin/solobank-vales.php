@@ -93,6 +93,7 @@ $totalPendiente = array_sum(array_column($disponibles, 'total'));
         <table class="caja-table">
             <thead>
                 <tr>
+                    <th>Cierre Python</th>
                     <th>Caja SB</th>
                     <th>Fecha</th>
                     <th>Turno</th>
@@ -112,6 +113,16 @@ $totalPendiente = array_sum(array_column($disponibles, 'total'));
                 $monto    = number_format((float)$v['total'], 2);
             ?>
                 <tr id="row-<?= $v['id'] ?>">
+                    <td>
+                        <?php if (!empty($v['cierre_id_python'])): ?>
+                            <strong style="color:#1e40af">#<?= (int) $v['cierre_id_python'] ?></strong>
+                        <?php else: ?>
+                            <span style="color:#94a3b8">—</span>
+                        <?php endif; ?>
+                        <span class="mono" style="display:block" title="Código único enviado por Python">
+                            <?= htmlspecialchars(substr($v['codigo'], 0, 8)) ?>…
+                        </span>
+                    </td>
                     <td><strong><?= htmlspecialchars($v['caja']) ?></strong></td>
                     <td><?= date('d/m/Y', strtotime($v['fecha'])) ?></td>
                     <td><?= htmlspecialchars($v['turno']) ?></td>
