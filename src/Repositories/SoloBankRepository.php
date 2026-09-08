@@ -38,7 +38,7 @@ class SoloBankRepository
     public function upsertVale(array $d): void
     {
         $stmt = $this->db->prepare(
-            "SELECT id, estado, movimiento_id FROM solobank_vales WHERE codigo = :codigo"
+            "SELECT id, estado, sesion_id, movimiento_id FROM solobank_vales WHERE codigo = :codigo"
         );
         $stmt->execute(['codigo' => $d['codigo']]);
         $existing = $stmt->fetch();
@@ -50,11 +50,18 @@ class SoloBankRepository
                  WHERE codigo = :codigo
             ")->execute(['total' => $d['total'], 'conteo' => $d['conteo'], 'codigo' => $d['codigo']]);
 
-            // Si ya fue usado en caja, actualizar también el movimiento
+            // Si ya fue usado en caja, actualizar también el movimiento y recalcular
+            // el cuadre — si no, el total interno cambia pero la web sigue mostrando
+            // el cuadre viejo (cacheado en detalle_cuadre).
             if ($existing['estado'] === 'USADO' && $existing['movimiento_id']) {
                 $this->db->prepare(
                     "UPDATE movimiento_sesion SET monto = :monto WHERE id_movimiento = :id"
                 )->execute(['monto' => $d['total'], 'id' => $existing['movimiento_id']]);
+
+                if (!empty($existing['sesion_id'])) {
+                    require_once __DIR__ . '/CajaRepository.php';
+                    (new CajaRepository())->recalcularDiferenciaCompleta((int) $existing['sesion_id']);
+                }
             }
         } else {
             $this->db->prepare("
