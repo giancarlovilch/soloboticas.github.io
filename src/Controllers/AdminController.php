@@ -622,6 +622,23 @@ class AdminController extends Controller
             $penDatos = compact('penTrabajadores', 'penMesSel', 'penLista');
         }
 
+        // Datos para el catálogo de documentación de locales
+        require_once __DIR__ . '/../Repositories/DocumentoLocalRepository.php';
+        $docDatos = null;
+        if ($page === 'documentos') {
+            $docRepo = new DocumentoLocalRepository();
+            $docDatos = [
+                'tipos'      => $docRepo->getTipos(false),
+                'locales'    => $docRepo->getLocales(),
+                'categorias' => DocumentoLocalRepository::CATEGORIAS,
+                'resumen'    => $docRepo->getResumenLocales(),
+                'alertas'    => $docRepo->getProximosVencimientos(45),
+            ];
+        }
+
+        // Campanita 🔔 del header: en TODAS las páginas del admin, no solo en "documentos".
+        $alertaLocales = (new DocumentoLocalRepository())->getAlertaResumen();
+
         require_once __DIR__ . '/../../views/admin/dashboard.php';
     }
 

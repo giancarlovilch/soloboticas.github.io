@@ -15,6 +15,7 @@ $navActive = [
     'supervisores'=> ($page === 'supervisores'),
     'encuesta-bcp'=> ($page === 'encuesta-bcp'),
     'penalidades' => ($page === 'penalidades'),
+    'documentos'  => ($page === 'documentos'),
 ];
 ?>
 
@@ -36,6 +37,12 @@ $navActive = [
         <link rel="stylesheet" href="<?= $basePath ?>/assets/css/postulantes.css">
     <?php endif; ?>
 
+    <?php if ($page === 'documentos'): ?>
+        <link rel="stylesheet" href="<?= $basePath ?>/assets/css/postulantes.css">
+    <?php endif; ?>
+    <!-- Siempre cargado: trae los estilos de la campanita 🔔 del header, visible en todas las páginas -->
+    <link rel="stylesheet" href="<?= $basePath ?>/assets/css/locales.css">
+
     <link rel="icon" type="image/x-icon" href="<?= $basePath ?>/assets/img/logo.ico">
 </head>
 
@@ -54,6 +61,25 @@ $navActive = [
         </button>
 
         <div class="header-user">
+            <?php
+                $bellClase = 'bell-alert--verde';
+                $bellTitulo = 'Documentación de locales: todo al día';
+                if (!empty($alertaLocales)) {
+                    if ($alertaLocales['vencidos'] > 0) {
+                        $bellClase = 'bell-alert--rojo';
+                        $bellTitulo = "Documentación de locales: {$alertaLocales['vencidos']} vencido(s), {$alertaLocales['por_vencer']} por vencer";
+                    } elseif ($alertaLocales['por_vencer'] > 0) {
+                        $bellClase = 'bell-alert--amarillo';
+                        $bellTitulo = "Documentación de locales: {$alertaLocales['por_vencer']} por vencer";
+                    }
+                }
+            ?>
+            <a href="<?= $basePath ?>/locales" class="bell-alert <?= $bellClase ?>" title="<?= htmlspecialchars($bellTitulo) ?>">
+                🔔
+                <?php if (!empty($alertaLocales) && $alertaLocales['total'] > 0): ?>
+                    <span class="bell-alert__count"><?= $alertaLocales['total'] ?></span>
+                <?php endif; ?>
+            </a>
             <div class="user-details">
                 <span class="user-name"><?= htmlspecialchars($nombreUsuario); ?></span>
                 <span class="user-role"><?= htmlspecialchars($rolUsuario); ?></span>
@@ -220,6 +246,22 @@ $navActive = [
                     </a>
                 </li>
 
+                <p class="nav__section">Locales</p>
+
+                <li class="list__item">
+                    <a href="<?= $basePath ?>/locales" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Gestión de Locales</span>
+                    </a>
+                </li>
+
+                <li class="list__item <?= $navActive['documentos'] ? 'list__item--active' : '' ?>">
+                    <a href="?page=documentos" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Catálogo Documentos</span>
+                    </a>
+                </li>
+
                 <p class="nav__section">Sistema</p>
 
                 <li class="list__item">
@@ -284,6 +326,9 @@ $navActive = [
                         break;
                     case 'logs-consistencia':
                         require_once __DIR__ . '/logs_consistencia.php';
+                        break;
+                    case 'documentos':
+                        require_once __DIR__ . '/documentos_tipos.php';
                         break;
                     case 'update':
                         if (isset($p) && !empty($p)) {

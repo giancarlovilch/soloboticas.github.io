@@ -66,6 +66,13 @@ class StaffController extends Controller
         $mesEncuestaBcp = $votoRepo->getMesEncuestado();
         $yaVotoEncuestaBcp = $mesEncuestaBcp ? $votoRepo->yaVoto($postulanteId, $mesEncuestaBcp) : false;
 
+        // Documentación de locales: solo supervisores y admin ven este acceso
+        $docAlertas = null;
+        if (in_array($userRol, ['ADMIN', 'SUPERVISOR'], true)) {
+            require_once __DIR__ . '/../Repositories/DocumentoLocalRepository.php';
+            $docAlertas = (new DocumentoLocalRepository())->getAlertaResumen();
+        }
+
         require_once __DIR__ . '/../../views/staff/dashboard.php';
     }
 

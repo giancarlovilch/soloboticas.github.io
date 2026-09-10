@@ -22,6 +22,9 @@ $estMonto      = (float)($estrellas['monto']      ?? round($estDiferencia * 0.10
     <title>Dashboard | Solo Boticas</title>
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/normalize.css">
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/staff.css">
+    <?php if (!empty($docAlertas)): ?>
+        <link rel="stylesheet" href="<?= $basePath ?>/assets/css/locales.css">
+    <?php endif; ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="<?= $basePath ?>/assets/img/logo.ico">
@@ -142,6 +145,24 @@ $estMonto      = (float)($estrellas['monto']      ?? round($estDiferencia * 0.10
         </div>
     </div>
     <div class="staff-header__user">
+        <?php if (!empty($docAlertas)):
+            $bellClase = 'bell-alert--verde';
+            $bellTitulo = 'Documentación de locales: todo al día';
+            if ($docAlertas['vencidos'] > 0) {
+                $bellClase = 'bell-alert--rojo';
+                $bellTitulo = "Documentación de locales: {$docAlertas['vencidos']} vencido(s), {$docAlertas['por_vencer']} por vencer";
+            } elseif ($docAlertas['por_vencer'] > 0) {
+                $bellClase = 'bell-alert--amarillo';
+                $bellTitulo = "Documentación de locales: {$docAlertas['por_vencer']} por vencer";
+            }
+        ?>
+            <a href="<?= $basePath ?>/locales" class="bell-alert <?= $bellClase ?>" title="<?= htmlspecialchars($bellTitulo) ?>">
+                🔔
+                <?php if ($docAlertas['total'] > 0): ?>
+                    <span class="bell-alert__count"><?= $docAlertas['total'] ?></span>
+                <?php endif; ?>
+            </a>
+        <?php endif; ?>
         <div>
             <p class="staff-header__name"><?= htmlspecialchars($userName) ?></p>
             <p class="staff-header__rol"><?= htmlspecialchars($userRol) ?></p>
@@ -269,6 +290,37 @@ $estMonto      = (float)($estrellas['monto']      ?? round($estDiferencia * 0.10
                 Ver métricas
             </a>
         </div>
+
+        <?php if (!empty($docAlertas)): ?>
+        <!-- Solo supervisores/admin: documentación de locales -->
+        <div class="db-card" style="grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap;
+             justify-content: space-between; text-align: left; gap: .75rem;
+             border-color:#fde68a; background:linear-gradient(135deg,#fffbeb,#fef3c7);">
+            <div style="display:flex;align-items:center;gap:.6rem;">
+                <span class="db-card__icon">🏪</span>
+                <div>
+                    <div class="db-card__title">Gestión de locales</div>
+                    <div style="font-size:.72rem;color:#92400e;margin-top:2px;">
+                        <?php if ($docAlertas['vencidos'] > 0): ?>
+                            <strong><?= $docAlertas['vencidos'] ?></strong> documento(s) vencido(s)<?php
+                            if ($docAlertas['total'] > $docAlertas['vencidos']): ?>,
+                            <?= $docAlertas['total'] - $docAlertas['vencidos'] ?> por vencer<?php endif; ?>
+                        <?php elseif ($docAlertas['total'] > 0): ?>
+                            <strong><?= $docAlertas['total'] ?></strong> documento(s) por vencer
+                        <?php else: ?>
+                            Todo al día ✅
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;flex:1;justify-content:flex-end;">
+                <a href="<?= $basePath ?>/locales" class="db-btn"
+                   style="background:#d97706;width:auto;padding:.55rem 1.1rem;">
+                    📄 Documentación
+                </a>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- Fila 3: Encuestas (ancho completo) -->
         <div class="db-card db-card--enc" style="grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; justify-content: space-between; text-align: left; gap: .75rem;">

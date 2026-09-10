@@ -231,6 +231,26 @@ $router->get('/admin/database/download-full',    [DatabaseController::class, 'do
 $router->get('/admin/database/apply',            [DatabaseController::class, 'applyToLocal']);
 $router->post('/admin/database/upload',          [DatabaseController::class, 'uploadMigration']);
 
+// --- GESTIÓN DE LOCALES (documentación, vigencias, firma y presupuesto) ---
+// OJO: las rutas estáticas van ANTES de /locales/{id}, si no {id} se come 'logs'.
+require_once __DIR__ . '/../src/Controllers/DocumentoLocalController.php';
+$router->get('/locales',                     [DocumentoLocalController::class, 'index']);
+$router->get('/locales/logs',                [DocumentoLocalController::class, 'logs']);
+$router->get('/locales/presupuesto',         [DocumentoLocalController::class, 'presupuesto']);
+$router->get('/locales/api/historial',       [DocumentoLocalController::class, 'apiHistorial']);
+$router->get('/locales/api/documento/{id}',  [DocumentoLocalController::class, 'apiDocumento']);
+$router->post('/locales/api/documento/guardar',              [DocumentoLocalController::class, 'apiGuardar']);
+$router->post('/locales/api/documento/{id}/estado',          [DocumentoLocalController::class, 'apiEstado']);
+$router->post('/locales/api/documento/{id}/archivo',         [DocumentoLocalController::class, 'apiSubirArchivo']);
+$router->post('/locales/api/documento/{id}/quitar-archivo',  [DocumentoLocalController::class, 'apiQuitarArchivo']);
+$router->post('/locales/api/documento/{id}/eliminar',        [DocumentoLocalController::class, 'apiEliminar']);
+$router->get('/locales/{id}',                [DocumentoLocalController::class, 'detalle']);
+
+// Catálogo de documentos (solo ADMIN, se edita desde admin/dashboard?page=documentos)
+$router->post('/admin/api/documento-tipo/guardar',        [DocumentoLocalController::class, 'apiGuardarTipo']);
+$router->post('/admin/api/documento-tipo/{id}/toggle',    [DocumentoLocalController::class, 'apiToggleTipo']);
+$router->post('/admin/api/documento-tipo/{id}/eliminar',  [DocumentoLocalController::class, 'apiEliminarTipo']);
+
 // --- MÓDULO DE REPORTES ---
 require_once __DIR__ . '/../src/Controllers/ReporteController.php';
 
