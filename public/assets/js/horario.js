@@ -2,33 +2,26 @@
  * Horarios Semanales tipo Cine — Solo Boticas
  */
 
-let _pickerSlotEl = null;
-let TRABAJADORES  = [];
+let TRABAJADORES = [];
 let _slots        = [];
 let _filtroId     = 0;
+let _modoCubrir   = false;
+let _slotParaMover = null;
 
 // ── Carga inicial ──────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     if (SEMANA_ID) cargarSlots();
-    if (ES_ADMIN)  cargarTrabajadores();
 });
 
-// ── Workers (solo admin) ───────────────────────────────
+// ── Workers (para el picker de "CUBRIR / CAMBIAR PUESTO") ──
 async function cargarTrabajadores() {
+    if (TRABAJADORES.length) return TRABAJADORES;
     try {
         const r   = await fetch(`${BASE}/horario/api/trabajadores`);
         const res = await r.json();
-        if (!res.success) return;
-        TRABAJADORES = res.data || [];
-        const sel = document.getElementById('pickerSelect');
-        if (!sel) return;
-        TRABAJADORES.forEach(t => {
-            const opt = document.createElement('option');
-            opt.value       = t.id;
-            opt.textContent = t.nombre;
-            sel.appendChild(opt);
-        });
+        if (res.success) TRABAJADORES = res.data || [];
     } catch { /* silencioso */ }
+    return TRABAJADORES;
 }
 
 // ── Slots ──────────────────────────────────────────────
@@ -71,140 +64,124 @@ function aplicarFiltro(val) {
 }
 
 function renderSlots(slots) {
-    // Resetear todos los asientos a "libre" (bloqueado hasta que se repinte)
+    // Resetear todos los asientos (el modo lectura por defecto lo da el CSS)
     document.querySelectorAll('.hor-asiento[data-semana]').forEach(el => {
-        el.dataset.slotid      = '';
-        el.dataset.ocupadoPor  = '';
-        el.className           = 'hor-asiento hor-asiento--libre';
-        el.title               = '';
-        el.style.pointerEvents = 'none'; // bloqueado hasta repintar
-        el.onclick             = null;
+        el.dataset.slotid     = '';
+        el.dataset.ocupadoPor = '';
+        el.className          = 'hor-asiento hor-asiento--libre';
+        el.title              = '';
+        el.onclick            = null;
         el.querySelector('.hor-asiento__nombre').textContent = '…';
-        quitarBtnPicker(el);
-        quitarBtnLiberar(el);
     });
 
-    // Pintar según los datos del servidor
     slots.forEach(s => {
         const id = `slot-${s.semana_id}-${s.local_id}-${s.turno_id}-${s.dia_semana}-${s.rol_puesto}-${s.slot_num}`;
         const el = document.getElementById(id);
         if (!el) return;
 
         el.dataset.slotid = s.id_slot;
+        const esPasado = s.fecha_dia < HOY;
 
         if (s.postulante_id) {
             el.dataset.ocupadoPor = s.postulante_id;
             const nombre = s.trabajador_nombre || '—';
-
-            const nombreEl = el.querySelector('.hor-asiento__nombre');
-            nombreEl.textContent = nombre;
+            el.querySelector('.hor-asiento__nombre').textContent = nombre;
 
             if (parseInt(s.postulante_id) === MI_ID) {
-                // Slot propio: solo el dueño puede liberarlo
-                el.className           = 'hor-asiento hor-asiento--mio';
-                el.title               = `Tuyo (${nombre}) — clic para liberar`;
-                el.style.pointerEvents = 'auto';
-                el.onclick             = () => clickAsiento(el);
+                el.className = 'hor-asiento hor-asiento--mio';
             } else {
-                // Ocupado por otro (o filtrado)
                 const esFiltrado = _filtroId && parseInt(s.postulante_id) === _filtroId;
-                el.className           = 'hor-asiento ' + (esFiltrado ? 'hor-asiento--filtrado' : 'hor-asiento--ocupado');
-                el.title               = `Ocupado por ${nombre}`;
-                el.style.pointerEvents = ES_ADMIN ? 'auto' : 'none';
-                el.onclick             = null;
-                if (ES_ADMIN) agregarBtnLiberar(el, nombre);
+                el.className = 'hor-asiento ' + (esFiltrado ? 'hor-asiento--filtrado' : 'hor-asiento--ocupado');
             }
-            quitarBtnPicker(el);
+            el.title = nombre;
+
+            if (_modoCubrir && (!esPasado || ES_ADMIN)) {
+                el.classList.add('hor-asiento--cubrir-eligible');
+                el.title   = `Mover este puesto (hoy: ${nombre})`;
+                el.onclick = () => abrirPickerMover(s);
+            }
         } else {
-            el.className          = 'hor-asiento hor-asiento--libre';
-            el.title              = 'Libre — clic para tomar';
-            el.style.pointerEvents = '';
-            el.onclick            = () => clickAsiento(el);
-            el.querySelector('.hor-asiento__nombre').innerHTML = el.dataset.rol === 'LIMPIEZA'
+            el.className = 'hor-asiento hor-asiento--libre';
+            el.querySelector('.hor-asiento__nombre').innerHTML = s.rol_puesto === 'LIMPIEZA'
                 ? '<span style="font-size:1.25em;line-height:1;letter-spacing:1px;">🧹🫧🧼</span>'
                 : '＋';
-            if (ES_ADMIN) agregarBtnPicker(el);
+
+            if (_modoCubrir && (!esPasado || ES_ADMIN)) {
+                el.classList.add('hor-asiento--cubrir-eligible');
+                el.title   = 'Turno libre — clic para asignar';
+                el.onclick = () => abrirPickerMover(s);
+            }
         }
     });
 
     actualizarResumen(slots);
 }
 
-// ── Botón picker (admin, slots libres) ────────────────
-function agregarBtnPicker(el) {
-    if (el.querySelector('.hor-asiento__btn-picker')) return;
-    const btn = document.createElement('button');
-    btn.className = 'hor-asiento__btn-picker';
-    btn.title     = 'Asignar a trabajador';
-    btn.textContent = '👤';
-    btn.addEventListener('click', e => {
-        e.stopPropagation();
-        abrirPicker(el);
-    });
-    el.appendChild(btn);
+// ── Modo Cubrir Puesto ─────────────────────────────────
+function toggleModoCubrir() {
+    _modoCubrir = !_modoCubrir;
+    document.body.classList.toggle('modo-cubrir', _modoCubrir);
+
+    const btn   = document.getElementById('btnCubrirPuesto');
+    const badge = document.getElementById('badgeEstado');
+    if (btn) {
+        btn.classList.toggle('activo', _modoCubrir);
+        btn.textContent = _modoCubrir ? '✕ Salir del modo cubrir' : '⇄ CUBRIR / CAMBIAR PUESTO';
+    }
+    if (badge) {
+        badge.textContent = _modoCubrir ? '🔓 Modo cubrir activo' : '📅 Activo';
+        badge.className   = _modoCubrir
+            ? 'hor-semana-estado estado-abierta'
+            : 'hor-semana-estado estado-activo';
+    }
+
+    renderSlots(_slots);
 }
 
-function quitarBtnPicker(el) {
-    el.querySelector('.hor-asiento__btn-picker')?.remove();
+// ── Picker universal: mover cualquier puesto a cualquiera ──────
+async function abrirPickerMover(s) {
+    _slotParaMover = s;
+    const trabajadores = await cargarTrabajadores();
+
+    document.getElementById('moverActualMsg').textContent = s.postulante_id
+        ? `Ahora está: ${s.trabajador_nombre || '—'}`
+        : 'Este turno está libre.';
+
+    const sel = document.getElementById('moverSelect');
+    sel.innerHTML = '<option value="">— Dejar libre —</option>' +
+        trabajadores
+            .filter(t => parseInt(t.id) !== parseInt(s.postulante_id))
+            .map(t => `<option value="${t.id}">${t.nombre}</option>`)
+            .join('');
+    sel.value = '';
+
+    document.getElementById('moverOverlay').hidden = false;
 }
 
-// ── Botón liberar (admin, slots ocupados por otro) ────
-let _liberarSlotEl = null;
-
-function agregarBtnLiberar(el, nombre) {
-    if (el.querySelector('.hor-asiento__btn-liberar')) return;
-    const btn = document.createElement('button');
-    btn.className   = 'hor-asiento__btn-liberar';
-    btn.title       = `Quitar a ${nombre}`;
-    btn.textContent = '✕';
-    btn.addEventListener('click', e => {
-        e.stopPropagation();
-        abrirModalLiberar(el, nombre);
-    });
-    el.appendChild(btn);
+function cerrarPickerMover() {
+    document.getElementById('moverOverlay').hidden = true;
+    _slotParaMover = null;
 }
 
-function quitarBtnLiberar(el) {
-    el.querySelector('.hor-asiento__btn-liberar')?.remove();
-}
-
-function abrirModalLiberar(el, nombre) {
-    _liberarSlotEl = el;
-    const overlay = document.getElementById('liberarAdminOverlay');
-    if (!overlay) return;
-    document.getElementById('liberarAdminNombre').textContent = `Vas a quitar a ${nombre} de este turno.`;
-    document.getElementById('liberarAdminPwd').value = '';
-    overlay.hidden = false;
-    setTimeout(() => document.getElementById('liberarAdminPwd').focus(), 50);
-}
-
-function cerrarModalLiberar() {
-    document.getElementById('liberarAdminOverlay').hidden = true;
-    _liberarSlotEl = null;
-}
-
-async function confirmarLiberarAdmin() {
-    const password = document.getElementById('liberarAdminPwd').value.trim();
-    if (!password) { mostrarToast('Ingresa tu contraseña', 'info'); return; }
-
-    const el     = _liberarSlotEl;
-    const slotId = el?.dataset.slotid;
-    if (!slotId) return;
-
-    cerrarModalLiberar();
-    el.classList.add('hor-asiento--loading');
+async function confirmarMover() {
+    const s = _slotParaMover;
+    const nuevoId = document.getElementById('moverSelect').value;
+    cerrarPickerMover();
 
     try {
-        const r   = await fetch(`${BASE}/horario/api/slot/${slotId}/liberar-admin`, {
+        const r   = await fetch(`${BASE}/horario/api/slot/mover`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ password }),
+            body:    JSON.stringify({
+                slot_id: parseInt(s.id_slot),
+                nuevo_postulante_id: nuevoId ? parseInt(nuevoId) : null,
+            }),
         });
         const res = await r.json();
         await cargarSlots();
-        if (!res.success) mostrarToast(res.message || 'No se pudo quitar al trabajador.', 'error');
+        if (res.success) mostrarToast(nuevoId ? '¡Turno reasignado!' : 'Turno liberado.', 'ok');
+        else             mostrarToast(res.message || 'No se pudo mover el turno.', 'error');
     } catch {
-        el.classList.remove('hor-asiento--loading');
         mostrarToast('Error de conexión.', 'error');
     }
 }
@@ -234,76 +211,6 @@ function actualizarResumen(slots) {
     el.innerHTML = `<span class="hor-resumen__label">Disponibles</span>${partes.join('')}`;
     el.hidden = false;
 }
-
-// ── Clic en asiento (comportamiento estándar) ──────────
-function clickAsiento(el) {
-    if (!EDITABLE) {
-        mostrarToast('La semana está cerrada. Solo el administrador puede modificar.', 'info');
-        return;
-    }
-
-    const slotId     = el.dataset.slotid;
-    const ocupadoPor = el.dataset.ocupadoPor;
-
-    if (!slotId) return;
-
-    // No-admin no puede tomar slots de otros
-    if (!ES_ADMIN && ocupadoPor && parseInt(ocupadoPor) !== MI_ID) return;
-
-    // Slot libre: asignar a sí mismo | Slot mío u otro (admin): liberar
-    ejecutarSlot(el, ocupadoPor ? 'liberar' : 'asignar', null);
-}
-
-// ── Ejecución de asignar/liberar ───────────────────────
-async function ejecutarSlot(el, accion, targetId) {
-    const slotId   = el.dataset.slotid;
-    const semanaId = el.dataset.semana;
-
-    el.classList.add('hor-asiento--loading');
-
-    const body = { slot_id: parseInt(slotId), semana_id: parseInt(semanaId) };
-    if (targetId) body.target_id = parseInt(targetId);
-
-    try {
-        const r   = await fetch(`${BASE}/horario/api/slot/${accion}`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(body),
-        });
-        const res = await r.json();
-        await cargarSlots();
-        if (!res.success) mostrarToast(res.message || 'No se pudo completar la acción.', 'error');
-    } catch {
-        el.classList.remove('hor-asiento--loading');
-        mostrarToast('Error de conexión.', 'error');
-    }
-}
-
-// ── Admin picker ───────────────────────────────────────
-function abrirPicker(el) {
-    _pickerSlotEl = el;
-    document.getElementById('pickerSelect').value = '';
-    document.getElementById('adminPickerOverlay').hidden = false;
-}
-
-function cerrarPicker() {
-    document.getElementById('adminPickerOverlay').hidden = true;
-    _pickerSlotEl = null;
-}
-
-function pickerAsignar() {
-    const targetId = document.getElementById('pickerSelect').value;
-    if (!targetId) {
-        mostrarToast('Selecciona un trabajador', 'info');
-        return;
-    }
-    const el = _pickerSlotEl;
-    cerrarPicker();
-    ejecutarSlot(el, 'asignar', targetId);
-}
-
-
-
 
 // ── Toast central ──────────────────────────────────────
 let _toastTimer = null;

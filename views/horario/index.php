@@ -37,14 +37,6 @@ if ($semana) {
     }
 }
 
-// Calcular si la semana está editable
-$editable = false;
-if ($semana) {
-    $hoy = new DateTime('now', new DateTimeZone('America/Lima'));
-    $fin = new DateTime($semana['fecha_fin'] . ' 23:59:59');
-    $editable = ($semana['estado'] === 'ABIERTA' && $hoy <= $fin) || $esAdmin;
-}
-
 // Estructurar slots por [local][turno][rol][slot_num][dia_semana]
 $grid = [];
 if ($semana) {
@@ -60,6 +52,31 @@ if ($semana) {
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/normalize.css">
     <link rel="stylesheet" href="<?= $basePath ?>/assets/css/horario.css">
     <link rel="icon" type="image/x-icon" href="<?= $basePath ?>/assets/img/logo.ico">
+    <style>
+        /* Modo solo lectura por defecto */
+        .hor-asiento { cursor: default !important; pointer-events: none !important; }
+        .hor-asiento:hover { transform: none !important; box-shadow: none !important; }
+
+        /* Modo cubrir: desbloquea slots elegibles */
+        body.modo-cubrir .hor-asiento--cubrir-eligible {
+            cursor: pointer !important;
+            pointer-events: auto !important;
+        }
+        body.modo-cubrir .hor-asiento--cubrir-eligible:hover {
+            transform: translateY(-2px) scale(1.03) !important;
+            box-shadow: 0 4px 14px rgba(220,38,38,.35) !important;
+        }
+
+        /* Banner de modo cubrir activo */
+        #bannerCubrir {
+            display: none;
+            align-items: center; justify-content: center; gap: .75rem;
+            padding: .65rem 1.25rem; border-radius: 10px;
+            background: #fef2f2; border: 1.5px solid #fca5a5;
+            font-size: .82rem; font-weight: 600; color: #991b1b;
+        }
+        body.modo-cubrir #bannerCubrir { display: flex; }
+    </style>
 </head>
 <body<?= $esAdmin ? ' class="es-admin"' : '' ?>>
 
@@ -134,12 +151,7 @@ if ($semana) {
                 <?= date('d', strtotime($semana['fecha_inicio'])) ?> –
                 <?= date('d \d\e F Y', strtotime($semana['fecha_fin'])) ?>
             </h1>
-            <span class="hor-semana-estado estado-editable">✏️ Editable</span>
-            <?php if ($editable && !$esAdmin): ?>
-                <span class="hor-cierre-info">
-                    Cierra el domingo <?= date('d/m', strtotime($semana['fecha_fin'])) ?> a medianoche
-                </span>
-            <?php endif; ?>
+            <span id="badgeEstado" class="hor-semana-estado estado-activo">📅 Activo</span>
         </div>
 
         <!-- Filtro por trabajador -->
@@ -162,7 +174,24 @@ if ($semana) {
     <!-- ── Resumen de disponibles ──────────────────────────── -->
     <div id="horResumen" class="hor-resumen" hidden></div>
 
+    <div style="display:flex;justify-content:center;">
+        <button id="btnCubrirPuesto" class="hor-btn-cubrir" onclick="toggleModoCubrir()"
+                style="width:min(480px,100%);font-size:1.17rem;padding:.1rem 1.5rem;">
+            ⇄ CUBRIR / CAMBIAR PUESTO
+        </button>
+    </div>
+
     <div id="horMsg" class="hor-alert" hidden></div>
+
+    <!-- Banner modo cubrir activo -->
+    <div id="bannerCubrir">
+        <span>🔓 Modo <strong>Cubrir Puesto</strong> activo — haz clic en cualquier turno de hoy o de días futuros para ubicar a quien quieras</span>
+        <button onclick="toggleModoCubrir()"
+                style="background:transparent;border:1.5px solid #fca5a5;border-radius:6px;
+                       padding:2px 10px;cursor:pointer;font-size:.76rem;color:#991b1b;font-weight:700;">
+            ✕ Salir
+        </button>
+    </div>
 
     <!-- ── Grillas por local ──────────────────────────────── -->
     <?php foreach ($LOCALES as $localId => $localInfo):
@@ -233,7 +262,6 @@ if ($semana) {
                          data-slotnum="<?= $n ?>"
                          data-slotid=""
                          data-ocupado-por=""
-                         onclick="clickAsiento(this)"
                          title="">
                         <span class="hor-asiento__nombre">…</span>
                     </div>
@@ -255,15 +283,15 @@ if ($semana) {
     <div class="hor-leyenda">
         <div class="hor-leyenda__item">
             <div class="hor-asiento hor-asiento--libre hor-asiento--demo"></div>
-            <span>Libre — clic para tomar</span>
+            <span>Libre</span>
         </div>
         <div class="hor-leyenda__item">
             <div class="hor-asiento hor-asiento--mio hor-asiento--demo"></div>
-            <span>Tuyo — clic para liberar</span>
+            <span>Tuyo</span>
         </div>
         <div class="hor-leyenda__item">
             <div class="hor-asiento hor-asiento--ocupado hor-asiento--demo"></div>
-            <span>Ocupado por otro</span>
+            <span>Ocupado</span>
         </div>
     </div>
 
@@ -271,49 +299,31 @@ if ($semana) {
 
 </main>
 
-<?php if ($esAdmin): ?>
-<!-- ── Admin: picker de trabajador ──────────────────────── -->
-<div id="adminPickerOverlay" class="hor-picker-overlay" hidden>
+<!-- ── Modal: mover puesto (disponible para todo el staff, hoy y futuro) ── -->
+<div id="moverOverlay" class="hor-picker-overlay" hidden>
     <div class="hor-picker">
         <div class="hor-picker__header">
-            <h3 id="pickerTitulo">Asignar turno</h3>
-            <button onclick="cerrarPicker()">✕</button>
+            <h3>⇄ Mover puesto</h3>
+            <button onclick="cerrarPickerMover()">✕</button>
         </div>
-        <select id="pickerSelect" class="hor-picker__select">
-            <option value="">— Seleccionar trabajador —</option>
+        <p id="moverActualMsg" style="font-size:.82rem;color:#475569;margin:.1rem 0 .4rem;"></p>
+        <select id="moverSelect" class="hor-picker__select">
+            <option value="">— Dejar libre —</option>
         </select>
         <div class="hor-picker__footer">
-            <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;" onclick="cerrarPicker()">Cancelar</button>
-            <button class="hor-btn hor-btn--primary" onclick="pickerAsignar()">Asignar</button>
+            <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;"
+                    onclick="cerrarPickerMover()">Cancelar</button>
+            <button class="hor-btn hor-btn--primary" onclick="confirmarMover()">Confirmar</button>
         </div>
     </div>
 </div>
-
-<!-- ── Admin: modal liberar slot ─────────────────────────── -->
-<div id="liberarAdminOverlay" class="hor-picker-overlay" hidden>
-    <div class="hor-picker">
-        <div class="hor-picker__header">
-            <h3>Quitar del turno</h3>
-            <button onclick="cerrarModalLiberar()">✕</button>
-        </div>
-        <p id="liberarAdminNombre" style="font-size:.85rem;color:#475569;margin:.25rem 0 .75rem;padding:0 .1rem;"></p>
-        <input id="liberarAdminPwd" type="password" class="hor-picker__select"
-               placeholder="Tu contraseña de administrador"
-               onkeydown="if(event.key==='Enter') confirmarLiberarAdmin()">
-        <div class="hor-picker__footer">
-            <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;" onclick="cerrarModalLiberar()">Cancelar</button>
-            <button class="hor-btn" style="background:#ef4444;color:#fff;border:none;" onclick="confirmarLiberarAdmin()">Quitar</button>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
 
 <script>
 const BASE          = '<?= $basePath ?>';
 const MI_ID         = <?= $postulanteId ?>;
 const ES_ADMIN      = <?= $esAdmin ? 'true' : 'false' ?>;
 const SEMANA_ID     = <?= $semana ? $semana['id_semana'] : 'null' ?>;
-const EDITABLE      = <?= $editable ? 'true' : 'false' ?>;
+const HOY           = '<?= date('Y-m-d') ?>';
 </script>
 <script src="<?= $basePath ?>/assets/js/session-guard.js"></script>
 <script src="<?= $basePath ?>/assets/js/horario.js"></script>
