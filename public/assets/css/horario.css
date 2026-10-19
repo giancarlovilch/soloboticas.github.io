@@ -170,12 +170,13 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--hor-bg
 .hor-asiento--ocupado  .hor-asiento__nombre { font-weight: 500; color: #50617a; }
 .hor-asiento--filtrado .hor-asiento__nombre { font-weight: 750; color: #2563eb; background: yellow;}
 
-/* Botones admin: siempre clicables aunque el padre tenga pointer-events:none */
+/* Botones admin: siempre clicables aunque el padre tenga pointer-events:none.
+   Usado por views/horario/historial.php (semanas pasadas); actual.php ya no
+   los usa — ahí todo pasa por el picker de "CUBRIR / CAMBIAR PUESTO". */
 .hor-asiento__btn-picker,
 .hor-asiento__btn-liberar,
 .hor-asiento__btn-encuestado { pointer-events: auto !important; }
 
-/* Botón de asignación para admins (aparece en hover del slot libre) */
 .hor-asiento__btn-picker {
     position: absolute;
     top: -4px; right: -4px;
@@ -451,7 +452,8 @@ body.es-admin .hor-asiento--ocupado:hover {
 }
 .hor-btn-pagina-actual__sub { font-size: 0.75rem; font-weight: 400; margin-top: 2px; opacity: .7; }
 
-/* ── ENCUESTADO (admin no puede quitar — ya hay asistencia) ── */
+/* ── ENCUESTADO (admin no puede quitar — ya hay asistencia) ──
+   Usado por views/horario/historial.php; no tocar desde actual.php. ── */
 .hor-asiento__btn-encuestado {
     position: absolute; top: -4px; left: -4px;
     width: 16px; height: 16px; border-radius: 50%;

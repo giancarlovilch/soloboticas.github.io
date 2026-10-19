@@ -147,48 +147,11 @@ class HorarioRepository
         $id     = (int)$this->db->lastInsertId();
         $semana = $this->getSemanaById($id);
 
-        // Pre-crear todos los slots vacíos
+        // Pre-crear todos los slots vacíos (ya no se clonan asignaciones de otra
+        // semana: cada semana nueva empieza en blanco y se va llenando poco a poco)
         $this->inicializarSlots($semana);
 
-        // Clonar asignaciones de la semana más reciente con datos
-        $this->clonarAsignacionesRecientes($id);
-
         return $semana;
-    }
-
-    /** Copia las asignaciones de la semana anterior más reciente a la nueva semana */
-    private function clonarAsignacionesRecientes(int $semanaDestinoId): void
-    {
-        // Buscar la semana con más asignaciones reciente (excluyendo la nueva)
-        $stmt = $this->db->prepare(
-            "SELECT s.id_semana
-             FROM semana s
-             INNER JOIN horario_slot hs ON hs.semana_id = s.id_semana
-             WHERE hs.postulante_id IS NOT NULL
-               AND s.id_semana != :did
-             GROUP BY s.id_semana
-             ORDER BY s.fecha_inicio DESC
-             LIMIT 1"
-        );
-        $stmt->execute(['did' => $semanaDestinoId]);
-        $origenId = $stmt->fetchColumn();
-        if (!$origenId) return;
-
-        // Copiar asignaciones emparejando por día de la semana
-        $this->db->prepare(
-            "UPDATE horario_slot dest
-             INNER JOIN horario_slot src
-                 ON  src.semana_id      = :origen
-                 AND src.local_id       = dest.local_id
-                 AND src.turno_id       = dest.turno_id
-                 AND DAYOFWEEK(src.fecha_dia) = DAYOFWEEK(dest.fecha_dia)
-                 AND src.rol_horario_id = dest.rol_horario_id
-                 AND src.slot_num       = dest.slot_num
-                 AND src.postulante_id  IS NOT NULL
-             SET dest.postulante_id    = src.postulante_id,
-                 dest.fecha_asignacion = NOW()
-             WHERE dest.semana_id = :destino"
-        )->execute(['origen' => $origenId, 'destino' => $semanaDestinoId]);
     }
 
     /** Rellena horario_slot con todos los asientos vacíos para la semana */
@@ -261,7 +224,7 @@ class HorarioRepository
         if ($siguiente) $this->crearSemanaEspejo($siguiente); // W+2
     }
 
-    /** Crea la semana siguiente a $base (1 semana después) si no existe, clonando sus datos */
+    /** Crea la semana siguiente a $base (1 semana después) si no existe, en blanco */
     private function crearSemanaEspejo(array $base): ?array
     {
         $lunes   = (new DateTime($base['fecha_inicio']))->modify('+7 days');
@@ -282,29 +245,12 @@ class HorarioRepository
         $id    = (int)$this->db->lastInsertId();
         $nueva = $this->getSemanaById($id);
 
+        // Ya no se clona nada: empieza vacía y se va llenando poco a poco.
+        // El espejo igual se mantiene sincronizado en vivo vía propagarEspejo()
+        // a medida que se editan los slots de la semana base.
         $this->inicializarSlots($nueva);
-        $this->clonarAsignaciones($base['id_semana'], $id);
 
         return $nueva;
-    }
-
-    /** Copia asignaciones de una semana a otra emparejando por día de la semana (Lun→Lun, Mar→Mar…) */
-    public function clonarAsignaciones(int $origenId, int $destinoId): void
-    {
-        $this->db->prepare(
-            "UPDATE horario_slot dest
-             INNER JOIN horario_slot src
-                 ON  src.semana_id      = :origen
-                 AND src.local_id       = dest.local_id
-                 AND src.turno_id       = dest.turno_id
-                 AND DAYOFWEEK(src.fecha_dia) = DAYOFWEEK(dest.fecha_dia)
-                 AND src.rol_horario_id = dest.rol_horario_id
-                 AND src.slot_num       = dest.slot_num
-                 AND src.postulante_id  IS NOT NULL
-             SET dest.postulante_id    = src.postulante_id,
-                 dest.fecha_asignacion = NOW()
-             WHERE dest.semana_id = :destino"
-        )->execute(['origen' => $origenId, 'destino' => $destinoId]);
     }
 
     // ── ESPEJO ────────────────────────────────────────────
@@ -429,8 +375,9 @@ class HorarioRepository
     }
 
     /** Asigna un trabajador a un slot. Valida conflictos. */
-    public function asignarSlot(int $slotId, int $semanaId, int $postulanteId): string
+    public function asignarSlot(int $slotId, int $semanaId, int $postulanteId, ?int $actorId = null): string
     {
+        $actorId = $actorId ?? $postulanteId;
         // Verificar que el slot existe y está libre
         $slot = $this->getSlotById($slotId);
         if (!$slot) return 'Slot no encontrado';
@@ -498,6 +445,14 @@ class HorarioRepository
              WHERE id_slot = :id"
         )->execute(['pid' => $postulanteId, 'id' => $slotId]);
 
+        // Registrar quién tomó el turno (el actor, no necesariamente quien queda en el puesto
+        // — ej. el admin asignando a otro trabajador en su nombre)
+        $nuevoParaLog = ($actorId !== $postulanteId) ? $postulanteId : null;
+        $this->db->prepare(
+            "INSERT INTO solicitud_cambio (slot_id, semana_id, tipo, postulante_solicitante_id, postulante_nuevo_id)
+             VALUES (:sid, :mid, 'CAMBIO', :actor, :nuevo)"
+        )->execute(['sid' => $slotId, 'mid' => $semanaId, 'actor' => $actorId, 'nuevo' => $nuevoParaLog]);
+
         // Propagar al espejo
         $this->propagarEspejo($slotId, $postulanteId);
 
@@ -522,6 +477,12 @@ class HorarioRepository
         $stmt->execute(['id' => $slotId, 'pid' => $postulanteId]);
 
         if ($stmt->rowCount() === 0) return 'Solo puedes liberar tus propios turnos';
+
+        // Registrar quién liberó el turno
+        $this->db->prepare(
+            "INSERT INTO solicitud_cambio (slot_id, semana_id, tipo, postulante_solicitante_id, postulante_original_id, notas)
+             VALUES (:sid, :mid, 'CAMBIO', :pid1, :pid2, 'Liberado por su propia cuenta')"
+        )->execute(['sid' => $slotId, 'mid' => $slot['semana_id'], 'pid1' => $postulanteId, 'pid2' => $postulanteId]);
 
         // Propagar al espejo antes del cascade (para que el estado sea consistente)
         if ($slot['rol_puesto'] !== 'LIMPIEZA') {
@@ -1114,16 +1075,20 @@ class HorarioRepository
 
             // 4) Si es CAJERA, migrar apertura/cierre de esa sesión
             if ($slot['rol_puesto'] === 'CAJERA') {
+                // Nota: PDO con prepares nativos (EMULATE_PREPARES=false) no permite
+                // reusar el mismo parámetro nombrado varias veces en una consulta
+                // ("SQLSTATE[HY093]: Invalid parameter number") — de ahí los sufijos.
                 $this->db->prepare(
                     "UPDATE sesion_caja sc
                      INNER JOIN caja c ON c.id_caja = sc.caja_id
-                     SET sc.postulante_apertura_id = IF(sc.postulante_apertura_id = :viejo, :nuevo, sc.postulante_apertura_id),
-                         sc.postulante_cierre_id   = IF(sc.postulante_cierre_id   = :viejo, :nuevo, sc.postulante_cierre_id)
+                     SET sc.postulante_apertura_id = IF(sc.postulante_apertura_id = :viejo1, :nuevo1, sc.postulante_apertura_id),
+                         sc.postulante_cierre_id   = IF(sc.postulante_cierre_id   = :viejo2, :nuevo2, sc.postulante_cierre_id)
                      WHERE c.local_id = :lid AND sc.turno_id = :tid AND sc.fecha_operacion = :fecha
-                       AND (sc.postulante_apertura_id = :viejo OR sc.postulante_cierre_id = :viejo)"
+                       AND (sc.postulante_apertura_id = :viejo3 OR sc.postulante_cierre_id = :viejo4)"
                 )->execute([
-                    'nuevo' => $nuevoPostulanteId, 'viejo' => $viejoId,
-                    'lid'   => $slot['local_id'],  'tid'   => $slot['turno_id'], 'fecha' => $slot['fecha_dia'],
+                    'nuevo1' => $nuevoPostulanteId, 'nuevo2' => $nuevoPostulanteId,
+                    'viejo1' => $viejoId, 'viejo2' => $viejoId, 'viejo3' => $viejoId, 'viejo4' => $viejoId,
+                    'lid'    => $slot['local_id'],  'tid'   => $slot['turno_id'], 'fecha' => $slot['fecha_dia'],
                 ]);
             }
 
@@ -1146,6 +1111,161 @@ class HorarioRepository
         } catch (\Throwable $e) {
             $this->db->rollBack();
             return 'No se pudo reasignar: ' . $e->getMessage();
+        }
+    }
+
+    /**
+     * Mueve un slot (lo deja libre, o lo asigna a cualquier trabajador) — disponible
+     * para cualquier staff logueado, no solo admin. El botón "CUBRIR / CAMBIAR PUESTO"
+     * es el único gate de seguridad (hay que activarlo a propósito); por eso esto no
+     * pide contraseña, a diferencia de reasignarSlotAdmin/liberarSlotAdmin que sí la
+     * piden porque viven en el panel de administración y pueden tocar cualquier fecha.
+     * Un no-admin solo puede mover slots de hoy en adelante; el admin no tiene esa
+     * restricción (igual que en el resto de acciones de horario).
+     */
+    public function moverSlotCualquiera(int $slotId, ?int $nuevoPostulanteId, int $actorId, bool $isAdmin): string
+    {
+        $slot = $this->getSlotById($slotId);
+        if (!$slot) return 'Slot no encontrado';
+
+        if ($this->esEspejo((int)$slot['semana_id'])) {
+            return 'La semana espejo se actualiza automáticamente; no puede editarse directamente';
+        }
+
+        if (!$isAdmin) {
+            $hoy = new DateTime('now', new DateTimeZone('America/Lima'));
+            if ((new DateTime($slot['fecha_dia'])) < $hoy->setTime(0, 0)) {
+                return 'No se pueden modificar turnos de días pasados';
+            }
+        }
+
+        $viejoId = $slot['postulante_id'] ? (int)$slot['postulante_id'] : null;
+
+        // ── Dejar el slot libre (sin reemplazo) ────────────────────────
+        if ($nuevoPostulanteId === null) {
+            if (!$viejoId) return 'El slot ya está libre';
+
+            $chkSurvey = $this->db->prepare(
+                "SELECT id_asistencia FROM asistencia
+                 WHERE postulante_id = :pid AND fecha = :fecha AND turno_id = :tid LIMIT 1"
+            );
+            $chkSurvey->execute(['pid' => $viejoId, 'fecha' => $slot['fecha_dia'], 'tid' => $slot['turno_id']]);
+            if ($chkSurvey->fetch()) {
+                return 'Este trabajador ya fue encuestado para este turno. No se puede eliminar del horario.';
+            }
+
+            $this->db->prepare(
+                "UPDATE horario_slot SET postulante_id = NULL, fecha_asignacion = NULL WHERE id_slot = :id"
+            )->execute(['id' => $slotId]);
+
+            $this->db->prepare(
+                "INSERT INTO solicitud_cambio (slot_id, semana_id, tipo, postulante_solicitante_id, postulante_original_id, notas)
+                 VALUES (:sid, :mid, 'CAMBIO', :actor, :viejo, 'Dejado libre')"
+            )->execute(['sid' => $slotId, 'mid' => $slot['semana_id'], 'actor' => $actorId, 'viejo' => $viejoId]);
+
+            $this->propagarEspejo($slotId, null);
+
+            if ($slot['rol_puesto'] !== 'LIMPIEZA') {
+                $this->limpiezaCascade($viejoId, (int)$slot['semana_id'], (int)$slot['local_id'], (int)$slot['turno_id'], $slot['fecha_dia']);
+            }
+
+            return 'ok';
+        }
+
+        // ── Asignar a alguien (slot libre u ocupado por otra persona) ──
+        if ($viejoId === $nuevoPostulanteId) return 'Ya está asignado a esta persona';
+
+        $esLimpieza = ($slot['rol_puesto'] === 'LIMPIEZA');
+        if ($esLimpieza) {
+            $trabajaLocal = $this->db->prepare(
+                "SELECT COUNT(*) FROM horario_slot hs
+                 INNER JOIN rol_horario rh ON hs.rol_horario_id = rh.id_rol_horario
+                 WHERE hs.semana_id = :sid AND hs.postulante_id = :pid
+                   AND hs.local_id = :lid AND hs.turno_id = :tid
+                   AND hs.fecha_dia = :fdia AND rh.codigo != 'LIMPIEZA'"
+            );
+            $trabajaLocal->execute([
+                'sid' => $slot['semana_id'], 'pid' => $nuevoPostulanteId,
+                'lid' => $slot['local_id'],  'tid' => $slot['turno_id'], 'fdia' => $slot['fecha_dia'],
+            ]);
+            if ((int)$trabajaLocal->fetchColumn() === 0) {
+                return 'Solo puede tomar limpieza en el local y turno donde trabaja ese día';
+            }
+        } else {
+            $conflicto = $this->db->prepare(
+                "SELECT id_slot FROM horario_slot
+                 WHERE semana_id = :sid AND postulante_id = :pid
+                   AND turno_id = :tid AND fecha_dia = :fdia AND id_slot != :slot"
+            );
+            $conflicto->execute([
+                'sid' => $slot['semana_id'], 'pid' => $nuevoPostulanteId,
+                'tid' => $slot['turno_id'],  'fdia' => $slot['fecha_dia'], 'slot' => $slotId,
+            ]);
+            if ($conflicto->fetch()) return 'Ese trabajador ya tiene un turno asignado ese día y turno';
+        }
+
+        $this->db->beginTransaction();
+        try {
+            if ($viejoId) {
+                // Slot ocupado por otra persona: migrar encuesta/cuadre/bono igual que reasignarSlotAdmin
+                $this->db->prepare(
+                    "DELETE FROM asistencia WHERE postulante_id = :pid AND fecha = :fecha AND turno_id = :tid"
+                )->execute(['pid' => $viejoId, 'fecha' => $slot['fecha_dia'], 'tid' => $slot['turno_id']]);
+
+                $this->db->prepare(
+                    "UPDATE sesion_participante sp
+                     INNER JOIN sesion_caja sc ON sc.id_sesion = sp.sesion_id
+                     INNER JOIN caja c ON c.id_caja = sc.caja_id
+                     SET sp.postulante_id = :nuevo
+                     WHERE sp.postulante_id = :viejo
+                       AND sp.rol_participacion = :rol
+                       AND c.local_id = :lid AND sc.turno_id = :tid AND sc.fecha_operacion = :fecha"
+                )->execute([
+                    'nuevo' => $nuevoPostulanteId, 'viejo' => $viejoId, 'rol' => $slot['rol_puesto'],
+                    'lid'   => $slot['local_id'],  'tid'   => $slot['turno_id'], 'fecha' => $slot['fecha_dia'],
+                ]);
+
+                if ($slot['rol_puesto'] === 'CAJERA') {
+                    $this->db->prepare(
+                        "UPDATE sesion_caja sc
+                         INNER JOIN caja c ON c.id_caja = sc.caja_id
+                         SET sc.postulante_apertura_id = IF(sc.postulante_apertura_id = :viejo1, :nuevo1, sc.postulante_apertura_id),
+                             sc.postulante_cierre_id   = IF(sc.postulante_cierre_id   = :viejo2, :nuevo2, sc.postulante_cierre_id)
+                         WHERE c.local_id = :lid AND sc.turno_id = :tid AND sc.fecha_operacion = :fecha
+                           AND (sc.postulante_apertura_id = :viejo3 OR sc.postulante_cierre_id = :viejo4)"
+                    )->execute([
+                        'nuevo1' => $nuevoPostulanteId, 'nuevo2' => $nuevoPostulanteId,
+                        'viejo1' => $viejoId, 'viejo2' => $viejoId, 'viejo3' => $viejoId, 'viejo4' => $viejoId,
+                        'lid'    => $slot['local_id'],  'tid'   => $slot['turno_id'], 'fecha' => $slot['fecha_dia'],
+                    ]);
+                }
+
+                $this->db->prepare(
+                    "UPDATE horario_rendimiento SET postulante_id = :nuevo WHERE horario_slot_id = :slot"
+                )->execute(['nuevo' => $nuevoPostulanteId, 'slot' => $slotId]);
+            }
+
+            $this->db->prepare(
+                "UPDATE horario_slot SET postulante_id = :pid, fecha_asignacion = NOW() WHERE id_slot = :id"
+            )->execute(['pid' => $nuevoPostulanteId, 'id' => $slotId]);
+
+            $this->db->prepare(
+                "INSERT INTO solicitud_cambio
+                    (slot_id, semana_id, tipo, postulante_solicitante_id, postulante_original_id, postulante_nuevo_id, notas)
+                 VALUES (:sid, :mid, 'CAMBIO', :actor, :viejo, :nuevo, :notas)"
+            )->execute([
+                'sid'   => $slotId, 'mid' => $slot['semana_id'], 'actor' => $actorId,
+                'viejo' => $viejoId, 'nuevo' => $nuevoPostulanteId,
+                'notas' => $viejoId ? 'Reasignado (cuadre, rendimiento y encuesta incluidos)' : null,
+            ]);
+
+            $this->propagarEspejo($slotId, $nuevoPostulanteId);
+
+            $this->db->commit();
+            return 'ok';
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            return 'No se pudo mover el turno: ' . $e->getMessage();
         }
     }
 
@@ -1437,6 +1557,7 @@ class HorarioRepository
                     t.descripcion  AS turno_desc,
                     ps.nombres     AS solicitante_nombre,
                     po.nombres     AS original_nombre,
+                    pn.nombres     AS nuevo_nombre,
                     pr.nombres     AS revertida_por_nombre
              FROM solicitud_cambio sc
              INNER JOIN horario_slot hs ON sc.slot_id            = hs.id_slot
@@ -1445,6 +1566,7 @@ class HorarioRepository
              INNER JOIN turno t         ON hs.turno_id           = t.id_turno
              INNER JOIN postulante ps   ON sc.postulante_solicitante_id = ps.id_postulante
              LEFT  JOIN postulante po   ON sc.postulante_original_id    = po.id_postulante
+             LEFT  JOIN postulante pn   ON sc.postulante_nuevo_id       = pn.id_postulante
              LEFT  JOIN postulante pr   ON sc.revertida_por             = pr.id_postulante
              {$whereStr}
              ORDER BY sc.fecha_solicitud DESC

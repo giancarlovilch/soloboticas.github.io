@@ -45,10 +45,6 @@ if ($semana) {
         .hor-asiento { cursor: default !important; pointer-events: none !important; }
         .hor-asiento:hover { transform: none !important; box-shadow: none !important; }
 
-        /* Admin: botones siempre visibles en páginas read-only */
-        .hor-asiento__btn-picker  { opacity: 1 !important; }
-        .hor-asiento__btn-liberar { opacity: 1 !important; }
-
         /* Modo cubrir: desbloquea slots elegibles */
         body.modo-cubrir .hor-asiento--cubrir-eligible {
             cursor: pointer !important;
@@ -174,7 +170,7 @@ if ($semana) {
 
     <!-- Banner modo cubrir activo -->
     <div id="bannerCubrir">
-        <span>🔓 Modo <strong>Cubrir Puesto</strong> activo — haz clic en el turno de tu compañera para reemplazarla</span>
+        <span>🔓 Modo <strong>Cubrir Puesto</strong> activo — haz clic en cualquier turno de hoy o de días futuros para ubicar a quien quieras</span>
         <button onclick="toggleModoCubrir()"
                 style="background:transparent;border:1.5px solid #fca5a5;border-radius:6px;
                        padding:2px 10px;cursor:pointer;font-size:.76rem;color:#991b1b;font-weight:700;">
@@ -271,114 +267,21 @@ if ($semana) {
 
 </main>
 
-<?php if ($esAdmin): ?>
-<!-- ── Admin: picker ─────────────────────────────────────── -->
-<div id="adminPickerOverlayA" class="hor-picker-overlay" hidden>
+<!-- ── Modal: mover puesto (disponible para todo el staff, hoy y futuro) ── -->
+<div id="moverOverlay" class="hor-picker-overlay" hidden>
     <div class="hor-picker">
         <div class="hor-picker__header">
-            <h3>Asignar trabajador</h3>
-            <button onclick="cerrarPickerAdmin()">✕</button>
+            <h3>⇄ Mover puesto</h3>
+            <button onclick="cerrarPickerMover()">✕</button>
         </div>
-        <select id="adminPickerSelectA" class="hor-picker__select">
-            <option value="">— Seleccionar trabajador —</option>
+        <p id="moverActualMsg" style="font-size:.82rem;color:#475569;margin:.1rem 0 .4rem;"></p>
+        <select id="moverSelect" class="hor-picker__select">
+            <option value="">— Dejar libre —</option>
         </select>
         <div class="hor-picker__footer">
-            <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;" onclick="cerrarPickerAdmin()">Cancelar</button>
-            <button class="hor-btn hor-btn--primary" onclick="pickerAsignarAdmin()">Asignar</button>
-        </div>
-    </div>
-</div>
-<!-- ── Admin: liberar ────────────────────────────────────── -->
-<div id="liberarAdminOverlayA" class="hor-picker-overlay" hidden>
-    <div class="hor-picker">
-        <div class="hor-picker__header">
-            <h3>Quitar del turno</h3>
-            <button onclick="cerrarLiberarAdmin()">✕</button>
-        </div>
-        <p id="liberarAdminNombreA" style="font-size:.85rem;color:#475569;margin:.25rem 0 .75rem;"></p>
-        <input id="liberarAdminPwdA" type="password" class="hor-picker__select"
-               placeholder="Tu contraseña de administrador"
-               onkeydown="if(event.key==='Enter') confirmarLiberarAdmin()">
-        <div class="hor-picker__footer">
-            <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;" onclick="cerrarLiberarAdmin()">Cancelar</button>
-            <button class="hor-btn" style="background:#ef4444;color:#fff;border:none;" onclick="confirmarLiberarAdmin()">Quitar</button>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
-
-<!-- ── Modal: cubrir / tomar puesto ─────────────────────── -->
-<div id="cubrirOverlay" class="hor-picker-overlay" hidden>
-    <div class="hor-picker">
-        <div class="hor-picker__header">
-            <h3 id="cubrirTitulo">🤝 Cubrir Puesto</h3>
-            <button onclick="cerrarModalCubrir()">✕</button>
-        </div>
-        <p id="cubrirPreMsg" style="font-size:.82rem;color:#475569;margin:.1rem 0 .4rem;">
-            Cubrirás el turno de:
-        </p>
-        <div id="cubrirNombre"
-             style="font-size:.95rem;font-weight:700;
-                    border-radius:8px;padding:.55rem .85rem;"></div>
-        <p id="cubrirExtraMsg" style="font-size:.77rem;color:#64748b;line-height:1.5;margin-top:.4rem;"></p>
-        <input id="cubrirPwd" type="password" class="hor-picker__select"
-               placeholder="Confirma con tu contraseña"
-               onkeydown="if(event.key==='Enter') confirmarCubrir()">
-        <div class="hor-picker__footer">
             <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;"
-                    onclick="cerrarModalCubrir()">Cancelar</button>
-            <button id="cubrirConfirmBtn" class="hor-btn" style="background:#dc2626;color:#fff;border:none;"
-                    onclick="confirmarCubrir()">Confirmar</button>
-        </div>
-    </div>
-</div>
-
-<!-- ── Modal: cambiar de puesto (intercambio) ────────────── -->
-<div id="intercambioOverlay" class="hor-picker-overlay" hidden>
-    <div class="hor-picker">
-        <div class="hor-picker__header">
-            <h3>⇄ Cambiar de Puesto</h3>
-            <button onclick="cerrarModalIntercambio()">✕</button>
-        </div>
-        <p style="font-size:.82rem;color:#475569;margin:.1rem 0 .4rem;">Intercambiarás tu posición con:</p>
-        <div id="intercambioNombreOtra"
-             style="font-size:.95rem;font-weight:700;color:#92400e;
-                    background:#fef3c7;border:1px solid #fbbf24;
-                    border-radius:8px;padding:.55rem .85rem;"></div>
-        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:.5rem;margin:.5rem 0;font-size:.75rem;color:#64748b;">
-            <div id="intercambioMiPuesto" style="background:#f8fafc;border-radius:6px;padding:.4rem .6rem;text-align:center;"></div>
-            <span style="font-size:1.1rem;">⇄</span>
-            <div id="intercambioOtroPuesto" style="background:#f8fafc;border-radius:6px;padding:.4rem .6rem;text-align:center;"></div>
-        </div>
-        <p style="font-size:.77rem;color:#64748b;line-height:1.5;">
-            Tú irás a su posición y ella irá a la tuya. Solo tú podrás revertir el cambio.
-        </p>
-        <input id="intercambioPwd" type="password" class="hor-picker__select"
-               placeholder="Confirma con tu contraseña"
-               onkeydown="if(event.key==='Enter') confirmarIntercambio()">
-        <div class="hor-picker__footer">
-            <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;"
-                    onclick="cerrarModalIntercambio()">Cancelar</button>
-            <button class="hor-btn" style="background:#d97706;color:#fff;border:none;"
-                    onclick="confirmarIntercambio()">Confirmar cambio</button>
-        </div>
-    </div>
-</div>
-
-<!-- ── Modal: revertir cobertura propia ─────────────────── -->
-<div id="revertirOverlay" class="hor-picker-overlay" hidden>
-    <div class="hor-picker">
-        <div class="hor-picker__header">
-            <h3>↩ Revertir cobertura</h3>
-            <button onclick="cerrarModalRevertir()">✕</button>
-        </div>
-        <p id="revertirMsg"
-           style="font-size:.85rem;color:#475569;line-height:1.5;margin:.25rem 0;"></p>
-        <div class="hor-picker__footer">
-            <button class="hor-btn" style="background:#f1f5f9;color:#64748b;border:none;"
-                    onclick="cerrarModalRevertir()">Cancelar</button>
-            <button class="hor-btn" style="background:#dc2626;color:#fff;border:none;"
-                    onclick="confirmarRevertir()">Sí, revertir</button>
+                    onclick="cerrarPickerMover()">Cancelar</button>
+            <button class="hor-btn hor-btn--primary" onclick="confirmarMover()">Confirmar</button>
         </div>
     </div>
 </div>
@@ -393,9 +296,7 @@ const ES_ADMIN  = <?= $esAdmin ? 'true' : 'false' ?>;
 let _slots              = [];
 let _filtroId           = 0;
 let _modoCubrir         = false;
-let _slotParaCubrir     = null;
-let _slotParaRevertir   = null;
-let _slotParaIntercambio = null; // { miSlot, otroSlot }
+let _slotParaMover      = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (SEMANA_ID) cargarSlots();
@@ -491,32 +392,12 @@ function renderSlots(slots) {
             el.title     = s.trabajador_nombre || '—';
             el.querySelector('.hor-asiento__nombre').textContent = s.trabajador_nombre || '—';
 
+            // Días pasados solo los puede tocar el admin
             const esPasado = s.fecha_dia < HOY;
-            if (_modoCubrir && !esPasado) {
-                if (esCoberturaMia || esMiCambio || esMiIntercambio) {
-                    // Mis slots con solicitud activa → revertir
-                    el.classList.add('hor-asiento--cubrir-eligible');
-                    el.title   = esMiIntercambio
-                        ? 'Intercambiaste este puesto — clic para revertir ambos'
-                        : 'Estás cubriendo este turno — clic para revertir';
-                    el.onclick = () => abrirModalRevertir(s);
-                } else if (!esMio) {
-                    // Slot de otra persona → detectar si hay conflicto (intercambio) o no (cubrir)
-                    el.classList.add('hor-asiento--cubrir-eligible');
-                    const miConflicto = _slots.find(x =>
-                        parseInt(x.postulante_id) === MI_ID &&
-                        x.turno_id == s.turno_id &&
-                        x.dia_semana == s.dia_semana &&
-                        x.id_slot != s.id_slot
-                    );
-                    if (miConflicto) {
-                        el.title   = `Cambiar puesto con ${s.trabajador_nombre || 'esta compañera'}`;
-                        el.onclick = () => abrirModalIntercambio(s, miConflicto);
-                    } else {
-                        el.title   = `Cubrir a ${s.trabajador_nombre || 'esta compañera'}`;
-                        el.onclick = () => abrirModalCubrir(s);
-                    }
-                }
+            if (_modoCubrir && (!esPasado || ES_ADMIN)) {
+                el.classList.add('hor-asiento--cubrir-eligible');
+                el.title   = `Mover este puesto (hoy: ${s.trabajador_nombre || '—'})`;
+                el.onclick = () => abrirPickerMover(s);
             }
         } else {
             el.className = 'hor-asiento hor-asiento--libre';
@@ -530,23 +411,12 @@ function renderSlots(slots) {
                 libres[s.local_id] = (libres[s.local_id] || 0) + 1;
             }
 
-            // Slots libres: tomables en modo cubrir o asignables por admin
+            // Slots libres: asignables en modo cubrir, a cualquiera (días pasados solo admin)
             const esPasado = s.fecha_dia < HOY;
-            if (_modoCubrir && !esPasado) {
+            if (_modoCubrir && (!esPasado || ES_ADMIN)) {
                 el.classList.add('hor-asiento--cubrir-eligible');
-                el.title   = 'Turno libre — clic para tomar';
-                el.onclick = () => abrirModalCubrir(s);
-            }
-            if (ES_ADMIN) agregarBtnPicker(el);
-        }
-
-        // Admin: botón liberar en slots ocupados
-        if (ES_ADMIN && s.postulante_id) {
-            const yaEncuestado = parseInt(s.encuestado) === 1;
-            if (yaEncuestado) {
-                agregarBtnEncuestado(el);
-            } else {
-                agregarBtnLiberar(el, s.trabajador_nombre || '—');
+                el.title   = 'Turno libre — clic para asignar';
+                el.onclick = () => abrirPickerMover(s);
             }
         }
     });
@@ -588,270 +458,66 @@ function toggleModoCubrir() {
     renderSlots(_slots);
 }
 
-// ── Modal: cubrir / tomar ──────────────────────────────
-function abrirModalCubrir(s) {
-    _slotParaCubrir = s;
-    const tieneOcupante = !!s.postulante_id;
-    const nombre = document.getElementById('cubrirNombre');
+// ── Picker universal: mover cualquier puesto a cualquiera ──────
+let _trabajadoresCache = [];
 
-    if (tieneOcupante) {
-        document.getElementById('cubrirTitulo').textContent    = '🤝 Cubrir Puesto';
-        document.getElementById('cubrirPreMsg').textContent    = 'Cubrirás el turno de:';
-        nombre.textContent   = s.trabajador_nombre || '—';
-        nombre.style.color   = '#991b1b';
-        nombre.style.background = '#fee2e2';
-        nombre.style.border  = '1px solid #fca5a5';
-        document.getElementById('cubrirExtraMsg').textContent  =
-            'Tu nombre reemplazará al suyo. Puedes revertirlo haciendo clic en tu nombre (rojo).';
-        document.getElementById('cubrirConfirmBtn').textContent = 'Confirmar cobertura';
-    } else {
-        document.getElementById('cubrirTitulo').textContent    = '✅ Tomar Turno Libre';
-        document.getElementById('cubrirPreMsg').textContent    = 'Tomarás este turno:';
-        nombre.textContent   = '— Libre —';
-        nombre.style.color   = '#065f46';
-        nombre.style.background = '#d1fae5';
-        nombre.style.border  = '1px solid #a7f3d0';
-        document.getElementById('cubrirExtraMsg').textContent  =
-            'Tu nombre aparecerá en el horario. Puedes liberarlo haciendo clic en tu nombre después.';
-        document.getElementById('cubrirConfirmBtn').textContent = 'Confirmar';
-    }
-
-    document.getElementById('cubrirPwd').value = '';
-    document.getElementById('cubrirOverlay').hidden = false;
-    setTimeout(() => document.getElementById('cubrirPwd').focus(), 60);
-}
-
-function cerrarModalCubrir() {
-    document.getElementById('cubrirOverlay').hidden = true;
-    _slotParaCubrir = null;
-}
-
-async function confirmarCubrir() {
-    const password = document.getElementById('cubrirPwd').value.trim();
-    if (!password) { mostrarToast('Ingresa tu contraseña', 'info'); return; }
-
-    const s = _slotParaCubrir;
-    cerrarModalCubrir();
-
+async function cargarTrabajadores() {
+    if (_trabajadoresCache.length) return _trabajadoresCache;
     try {
-        const r   = await fetch(`${BASE}/horario/api/solicitud/cubrir`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ slot_id: parseInt(s.id_slot), password }),
-        });
+        const r   = await fetch(`${BASE}/horario/api/trabajadores`);
         const res = await r.json();
-        await cargarSlots();
-        if (res.success) mostrarToast('¡Turno cubierto correctamente!', 'ok');
-        else             mostrarToast(res.message || 'No se pudo cubrir el turno.', 'error');
-    } catch {
-        mostrarToast('Error de conexión.', 'error');
-    }
+        if (res.success) _trabajadoresCache = res.data || [];
+    } catch {}
+    return _trabajadoresCache;
 }
 
-// ── Modal: revertir (cobertura, cambio o intercambio) ──
-function abrirModalRevertir(s) {
-    _slotParaRevertir = s;
-    let msg;
-    if (s.solicitud_tipo === 'INTERCAMBIO') {
-        const orig = s.original_nombre || 'tu compañera';
-        msg = `¿Revertir el intercambio? ${orig} volverá a su puesto y tú volverás al tuyo.`;
-    } else if (s.solicitud_tipo === 'COBERTURA') {
-        const orig = s.original_nombre || 'tu compañera';
-        msg = `¿Quieres dejar de cubrir este turno? ${orig} recuperará su puesto.`;
-    } else {
-        msg = '¿Quieres liberar este turno? Quedará disponible para otras compañeras.';
-    }
-    document.getElementById('revertirMsg').textContent = msg;
-    document.getElementById('revertirOverlay').hidden = false;
+async function abrirPickerMover(s) {
+    _slotParaMover = s;
+    const trabajadores = await cargarTrabajadores();
+
+    document.getElementById('moverActualMsg').textContent = s.postulante_id
+        ? `Ahora está: ${s.trabajador_nombre || '—'}`
+        : 'Este turno está libre.';
+
+    const sel = document.getElementById('moverSelect');
+    sel.innerHTML = '<option value="">— Dejar libre —</option>' +
+        trabajadores
+            .filter(t => parseInt(t.id) !== parseInt(s.postulante_id))
+            .map(t => `<option value="${t.id}">${t.nombre}</option>`)
+            .join('');
+    sel.value = '';
+
+    document.getElementById('moverOverlay').hidden = false;
 }
 
-// ── Modal: intercambio de puesto ───────────────────────
-const _ROLES_LABEL = {
-    CAJERA:'Cajera', VENDEDORA:'Vendedora', ALMACENERA:'Almacenera', LIMPIEZA:'Limpieza',
-    ABASTECIMIENTO:'Abastecimiento', INVENTARIO:'Inventario', COMPRAS:'Compras', AUDITORIA:'Auditoría',
-};
-const _LOCALES_LABEL = { '2':'SB2', '3':'SB3', '4':'SB4', '5':'Admin' };
-
-function abrirModalIntercambio(otroSlot, miSlot) {
-    _slotParaIntercambio = { miSlot, otroSlot };
-    document.getElementById('intercambioNombreOtra').textContent = otroSlot.trabajador_nombre || '—';
-
-    const fmtSlot = s => `${_LOCALES_LABEL[s.local_id] || 'Local'} · ${_ROLES_LABEL[s.rol_puesto] || s.rol_puesto}`;
-    document.getElementById('intercambioMiPuesto').textContent   = 'Tú: ' + fmtSlot(miSlot);
-    document.getElementById('intercambioOtroPuesto').textContent = (otroSlot.trabajador_nombre?.split(' ')[0] || 'Ella') + ': ' + fmtSlot(otroSlot);
-
-    document.getElementById('intercambioPwd').value = '';
-    document.getElementById('intercambioOverlay').hidden = false;
-    setTimeout(() => document.getElementById('intercambioPwd').focus(), 60);
+function cerrarPickerMover() {
+    document.getElementById('moverOverlay').hidden = true;
+    _slotParaMover = null;
 }
 
-function cerrarModalIntercambio() {
-    document.getElementById('intercambioOverlay').hidden = true;
-    _slotParaIntercambio = null;
-}
-
-async function confirmarIntercambio() {
-    const pwd = document.getElementById('intercambioPwd').value.trim();
-    if (!pwd) { mostrarToast('Ingresa tu contraseña', 'info'); return; }
-
-    const { miSlot, otroSlot } = _slotParaIntercambio;
-    cerrarModalIntercambio();
+async function confirmarMover() {
+    const s = _slotParaMover;
+    const nuevoId = document.getElementById('moverSelect').value;
+    cerrarPickerMover();
 
     try {
-        const r   = await fetch(`${BASE}/horario/api/slot/intercambiar`, {
+        const r   = await fetch(`${BASE}/horario/api/slot/mover`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
-                mi_slot_id:   parseInt(miSlot.id_slot),
-                otro_slot_id: parseInt(otroSlot.id_slot),
-                password:     pwd,
+                slot_id: parseInt(s.id_slot),
+                nuevo_postulante_id: nuevoId ? parseInt(nuevoId) : null,
             }),
         });
         const res = await r.json();
         await cargarSlots();
-        if (res.success) mostrarToast('¡Puesto intercambiado correctamente!', 'ok');
-        else             mostrarToast(res.message || 'No se pudo realizar el intercambio.', 'error');
+        if (res.success) mostrarToast(nuevoId ? '¡Turno reasignado!' : 'Turno liberado.', 'ok');
+        else             mostrarToast(res.message || 'No se pudo mover el turno.', 'error');
     } catch {
         mostrarToast('Error de conexión.', 'error');
     }
 }
 
-function cerrarModalRevertir() {
-    document.getElementById('revertirOverlay').hidden = true;
-    _slotParaRevertir = null;
-}
-
-// ── Admin: picker y liberar ────────────────────────────
-let _adminTrabajadores = [];
-let _pickerSlotElA     = null;
-let _liberarSlotElA    = null;
-
-async function cargarTrabajadoresAdmin() {
-    if (!ES_ADMIN || _adminTrabajadores.length) return;
-    try {
-        const r   = await fetch(`${BASE}/horario/api/trabajadores`);
-        const res = await r.json();
-        if (!res.success) return;
-        _adminTrabajadores = res.data || [];
-        const sel = document.getElementById('adminPickerSelectA');
-        if (!sel) return;
-        _adminTrabajadores.forEach(t => {
-            const o = document.createElement('option');
-            o.value = t.id; o.textContent = t.nombre;
-            sel.appendChild(o);
-        });
-    } catch {}
-}
-
-function agregarBtnPicker(el) {
-    if (el.querySelector('.hor-asiento__btn-picker')) return;
-    const btn = document.createElement('button');
-    btn.className   = 'hor-asiento__btn-picker';
-    btn.title       = 'Asignar trabajador';
-    btn.textContent = '👤';
-    btn.addEventListener('click', e => { e.stopPropagation(); abrirPickerAdmin(el); });
-    el.appendChild(btn);
-}
-
-function agregarBtnLiberar(el, nombre) {
-    if (el.querySelector('.hor-asiento__btn-liberar')) return;
-    const btn = document.createElement('button');
-    btn.className   = 'hor-asiento__btn-liberar';
-    btn.title       = `Quitar a ${nombre}`;
-    btn.textContent = '✕';
-    btn.addEventListener('click', e => { e.stopPropagation(); abrirLiberarAdmin(el, nombre); });
-    el.appendChild(btn);
-}
-
-function agregarBtnEncuestado(el) {
-    if (el.querySelector('.hor-asiento__btn-encuestado')) return;
-    const btn = document.createElement('button');
-    btn.className   = 'hor-asiento__btn-encuestado';
-    btn.title       = 'Ya fue encuestado — no se puede quitar';
-    btn.textContent = '📋';
-    el.appendChild(btn);
-}
-
-function abrirPickerAdmin(el) {
-    _pickerSlotElA = el;
-    cargarTrabajadoresAdmin();
-    const sel = document.getElementById('adminPickerSelectA');
-    if (sel) sel.value = '';
-    document.getElementById('adminPickerOverlayA').hidden = false;
-}
-
-function cerrarPickerAdmin() {
-    document.getElementById('adminPickerOverlayA').hidden = true;
-    _pickerSlotElA = null;
-}
-
-async function pickerAsignarAdmin() {
-    const targetId = document.getElementById('adminPickerSelectA').value;
-    if (!targetId) { mostrarToast('Selecciona un trabajador', 'info'); return; }
-    const el = _pickerSlotElA;
-    cerrarPickerAdmin();
-    el.classList.add('hor-asiento--loading');
-    try {
-        const r   = await fetch(`${BASE}/horario/api/slot/asignar`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slot_id: parseInt(el.dataset.slotid), semana_id: SEMANA_ID, target_id: parseInt(targetId) }),
-        });
-        const res = await r.json();
-        await cargarSlots();
-        if (!res.success) mostrarToast(res.message || 'Error al asignar.', 'error');
-    } catch { el.classList.remove('hor-asiento--loading'); mostrarToast('Error de conexión.', 'error'); }
-}
-
-function abrirLiberarAdmin(el, nombre) {
-    _liberarSlotElA = el;
-    document.getElementById('liberarAdminNombreA').textContent = `Quitar a ${nombre} de este turno.`;
-    document.getElementById('liberarAdminPwdA').value = '';
-    document.getElementById('liberarAdminOverlayA').hidden = false;
-    setTimeout(() => document.getElementById('liberarAdminPwdA').focus(), 50);
-}
-
-function cerrarLiberarAdmin() {
-    document.getElementById('liberarAdminOverlayA').hidden = true;
-    _liberarSlotElA = null;
-}
-
-async function confirmarLiberarAdmin() {
-    const pwd   = document.getElementById('liberarAdminPwdA').value.trim();
-    if (!pwd) { mostrarToast('Ingresa tu contraseña', 'info'); return; }
-    const el    = _liberarSlotElA;
-    const slotId = el?.dataset.slotid;
-    if (!slotId) return;
-    cerrarLiberarAdmin();
-    el.classList.add('hor-asiento--loading');
-    try {
-        const r   = await fetch(`${BASE}/horario/api/slot/${slotId}/liberar-admin`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: pwd }),
-        });
-        const res = await r.json();
-        await cargarSlots();
-        if (!res.success) mostrarToast(res.message || 'No se pudo quitar al trabajador.', 'error');
-    } catch { el.classList.remove('hor-asiento--loading'); mostrarToast('Error de conexión.', 'error'); }
-}
-
-async function confirmarRevertir() {
-    const s           = _slotParaRevertir;
-    const solicitudId = s.id_solicitud_activa;
-    cerrarModalRevertir();
-
-    try {
-        const r   = await fetch(`${BASE}/horario/api/solicitud/${solicitudId}/revertir-propia`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        const res = await r.json();
-        await cargarSlots();
-        if (res.success) mostrarToast('Cobertura revertida.', 'ok');
-        else             mostrarToast(res.message || 'No se pudo revertir.', 'error');
-    } catch {
-        mostrarToast('Error de conexión.', 'error');
-    }
-}
 </script>
 </body>
 </html>

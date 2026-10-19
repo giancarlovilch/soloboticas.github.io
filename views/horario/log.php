@@ -166,10 +166,12 @@ $TURNOS = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
         <?php foreach ($logs as $r):
             $color = $colores[$r['local_id']] ?? '#64748b';
 
-            // Determinar si el solicitante TOMÓ el slot o lo VACIÓ
-            // COBERTURA o CAMBIO-sin-original → tomó el slot
-            // CAMBIO-con-original → sacó a alguien (slot queda libre)
-            $vaciado = $r['tipo'] === 'CAMBIO' && !empty($r['original_nombre']);
+            // Determinar qué mostrar en "Nuevo ocupante":
+            // - nuevo_nombre presente → otra persona lo reasignó a un tercero (puede ser el propio actor)
+            // - si no, y es CAMBIO con original → lo dejaron libre (nadie quedó)
+            // - si no, el propio solicitante quedó en el puesto (autoservicio: cubrir/tomar/asignarse)
+            $vaciado = empty($r['nuevo_nombre']) && $r['tipo'] === 'CAMBIO' && !empty($r['original_nombre']);
+            $nuevoOcupanteNombre = $r['nuevo_nombre'] ?: (!$vaciado ? $r['solicitante_nombre'] : null);
         ?>
         <tr>
             <td style="font-weight:600;white-space:nowrap;">
@@ -189,7 +191,12 @@ $TURNOS = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
             </td>
             <td>
                 <span class="log-badge log-badge--<?= $r['tipo'] ?>">
-                    <?= $r['tipo'] === 'COBERTURA' ? 'Cobertura' : ($vaciado ? 'Liberado' : 'Tomó turno') ?>
+                    <?php
+                        if ($r['tipo'] === 'COBERTURA') echo 'Cobertura';
+                        elseif ($vaciado) echo 'Liberado';
+                        elseif (!empty($r['nuevo_nombre']) && $r['nuevo_nombre'] !== $r['solicitante_nombre']) echo 'Reasignado';
+                        else echo 'Tomó turno';
+                    ?>
                 </span>
             </td>
             <!-- Quién ejecutó la acción (siempre) -->
@@ -199,7 +206,7 @@ $TURNOS = [1 => '☀️ Mañana', 2 => '🌙 Tarde'];
                 <?php if ($vaciado): ?>
                     <span class="log-muted">— libre —</span>
                 <?php else: ?>
-                    <span style="color:#059669;font-weight:600;"><?= htmlspecialchars($r['solicitante_nombre']) ?></span>
+                    <span style="color:#059669;font-weight:600;"><?= htmlspecialchars($nuevoOcupanteNombre) ?></span>
                 <?php endif; ?>
             </td>
             <!-- Quién había antes -->

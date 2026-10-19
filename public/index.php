@@ -116,6 +116,7 @@ $router->post('/horario/api/semana/{id}/cerrar',[HorarioController::class, 'cerr
 $router->post('/horario/api/slot/intercambiar', [HorarioController::class, 'intercambiarSlots']);
 $router->post('/horario/api/slot/asignar',      [HorarioController::class, 'asignarSlot']);
 $router->post('/horario/api/slot/liberar',      [HorarioController::class, 'liberarSlot']);
+$router->post('/horario/api/slot/mover',        [HorarioController::class, 'moverSlot']);
 $router->get('/horario/api/staff-turno',        [HorarioController::class, 'getStaffTurno']);
 $router->get('/horario/api/trabajadores',       [HorarioController::class, 'getTrabajadores']);
 

@@ -287,8 +287,31 @@ class HorarioController extends Controller
     public function getTrabajadores(): void
     {
         $this->requireAuth();
-        if (!$this->isAdmin()) $this->error('Solo administradores', 403);
         $this->success('OK', $this->repo->getTrabajadores());
+    }
+
+    // ── POST /horario/api/slot/mover ──────────────────────
+    // Mueve cualquier slot (lo libera, o lo asigna a cualquier trabajador).
+    // Disponible para todo el staff logueado, no solo admin — el botón
+    // "CUBRIR / CAMBIAR PUESTO" (que activa el modo necesario para llegar aquí)
+    // es el gate de seguridad, por eso no pide contraseña. Solo admin puede
+    // tocar días ya pasados.
+    public function moverSlot(): void
+    {
+        $actorId = $this->requireAuth();
+        $data    = $this->getAllInput();
+
+        $slotId  = (int)($data['slot_id'] ?? 0);
+        $nuevoId = (isset($data['nuevo_postulante_id']) && $data['nuevo_postulante_id'] !== '' && $data['nuevo_postulante_id'] !== null)
+            ? (int)$data['nuevo_postulante_id']
+            : null;
+
+        if (!$slotId) $this->error('slot_id requerido', 400);
+
+        $result = $this->repo->moverSlotCualquiera($slotId, $nuevoId, $actorId, $this->isAdmin());
+        if ($result !== 'ok') $this->error($result, 409);
+
+        $this->success($nuevoId ? 'Turno reasignado correctamente' : 'Turno liberado correctamente');
     }
 
     // ── POST /horario/api/slot/{id}/liberar-admin ─────────
@@ -390,7 +413,8 @@ class HorarioController extends Controller
     // ── POST /horario/api/slot/asignar ─────────────────────
     public function asignarSlot(): void
     {
-        $postulanteId = $this->requireAuth();
+        $actorId      = $this->requireAuth();
+        $postulanteId = $actorId;
         $data         = $this->getAllInput();
 
         $slotId    = (int)($data['slot_id']   ?? 0);
@@ -419,7 +443,7 @@ class HorarioController extends Controller
             $this->error('La semana está cerrada. Solo el administrador puede modificarla.', 403);
         }
 
-        $result = $this->repo->asignarSlot($slotId, $semanaId, $postulanteId);
+        $result = $this->repo->asignarSlot($slotId, $semanaId, $postulanteId, $actorId);
         if ($result !== 'ok') $this->error($result, 409);
 
         $this->success('Turno asignado');
