@@ -1,21 +1,17 @@
 # Credenciales y entorno local
 .env
 
-# Dumps de base de datos (datos reales / snapshots) - no deben ir al repo publico
+# Estacion de trabajo local: docker, dumps de BD, backups, docs de contexto.
+# Nada de esto debe llegar a produccion ni a GitHub.
+deploy/
+
+# Dumps de base de datos sueltos (por si alguno se cae fuera de deploy/ por error)
 *.sql
 !db/sb_schema.sql
 !db/sb_data.sql
 
-# Backups locales de datos reales de produccion (fotos, documentos)
-backups/
-
 # Archivos subidos por usuarios (fotos, documentos escaneados) - datos reales, no van al repo
 public/uploads/
-
-# Docker local (desarrollo)
-docker-compose.yml
-docker-compose.*.yml
-docker/
 
 # Dependencias
 vendor/
