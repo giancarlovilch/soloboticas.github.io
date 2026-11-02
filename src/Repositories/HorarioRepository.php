@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../Core/Database.php';
+require_once __DIR__ . '/CajaRepository.php';
 
 class HorarioRepository
 {
@@ -9,6 +10,39 @@ class HorarioRepository
     public function __construct()
     {
         $this->db = Database::getConnection();
+    }
+
+    /**
+     * Si el slot es de CAJERA, busca la sesion_caja de ese local+turno+fecha
+     * y vuelve a sincronizar horario_rendimiento con los datos actuales del
+     * cuadre (CajaRepository::registrarRendimientoCajera). Hace falta porque
+     * un turno se puede asignar/reasignar DESPUES de que la caja ya cerro
+     * (p.ej. cubrir un puesto que quedo vacante), y sin esto el rendimiento
+     * (operaciones BCP, bono) nunca se registraba para ese caso.
+     */
+    private function sincronizarRendimientoCajera(string $rolPuesto, int $localId, int $turnoId, string $fechaDia, int $postulanteId): void
+    {
+        if ($rolPuesto !== 'CAJERA') return;
+
+        // Un local puede tener varias cajas/terminales abiertas el mismo turno,
+        // por eso hace falta filtrar tambien por el postulante (apertura o cierre)
+        // y no solo por local+turno+fecha, para no sincronizar la sesion equivocada.
+        $stmt = $this->db->prepare(
+            "SELECT sc.id_sesion FROM sesion_caja sc
+             INNER JOIN caja c ON c.id_caja = sc.caja_id
+             WHERE c.local_id = :lid AND sc.turno_id = :tid AND sc.fecha_operacion = :fecha
+               AND (sc.postulante_apertura_id = :pid1 OR sc.postulante_cierre_id = :pid2)
+             LIMIT 1"
+        );
+        $stmt->execute([
+            'lid' => $localId, 'tid' => $turnoId, 'fecha' => $fechaDia,
+            'pid1' => $postulanteId, 'pid2' => $postulanteId,
+        ]);
+        $sesionId = $stmt->fetchColumn();
+
+        if ($sesionId) {
+            (new CajaRepository())->registrarRendimientoCajera((int)$sesionId);
+        }
     }
 
     /**
@@ -1092,10 +1126,16 @@ class HorarioRepository
                 ]);
             }
 
-            // 5) Migrar el rendimiento/bono ya calculado para este slot
+            // 5) Migrar el rendimiento/bono ya calculado para este slot (si existe),
+            //    y re-sincronizar por si la caja cerro antes de esta reasignacion
+            //    (esta UPDATE no crea la fila si nunca se registro, por eso el paso extra).
             $this->db->prepare(
                 "UPDATE horario_rendimiento SET postulante_id = :nuevo WHERE horario_slot_id = :slot"
             )->execute(['nuevo' => $nuevoPostulanteId, 'slot' => $slotId]);
+
+            $this->sincronizarRendimientoCajera(
+                $slot['rol_puesto'], (int)$slot['local_id'], (int)$slot['turno_id'], $slot['fecha_dia'], $nuevoPostulanteId
+            );
 
             // 6) Trazabilidad
             $this->db->prepare(
@@ -1248,6 +1288,12 @@ class HorarioRepository
             $this->db->prepare(
                 "UPDATE horario_slot SET postulante_id = :pid, fecha_asignacion = NOW() WHERE id_slot = :id"
             )->execute(['pid' => $nuevoPostulanteId, 'id' => $slotId]);
+
+            // Por si la caja de ese turno ya cerro antes de asignar/cambiar este slot
+            // (turno cubierto o reasignado despues del cierre): re-sincroniza el rendimiento.
+            $this->sincronizarRendimientoCajera(
+                $slot['rol_puesto'], (int)$slot['local_id'], (int)$slot['turno_id'], $slot['fecha_dia'], $nuevoPostulanteId
+            );
 
             $this->db->prepare(
                 "INSERT INTO solicitud_cambio
