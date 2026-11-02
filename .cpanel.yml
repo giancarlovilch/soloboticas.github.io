@@ -2,4 +2,9 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/uiayikof/public_html/
-    - /bin/cp -R * $DEPLOYPATH
+    # rsync sincroniza el codigo pero NUNCA toca lo que vive solo en el servidor:
+    # - .htaccess: tiene el bloque de PHP que cPanel administra, no esta en el repo
+    # - .env / .user.ini / .well-known: config y credenciales propias del servidor
+    # - public/uploads: fotos y documentos reales subidos por usuarios
+    # - db/migrations|difference|download: historial generado por el panel admin
+    - rsync -a --exclude='.git/' --exclude='.htaccess' --exclude='.env' --exclude='.user.ini' --exclude='.well-known/' --exclude='public/uploads/' --exclude='db/migrations/' --exclude='db/difference/' --exclude='db/download/' ./ $DEPLOYPATH
