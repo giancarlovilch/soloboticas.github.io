@@ -34,7 +34,7 @@ jobs:
           set ftp:ssl-force true;
           set ftp:ssl-protect-data true;
           set ssl:verify-certificate no;
-          open -u \"\$FTP_USERNAME\",\"\$FTP_PASSWORD\" ftp.soloboticas.com;
+          open -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" ftp.soloboticas.com;
           mirror --reverse --verbose \
             --exclude-glob .git/ \
             --exclude-glob .github/ \
