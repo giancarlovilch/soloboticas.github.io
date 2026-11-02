@@ -1,0 +1,43 @@
+name: CI y Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Verificar sintaxis PHP
+    runs-on: ubuntu-latest
+    container: php:8.2-cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint de todos los archivos .php
+        run: find . -name "*.php" -not -path "./vendor/*" -print0 | xargs -0 -n1 -P4 php -l
+
+  deploy:
+    name: Deploy a produccion por FTPS
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy por FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ftp.soloboticas.com
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          server-dir: /
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .htaccess
+            .env
+            .user.ini
+            .well-known/**
+            public/uploads/**
+            db/migrations/**
+            db/difference/**
+            db/download/**
