@@ -1,0 +1,26 @@
+# Credenciales y entorno local
+.env
+
+# Dumps de base de datos (datos reales / snapshots) - no deben ir al repo publico
+*.sql
+!db/sb_schema.sql
+!db/sb_data.sql
+
+# Backups locales de datos reales de produccion (fotos, documentos)
+backups/
+
+# Archivos subidos por usuarios (fotos, documentos escaneados) - datos reales, no van al repo
+public/uploads/
+
+# Docker local (desarrollo)
+docker-compose.yml
+docker-compose.*.yml
+docker/
+
+# Dependencias
+vendor/
+node_modules/
+
+# Archivos del sistema / IDE
+.DS_Store
+Thumbs.db

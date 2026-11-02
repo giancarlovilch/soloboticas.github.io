@@ -214,11 +214,11 @@ INSERT INTO `postulacion` (`id_postulacion`, `postulante_id`, `puesto_id`, `etap
 VALUES (1, 1, 1, 4, 1);
 
 -- ============================================================
--- USUARIOS  (contraseñas en texto plano = DNI de cada persona)
--- !! IMPORTANTE: ejecutar después php scripts/hash_passwords.php !!
+-- USUARIOS  (password temporal de ejemplo, NO usar en producción)
+-- !! IMPORTANTE: cambiar este valor y ejecutar después php scripts/hash_passwords.php !!
 -- ============================================================
 INSERT INTO `usuario` (`postulante_id`, `rol_id`, `username`, `password`) VALUES
-(1, 2, 'GIANCARLOVC', '47238914');
+(1, 2, 'GIANCARLOVC', 'CAMBIAR_ESTA_PASSWORD');
 -- Las demás cuentas de staff se crean al contratar a cada trabajador
 -- a través del flujo de expediente en el dashboard.
 

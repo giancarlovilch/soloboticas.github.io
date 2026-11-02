@@ -2,6 +2,11 @@
 
 function env(string $key, $default = null)
 {
+    $fromProcess = getenv($key);
+    if ($fromProcess !== false) {
+        return $fromProcess;
+    }
+
     static $values = null;
 
     if ($values === null) {
