@@ -13,35 +13,60 @@ class HorarioRepository
     }
 
     /**
-     * Si el slot es de CAJERA, busca la sesion_caja de ese local+turno+fecha
-     * y vuelve a sincronizar horario_rendimiento con los datos actuales del
-     * cuadre (CajaRepository::registrarRendimientoCajera). Hace falta porque
-     * un turno se puede asignar/reasignar DESPUES de que la caja ya cerro
-     * (p.ej. cubrir un puesto que quedo vacante), y sin esto el rendimiento
-     * (operaciones BCP, bono) nunca se registraba para ese caso.
+     * Si el slot es de CAJERA o VENDEDORA, busca la sesion_caja de ese
+     * local+turno+fecha y vuelve a sincronizar horario_rendimiento con los
+     * datos actuales del cuadre (CajaRepository::registrarRendimientoCajera /
+     * registrarRendimientoVendedora). Hace falta porque un turno se puede
+     * asignar/reasignar DESPUES de que la caja ya cerro (p.ej. cubrir un
+     * puesto que quedo vacante), y sin esto el rendimiento (operaciones BCP,
+     * monto de ventas, bono) nunca se registraba para ese caso.
      */
     private function sincronizarRendimientoCajera(string $rolPuesto, int $localId, int $turnoId, string $fechaDia, int $postulanteId): void
     {
-        if ($rolPuesto !== 'CAJERA') return;
+        if ($rolPuesto !== 'CAJERA' && $rolPuesto !== 'VENDEDORA') return;
 
         // Un local puede tener varias cajas/terminales abiertas el mismo turno,
-        // por eso hace falta filtrar tambien por el postulante (apertura o cierre)
-        // y no solo por local+turno+fecha, para no sincronizar la sesion equivocada.
+        // por eso hace falta filtrar tambien por el postulante y no solo por
+        // local+turno+fecha, para no sincronizar la sesion equivocada.
+        if ($rolPuesto === 'CAJERA') {
+            $stmt = $this->db->prepare(
+                "SELECT sc.id_sesion FROM sesion_caja sc
+                 INNER JOIN caja c ON c.id_caja = sc.caja_id
+                 WHERE c.local_id = :lid AND sc.turno_id = :tid AND sc.fecha_operacion = :fecha
+                   AND (sc.postulante_apertura_id = :pid1 OR sc.postulante_cierre_id = :pid2)
+                 LIMIT 1"
+            );
+            $stmt->execute([
+                'lid' => $localId, 'tid' => $turnoId, 'fecha' => $fechaDia,
+                'pid1' => $postulanteId, 'pid2' => $postulanteId,
+            ]);
+            $sesionId = $stmt->fetchColumn();
+
+            if ($sesionId) {
+                (new CajaRepository())->registrarRendimientoCajera((int)$sesionId);
+            }
+            return;
+        }
+
+        // VENDEDORA: la sesion se ubica por sesion_participante, y el monto
+        // ya registrado (si existe) vive en reporte_venta.
         $stmt = $this->db->prepare(
-            "SELECT sc.id_sesion FROM sesion_caja sc
+            "SELECT sc.id_sesion, rv.monto FROM sesion_caja sc
              INNER JOIN caja c ON c.id_caja = sc.caja_id
+             INNER JOIN sesion_participante sp ON sp.sesion_id = sc.id_sesion
+                    AND sp.rol_participacion = 'VENDEDORA' AND sp.postulante_id = :pid
+             LEFT JOIN reporte_venta rv ON rv.sesion_id = sc.id_sesion AND rv.postulante_vendedor_id = :pid2
              WHERE c.local_id = :lid AND sc.turno_id = :tid AND sc.fecha_operacion = :fecha
-               AND (sc.postulante_apertura_id = :pid1 OR sc.postulante_cierre_id = :pid2)
              LIMIT 1"
         );
         $stmt->execute([
             'lid' => $localId, 'tid' => $turnoId, 'fecha' => $fechaDia,
-            'pid1' => $postulanteId, 'pid2' => $postulanteId,
+            'pid' => $postulanteId, 'pid2' => $postulanteId,
         ]);
-        $sesionId = $stmt->fetchColumn();
+        $row = $stmt->fetch();
 
-        if ($sesionId) {
-            (new CajaRepository())->registrarRendimientoCajera((int)$sesionId);
+        if ($row && $row['monto'] !== null) {
+            (new CajaRepository())->registrarRendimientoVendedora((int)$row['id_sesion'], (float)$row['monto']);
         }
     }
 
