@@ -74,6 +74,10 @@
                 </button>
             </form>
 
+            <a href="https://asistencia.solodata.cc/" target="_blank" rel="noopener noreferrer" class="login-btn login-btn--asistencia">
+                Marcar Asistencia
+            </a>
+
             <p class="login-help">
                 ¿Olvidaste tu contraseña? Contacta al administrador del local.
             </p>

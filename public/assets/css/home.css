@@ -157,6 +157,18 @@ p {
     color: var(--oscuro);
 }
 
+/* ── Asistencia: naranja Ubuntu, relleno sólido, para que destaque ── */
+.navegacion a.nav-asistencia {
+    background: #e95420;
+    color: #ffffff;
+    border-radius: 0;
+}
+
+.navegacion a.nav-asistencia:hover {
+    background: #c7431a;
+    color: #ffffff;
+}
+
 .hero {
     min-height: 80rem;
     background-image:

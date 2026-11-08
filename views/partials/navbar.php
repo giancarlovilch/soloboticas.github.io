@@ -31,6 +31,8 @@ $basePath = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
             
             <!-- Enlace actualizado para dirigir a la nueva interfaz de Login[cite: 15] -->
             <a href="<?= htmlspecialchars($basePath . '/login', ENT_QUOTES, 'UTF-8') ?>">Intranet</a>
+
+            <a href="https://asistencia.solodata.cc/" target="_blank" rel="noopener noreferrer" class="nav-asistencia">Asistencia</a>
         </nav>
     </div>
 </header>

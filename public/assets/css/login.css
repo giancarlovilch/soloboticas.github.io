@@ -214,6 +214,15 @@ body {
 
 .login-btn__spinner { display: flex; align-items: center; gap: 0.4rem; }
 
+/* ── BOTÓN MARCAR ASISTENCIA (naranja Ubuntu, enlace externo) ── */
+.login-btn--asistencia {
+    background: #e95420;
+    text-decoration: none;
+    margin-top: 0.75rem;
+}
+
+.login-btn--asistencia:hover { background: #c7431a; }
+
 @keyframes spin {
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }
