@@ -1469,24 +1469,39 @@ class CajaRepository
      * Si el monto actual del cuadre ya coincide con el del cierre (ej.
      * alguien lo tipeo a mano antes de que existiera este sistema), solo
      * queda marcado como verificado -- igual que Culqi "Conforme con lo
-     * declarado" -- sin sumar dinero de nuevo. Si no coincide (ej. el
-     * cuadre se cerro en S/0 con "cerrar sin ventas"), corrige el total
-     * para incluirlo. Devuelve si hubo cambio de monto o solo verificacion.
+     * declarado" -- sin tocar el monto. Si no coincide, el monto real de
+     * SOFTPHARMA REEMPLAZA lo que hubiera (sea S/0 de "cerrar sin ventas" o
+     * un numero equivocado) -- nunca se suma, para no duplicar. Solo se
+     * suma cuando ya existe otra venta ERP asignada a la misma sesion (dos
+     * vendedoras cubriendo el mismo turno). Devuelve si hubo cambio de
+     * monto o solo verificacion.
      */
     public function asignarVentaErpVerificando(int $sesionId, array $cierre, ?int $adminId): array
     {
         $ventaNeta     = (float)$cierre['venta_neta'];
         $actual        = $this->getTotalVentaActual($sesionId);
+        $yaAsignadas   = $this->getAsignacionesErp($sesionId);
         $montoAplicado = 0.0;
 
         if (abs($actual - $ventaNeta) >= 0.50) {
-            $nuevoTotal = round($actual + $ventaNeta, 2);
+            if (empty($yaAsignadas)) {
+                // Primera venta ERP de esta sesion: lo que hubiera (0, o un
+                // numero tipeado a mano antes de que existiera este sistema
+                // y que no coincide) se REEMPLAZA por el monto real de
+                // SOFTPHARMA -- nunca se suma, para no duplicar dinero.
+                $nuevoTotal = round($ventaNeta, 2);
+            } else {
+                // Segunda vendedora en el mismo turno (cobertura a medio
+                // dia): esto si es venta adicional de verdad, se suma a lo
+                // que ya quedo correctamente asignado.
+                $nuevoTotal = round($actual + $ventaNeta, 2);
+            }
             $this->addCorreccionVenta(
                 $sesionId, $nuevoTotal,
                 "Venta SOFTPHARMA asignada: {$cierre['usuario']} (S/ " . number_format($ventaNeta, 2) . ")",
                 $adminId
             );
-            $montoAplicado = $ventaNeta;
+            $montoAplicado = round($nuevoTotal - $actual, 2);
         }
 
         $this->db->prepare(
@@ -1521,12 +1536,13 @@ class CajaRepository
         $sesionId      = (int)$row['sesion_id'];
         $montoAplicado = (float)$row['monto_aplicado'];
 
-        if ($montoAplicado > 0) {
+        if ($montoAplicado != 0.0) {
             $actual     = $this->getTotalVentaActual($sesionId);
             $nuevoTotal = round($actual - $montoAplicado, 2);
+            $signo = $montoAplicado > 0 ? '-' : '+';
             $this->addCorreccionVenta(
                 $sesionId, $nuevoTotal,
-                "Venta SOFTPHARMA retirada: {$row['usuario_erp']} (-S/ " . number_format($montoAplicado, 2) . ")",
+                "Venta SOFTPHARMA retirada: {$row['usuario_erp']} ({$signo}S/ " . number_format(abs($montoAplicado), 2) . ")",
                 $adminId
             );
         }

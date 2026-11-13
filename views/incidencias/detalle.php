@@ -579,18 +579,13 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                 </div>
                 <div class="card-body">
                     <?php if (!empty($correccionesVenta)): ?>
-                    <p style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:#94a3b8;margin:0 0 .5rem;">Correcciones anteriores</p>
+                    <p style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:#94a3b8;margin:0 0 .5rem;">Venta del turno actualizada</p>
                     <ul class="item-list" style="margin-bottom:.85rem;">
                         <?php foreach ($correccionesVenta as $cv): ?>
                         <li>
-                            <span class="item-desc">
-                                <?= $f2($cv['monto_anterior']) ?> → <?= $f2($cv['monto_nuevo']) ?>
-                                <?php if ($cv['motivo'] ?? ''): ?>
-                                  <span style="color:#94a3b8;"> · <?= htmlspecialchars($cv['motivo']) ?></span>
-                                <?php endif; ?>
-                            </span>
-                            <span class="item-amount" style="color:<?= (float)$cv['monto_nuevo']>(float)$cv['monto_anterior']?'#16a34a':'#dc2626' ?>">
-                                <?= (float)$cv['monto_nuevo']>=(float)$cv['monto_anterior']?'+':'' ?><?= $f2((float)$cv['monto_nuevo']-(float)$cv['monto_anterior']) ?>
+                            <span class="item-desc" style="color:#94a3b8;">Antes: <?= $f2($cv['monto_anterior']) ?></span>
+                            <span class="item-amount" style="color:#94a3b8;font-weight:400;">
+                                <?= date('d/m H:i', strtotime($cv['fecha_registro'])) ?>
                             </span>
                         </li>
                         <?php endforeach; ?>
