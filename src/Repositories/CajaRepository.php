@@ -1424,14 +1424,151 @@ class CajaRepository
     }
 
     // ── Ventas y cuadre ────────────────────────────────────
-    public function insertVenta(int $sesionId, int $vendedorId, float $monto): void
+    public function insertVenta(int $sesionId, int $vendedorId, float $monto, bool $pendienteAsignar = false): void
     {
         // Borrar venta previa si existe (evitar duplicados en re-submit)
         $this->db->prepare("DELETE FROM reporte_venta WHERE sesion_id = :sid")->execute(['sid' => $sesionId]);
         $this->db->prepare(
-            "INSERT INTO reporte_venta (sesion_id, postulante_vendedor_id, monto)
-             VALUES (:sid, :vid, :mon)"
-        )->execute(['sid' => $sesionId, 'vid' => $vendedorId, 'mon' => $monto]);
+            "INSERT INTO reporte_venta (sesion_id, postulante_vendedor_id, monto, venta_pendiente_asignar)
+             VALUES (:sid, :vid, :mon, :pend)"
+        )->execute(['sid' => $sesionId, 'vid' => $vendedorId, 'mon' => $monto, 'pend' => $pendienteAsignar ? 1 : 0]);
+    }
+
+    /**
+     * Registra que un cierre de SOFTPHARMA quedó asignado a esta sesión
+     * (bookkeeping + exclusividad). Una sesión puede tener más de una fila
+     * aquí -- ej. dos vendedoras distintas vendieron en el mismo turno por
+     * una cobertura a medio día.
+     */
+    public function registrarAsignacionErp(int $sesionId, array $cierre, ?int $adminId): void
+    {
+        $this->db->prepare(
+            "INSERT INTO venta_erp_asignada
+                (sesion_id, id_caja_erp, usuario_erp, nombre_erp, venta_neta, fecha_cierre_erp, asignado_por_admin_id)
+             VALUES (:sid, :idc, :uerp, :nerp, :mon, :fcierre, :adminid)"
+        )->execute([
+            'sid' => $sesionId, 'idc' => (int)$cierre['id_caja'], 'uerp' => $cierre['usuario'],
+            'nerp' => $cierre['nombre'] ?? null, 'mon' => (float)$cierre['venta_neta'],
+            'fcierre' => $cierre['cierre'] ?? null, 'adminid' => $adminId,
+        ]);
+    }
+
+    public function getAsignacionesErp(int $sesionId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT vea.*, p.nombres AS asignado_por_nombre
+             FROM venta_erp_asignada vea
+             LEFT JOIN postulante p ON p.id_postulante = vea.asignado_por_admin_id
+             WHERE vea.sesion_id = :sid ORDER BY vea.fecha_asignacion ASC"
+        );
+        $stmt->execute(['sid' => $sesionId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Total de ventas vigente del cuadre: la base original (detalle_cuadre)
+     * más cualquier corrección registrada después. Mismo cálculo que usa
+     * addCorreccionVenta para su "monto_anterior" -- se expone acá para que
+     * el que agrega una nueva corrección sepa sobre qué base está sumando.
+     */
+    public function getTotalVentaActual(int $sesionId): float
+    {
+        $baseStmt = $this->db->prepare("SELECT total_ventas_sistema FROM detalle_cuadre WHERE sesion_id = :sid");
+        $baseStmt->execute(['sid' => $sesionId]);
+        $totalOriginal = (float)($baseStmt->fetchColumn() ?? 0);
+
+        $deltaStmt = $this->db->prepare(
+            "SELECT COALESCE(SUM(monto_nuevo - monto_anterior), 0) FROM correccion_venta WHERE sesion_id = :sid"
+        );
+        $deltaStmt->execute(['sid' => $sesionId]);
+        $sumDelta = (float)$deltaStmt->fetchColumn();
+
+        return round($totalOriginal + $sumDelta, 2);
+    }
+
+    /**
+     * Mapeo local_id (soloboticas.com) -> codigo de establecimiento en
+     * SOFTPHARMA. Verificado contra datos reales (ver notas del proyecto).
+     * Los locales que no estan aqui (ej. SB7) no tienen integracion con el
+     * ERP todavia -- su cuadre se cierra siempre con "cerrar sin ventas".
+     */
+    public function getLocalSoftpharmaCodigo(int $localId): ?string
+    {
+        $mapa = [2 => 'SB2', 3 => 'SB3', 4 => 'SB4'];
+        return $mapa[$localId] ?? null;
+    }
+
+    public function getLocalIdPorSoftpharmaCodigo(string $codigo): ?int
+    {
+        $mapa = ['SB2' => 2, 'SB3' => 3, 'SB4' => 4];
+        return $mapa[strtoupper($codigo)] ?? null;
+    }
+
+    /**
+     * Cuadres de un local/fecha para el puente con soloboticas-softpharma
+     * (panel de conciliación en Django): cada uno con su venta actual
+     * (base + correcciones) y el usuario SOFTPHARMA de la vendedora, para
+     * que el panel pueda emparejar y, si hace falta, corregir desde ahí.
+     */
+    public function getSesionesParaBridge(string $fecha, int $localId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT sc.id_sesion, sc.estado, sc.turno_id, t.descripcion AS turno_desc,
+                    pc.nombres AS cajera_nombre,
+                    pv.id_postulante AS vendedora_id, pv.nombres AS vendedora_nombre,
+                    pv.softpharma_usuario
+             FROM sesion_caja sc
+             INNER JOIN caja ca ON ca.id_caja = sc.caja_id
+             INNER JOIN turno t ON t.id_turno = sc.turno_id
+             INNER JOIN postulante pc ON pc.id_postulante = sc.postulante_apertura_id
+             LEFT JOIN sesion_participante sp ON sp.sesion_id = sc.id_sesion AND sp.rol_participacion = 'VENDEDORA'
+             LEFT JOIN postulante pv ON pv.id_postulante = sp.postulante_id
+             WHERE ca.local_id = :lid AND sc.fecha_operacion = :fecha AND sc.estado != 'ABIERTA'
+             ORDER BY sc.turno_id"
+        );
+        $stmt->execute(['lid' => $localId, 'fecha' => $fecha]);
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$r) {
+            $r['venta_actual'] = $this->getTotalVentaActual((int)$r['id_sesion']);
+        }
+        return $rows;
+    }
+
+    public function getVendedoraAsignada(int $sesionId): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT p.id_postulante, p.nombres, p.apellidos, p.softpharma_usuario
+             FROM sesion_participante sp
+             INNER JOIN postulante p ON p.id_postulante = sp.postulante_id
+             WHERE sp.sesion_id = :sid AND sp.rol_participacion = 'VENDEDORA'
+             LIMIT 1"
+        );
+        $stmt->execute(['sid' => $sesionId]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /**
+     * IdCaja de SOFTPHARMA ya emparejados con algun cuadre de soloboticas.com
+     * ese dia -- exclusividad: un cierre no puede asignarse a dos cuadres.
+     * Acotado por fecha (los IdCaja de SOFTPHARMA son unicos globalmente,
+     * pero esto reduce el tamano de la consulta).
+     */
+    public function getIdsCajaErpAsignados(string $fecha): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT vea.id_caja_erp
+             FROM venta_erp_asignada vea
+             INNER JOIN sesion_caja sc ON sc.id_sesion = vea.sesion_id
+             WHERE sc.fecha_operacion = :fecha"
+        );
+        $stmt->execute(['fecha' => $fecha]);
+        return array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+    }
+
+    public function marcarVentaResueltaEnSesion(int $sesionId): void
+    {
+        $this->db->prepare("UPDATE reporte_venta SET venta_pendiente_asignar = 0 WHERE sesion_id = :sid")
+                 ->execute(['sid' => $sesionId]);
     }
 
     public function calcularYGuardarCuadre(int $sesionId, float $ventas): array
@@ -2844,7 +2981,7 @@ class CajaRepository
         return $stmt->fetchAll();
     }
 
-    public function addCorreccionVenta(int $sesionId, float $montoNuevo, string $motivo, int $usuarioId): void
+    public function addCorreccionVenta(int $sesionId, float $montoNuevo, string $motivo, ?int $usuarioId): void
     {
         $baseStmt = $this->db->prepare(
             "SELECT total_ventas_sistema FROM detalle_cuadre WHERE sesion_id = :sid"

@@ -716,12 +716,41 @@ CREATE TABLE IF NOT EXISTS `reporte_venta` (
   `sesion_id`             INT           NOT NULL,
   `postulante_vendedor_id` INT          NOT NULL,
   `monto`                 DECIMAL(10,2) NOT NULL,
+  -- 1 cuando la cajera cerro con "CERRAR SIN VENTAS" habiendo una vendedora
+  -- asignada (venta todavia sin emparejar contra SOFTPHARMA) -- cola de
+  -- revision del admin, resuelta desde la incidencia generada (ver
+  -- venta_erp_asignada mas abajo).
+  `venta_pendiente_asignar` TINYINT(1)  NOT NULL DEFAULT 0,
   `fecha_registro`        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_reporte_venta`),
   INDEX `idx_rv_sesion`   (`sesion_id` ASC),
   INDEX `idx_rv_vendedor` (`postulante_vendedor_id` ASC),
+  INDEX `idx_rv_pendiente_asignar` (`venta_pendiente_asignar` ASC),
   CONSTRAINT `fk_rv_sesion`   FOREIGN KEY (`sesion_id`)              REFERENCES `sesion_caja` (`id_sesion`)     ON DELETE NO ACTION,
   CONSTRAINT `fk_rv_vendedor` FOREIGN KEY (`postulante_vendedor_id`) REFERENCES `postulante`  (`id_postulante`) ON DELETE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Cierre(s) de SOFTPHARMA (soloboticas-softpharma, via microservicio)
+-- asignado(s) a un cuadre, en vez de un monto de ventas tipeado a mano.
+-- Una sesion puede tener mas de una fila (ej. dos vendedoras por una
+-- cobertura a medio turno) -- la suma + lo registrado en correccion_venta
+-- es el total real de ventas del cuadre.
+CREATE TABLE IF NOT EXISTS `venta_erp_asignada` (
+  `id_asignacion`         INT           NOT NULL AUTO_INCREMENT,
+  `sesion_id`             INT           NOT NULL,
+  `id_caja_erp`           INT           NOT NULL,
+  `usuario_erp`           VARCHAR(50)   NOT NULL,
+  `nombre_erp`            VARCHAR(100)  NULL,
+  `venta_neta`            DECIMAL(10,2) NOT NULL,
+  `fecha_cierre_erp`      DATETIME      NULL,
+  `asignado_por_admin_id` INT           NULL,
+  `fecha_asignacion`      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_asignacion`),
+  UNIQUE INDEX `uq_vea_id_caja_erp` (`id_caja_erp`),
+  INDEX `idx_vea_sesion` (`sesion_id`),
+  CONSTRAINT `fk_vea_sesion`   FOREIGN KEY (`sesion_id`)             REFERENCES `sesion_caja` (`id_sesion`)     ON DELETE CASCADE,
+  CONSTRAINT `fk_vea_asignador` FOREIGN KEY (`asignado_por_admin_id`) REFERENCES `postulante`  (`id_postulante`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

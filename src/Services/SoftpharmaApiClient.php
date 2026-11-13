@@ -31,6 +31,14 @@ class SoftpharmaApiClient
         return $data['usuarios'] ?? [];
     }
 
+    /** GET /api/v1/ventas/dia → [{id_caja, usuario, nombre, local, turno, apertura, cierre, venta_neta, ...}] */
+    public function getVentasDia(string $fecha, ?string $local = null): array
+    {
+        $qs = 'fecha=' . urlencode($fecha) . ($local ? '&local=' . urlencode($local) : '');
+        $data = $this->request('GET', '/api/v1/ventas/dia?' . $qs);
+        return $data['cierres'] ?? [];
+    }
+
     /** POST /api/v1/cuadres/registrar */
     public function registrarCuadre(string $usuario, string $fecha, float $monto, ?string $local): array
     {

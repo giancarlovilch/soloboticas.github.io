@@ -183,6 +183,29 @@ class IncidenciaContableController extends Controller
         $lotesVisaAsignados   = $lotesVisa ?? [];
         $lotesVisaDisponibles = $esAdminDetalle ? $tpRepo->getLotesDisponibles((int)($sesion['caja_id'] ?? 0)) : [];
 
+        // Ventas de SOFTPHARMA (soloboticas-softpharma) — mismo patrón que Culqi:
+        // asignación manual, solo admin, soporta más de una (ej. dos vendedoras
+        // distintas por una cobertura a medio turno).
+        $ventasErpAsignadas   = $cajaRepo->getAsignacionesErp($sesionId);
+        $ventasErpDisponibles = [];
+        if ($esAdminDetalle) {
+            $localCodigoErp = $cajaRepo->getLocalSoftpharmaCodigo((int)($sesion['id_local'] ?? 0));
+            if ($localCodigoErp) {
+                require_once __DIR__ . '/../Services/SoftpharmaApiClient.php';
+                try {
+                    $client    = new \SoftpharmaApiClient();
+                    $cierres   = $client->getVentasDia($sesion['fecha_operacion'], $localCodigoErp);
+                    $asignados = $cajaRepo->getIdsCajaErpAsignados($sesion['fecha_operacion']);
+                    $ventasErpDisponibles = array_values(array_filter(
+                        $cierres, fn($c) => !in_array((int)$c['id_caja'], $asignados, true)
+                    ));
+                } catch (\Throwable $e) {
+                    // Si SOFTPHARMA no responde, simplemente no se ofrece la asignación
+                    // automática -- no debe bloquear ver/cerrar la incidencia.
+                }
+            }
+        }
+
         // Transferencias de saldo confirmadas pendientes de aplicarse en la caja de esta sesión
         $transferenciasPendientes = $cajaRepo->getTransferenciasPendientesAplicar((int)$sesion['caja_id']);
 
@@ -435,6 +458,53 @@ class IncidenciaContableController extends Controller
         $ok = $tpRepo->asignarLote($loteId, (int)$inc['sesion_origen_id'], $postulanteId);
         if (!$ok) { $this->error('El lote ya no está disponible', 409); return; }
         $this->success('Lote asignado');
+    }
+
+    // ── POST /incidencias/api/{id}/asignar-venta-erp ──────
+    /**
+     * Asigna un cierre de SOFTPHARMA al cuadre de esta incidencia. Reusa
+     * addCorreccionVenta (el mismo mecanismo que ya corrige una venta
+     * después del cierre) -- se puede llamar más de una vez por incidencia
+     * si hace falta sumar más de un cierre (ej. cobertura a medio turno).
+     */
+    public function apiAsignarVentaErp(int $id): void
+    {
+        $adminId = $this->requireAdmin();
+        $data    = $this->getAllInput();
+
+        $idCaja  = (int)($data['id_caja'] ?? 0);
+        $usuario = trim($data['usuario'] ?? '');
+        $nombre  = $data['nombre'] ?? null;
+        $monto   = isset($data['venta_neta']) ? (float)$data['venta_neta'] : -1;
+        $cierre  = $data['cierre'] ?? null;
+
+        if (!$idCaja || !$usuario || $monto < 0) { $this->error('Datos inválidos', 422); return; }
+
+        $inc = $this->repo->getById($id);
+        if (!$inc) { $this->notFound('Incidencia no encontrada'); return; }
+        $sesionId = (int)$inc['sesion_origen_id'];
+
+        $cajaRepo = new CajaRepository();
+        try {
+            $cajaRepo->registrarAsignacionErp($sesionId, [
+                'id_caja' => $idCaja, 'usuario' => $usuario, 'nombre' => $nombre,
+                'venta_neta' => $monto, 'cierre' => $cierre,
+            ], $adminId);
+        } catch (\PDOException $e) {
+            $this->error('Ese cierre ya fue asignado a otro cuadre', 409); return;
+        }
+
+        $totalNuevo = $cajaRepo->getTotalVentaActual($sesionId) + $monto;
+        $cajaRepo->addCorreccionVenta(
+            $sesionId, $totalNuevo,
+            "Venta SOFTPHARMA asignada: {$usuario} (S/ " . number_format($monto, 2) . ")",
+            $adminId
+        );
+
+        // Ya no está "a la espera" -- el admin la está resolviendo ahora mismo.
+        $cajaRepo->marcarVentaResueltaEnSesion($sesionId);
+
+        $this->success('Venta asignada', ['total_ventas' => $totalNuevo]);
     }
 
     // ── POST /incidencias/api/lote-visa/{loteId}/quitar ───

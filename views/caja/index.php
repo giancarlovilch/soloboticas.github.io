@@ -79,7 +79,7 @@ $estadoLabel = [
                 </div>
                 <div class="caja-card__actions">
                     <a href="<?= $basePath ?>/caja/<?= $s['id_sesion'] ?>/ventas" class="caja-btn caja-btn--primary">
-                        Registrar ventas del turno →
+                        Ver venta pendiente →
                     </a>
                 </div>
             </div>
@@ -291,7 +291,7 @@ $estadoLabel = [
                             <?php if ($s['estado'] === 'ABIERTA'): ?>
                                 <a href="<?= $basePath ?>/caja/sesion/<?= $s['id_sesion'] ?>" class="caja-link">Continuar</a>
                             <?php elseif ($s['estado'] === 'PENDIENTE_VENTA'): ?>
-                                <a href="<?= $basePath ?>/caja/<?= $s['id_sesion'] ?>/ventas" class="caja-link">Registrar ventas</a>
+                                <a href="<?= $basePath ?>/caja/<?= $s['id_sesion'] ?>/ventas" class="caja-link">Ver venta pendiente</a>
                             <?php elseif (in_array($s['estado'], ['CERRADA','APROBADA','OBSERVADA','RECHAZADA'])): ?>
                                 <a href="<?= $basePath ?>/caja/reporte/<?= $s['id_sesion'] ?>" class="caja-link">Ver arqueo</a>
                             <?php else: ?>

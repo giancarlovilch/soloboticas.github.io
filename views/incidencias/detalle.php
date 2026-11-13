@@ -597,34 +597,11 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     </ul>
                     <?php endif; ?>
 
-                    <table class="ba-table">
-                        <thead>
-                            <tr>
-                                <th>Campo</th>
-                                <th>Actual</th>
-                                <th>Nuevo valor</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td class="field-name">Monto ventas</td>
-                                <td class="val-before"><?= $f2($ventaMonto) ?></td>
-                                <td>
-                                    <input type="number" step="0.01" min="0" id="venta_monto"
-                                           value="<?= number_format($ventaMonto,2,'.','') ?>">
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div style="margin-top:.6rem;">
-                        <label class="form-label">Motivo de corrección</label>
-                        <input type="text" class="form-input" id="venta_desc"
-                               placeholder="Ej: Error en captura de caja">
-                    </div>
-                    <div style="display:flex;gap:.5rem;align-items:center;margin-top:.65rem;flex-wrap:wrap;">
-                        <button class="btn btn-primary btn-sm" onclick="guardarVenta()">Guardar venta</button>
-                        <span id="ventaAlert" style="display:none;" class="alert"></span>
-                    </div>
+                    <p style="font-size:.78rem;color:#94a3b8;margin:0;">
+                        Monto actual: <strong style="color:#1e293b;"><?= $f2($ventaMonto) ?></strong>
+                        — ya no se tipea a mano, se asigna el cierre real de SOFTPHARMA desde
+                        "Ventas SOFTPHARMA" más abajo.
+                    </p>
                 </div>
             </div>
 
@@ -846,6 +823,60 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     <span id="visaAlert" style="display:none;margin-top:.4rem;" class="alert"></span>
                     <?php else: ?>
                     <p style="font-size:.78rem;color:#94a3b8;">No hay lotes disponibles para la caja de este cuadre.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <!-- ── 3c. Ventas SOFTPHARMA — sustento del monto de ventas ──── -->
+            <?php if ($esAdmin && (!empty($ventasErpAsignadas) || !empty($ventasErpDisponibles))): ?>
+            <div class="card card--amber">
+                <div class="card-head">
+                    <p class="card-title">Ventas SOFTPHARMA</p>
+                    <span style="font-size:.7rem;color:#94a3b8;">Solo administrador · control interno</span>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($ventasErpAsignadas)): ?>
+                    <ul class="item-list" style="margin-bottom:.85rem;">
+                        <?php foreach ($ventasErpAsignadas as $va): ?>
+                        <li>
+                            <span class="item-desc">
+                                <span style="font-family:monospace;font-size:.78rem;color:#475569;"><?= htmlspecialchars($va['usuario_erp']) ?></span>
+                                <span style="color:#94a3b8;font-size:.72rem;margin-left:.3rem;">
+                                    <?= htmlspecialchars($va['nombre_erp'] ?? '') ?>
+                                    <?php if ($va['fecha_cierre_erp']): ?> · cierre <?= date('d/m H:i', strtotime($va['fecha_cierre_erp'])) ?><?php endif; ?>
+                                </span>
+                            </span>
+                            <span class="item-amount" style="color:#5b21b6;">S/ <?= number_format($va['venta_neta'], 2) ?></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php else: ?>
+                    <p style="font-size:.82rem;color:#94a3b8;margin-bottom:.85rem;">Sin ventas asignadas todavía.</p>
+                    <?php endif; ?>
+
+                    <?php if (!empty($ventasErpDisponibles)): ?>
+                    <p class="form-label" style="margin-bottom:.5rem;">Asignar cierre disponible</p>
+                    <div class="form-row cols-2">
+                        <div>
+                            <label class="form-label">Cierre</label>
+                            <select class="form-input" id="erp_cierre_id">
+                                <option value="">— seleccionar —</option>
+                                <?php foreach ($ventasErpDisponibles as $c): ?>
+                                <option value='<?= htmlspecialchars(json_encode($c)) ?>'>
+                                    <?= htmlspecialchars($c['nombre']) ?> (<?= htmlspecialchars($c['usuario']) ?>) — <?= htmlspecialchars($c['turno']) ?>
+                                    · S/ <?= number_format($c['venta_neta'], 2) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div style="display:flex;align-items:flex-end;">
+                            <button class="btn btn-primary btn-sm" onclick="asignarVentaErp()" style="width:100%">Asignar</button>
+                        </div>
+                    </div>
+                    <span id="erpAlert" style="display:none;margin-top:.4rem;" class="alert"></span>
+                    <?php else: ?>
+                    <p style="font-size:.78rem;color:#94a3b8;">No hay cierres disponibles sin asignar para este local/fecha.</p>
                     <?php endif; ?>
                 </div>
             </div>
@@ -2087,20 +2118,6 @@ async function guardarNumBcp() {
     }
 }
 
-// ── Guardar ventas ──────────────────────────────────────
-async function guardarVenta() {
-    const monto = parseFloat(document.getElementById('venta_monto').value) || 0;
-    const desc  = document.getElementById('venta_desc').value.trim();
-    if (monto <= 0) { mostrarAlerta('ventaAlert', 'Ingresa un monto válido', 'err'); return; }
-    try {
-        await apiPost(`${BASE}/caja/api/sesion/${SESION_ID}/corregir-venta`, { monto_nuevo: monto, motivo: desc });
-        mostrarAlerta('ventaAlert', '✓ Venta actualizada', 'ok');
-        setTimeout(() => location.reload(), 900);
-    } catch(e) {
-        mostrarAlerta('ventaAlert', e.message, 'err');
-    }
-}
-
 // ── Guardar rectificación ───────────────────────────────
 async function guardarRectif() {
     const tipo  = document.getElementById('rect_tipo').value;
@@ -2345,6 +2362,22 @@ async function quitarLoteVisa(loteId, btn) {
         await apiPost(`${BASE}/incidencias/api/lote-visa/${loteId}/quitar`, {});
         btn.closest('li').remove();
     } catch(e) { alert(e.message); }
+}
+
+async function asignarVentaErp() {
+    const sel = document.getElementById('erp_cierre_id');
+    if (!sel.value) { mostrarAlerta('erpAlert', 'Selecciona un cierre', 'err'); return; }
+    const c = JSON.parse(sel.value);
+    try {
+        await apiPost(`${BASE}/incidencias/api/${INC_ID}/asignar-venta-erp`, {
+            id_caja: c.id_caja, usuario: c.usuario, nombre: c.nombre,
+            venta_neta: c.venta_neta, cierre: c.cierre,
+        });
+        mostrarAlerta('erpAlert', '✓ Venta asignada', 'ok');
+        setTimeout(() => location.reload(), 900);
+    } catch(e) {
+        mostrarAlerta('erpAlert', e.message, 'err');
+    }
 }
 
 // ── Guardar condonación ─────────────────────────────────

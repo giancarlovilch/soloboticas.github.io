@@ -129,6 +129,8 @@ $router->get('/caja/reporte/{id}',             [CajaController::class, 'reporte'
 $router->post('/caja/api/sesion/crear',        [CajaController::class, 'crearSesion']);
 $router->post('/caja/api/sesion/guardar',      [CajaController::class, 'guardarSesion']);
 $router->post('/caja/api/{id}/ventas',         [CajaController::class, 'submitVentas']);
+$router->post('/caja/api/{id}/actualizar-venta',    [CajaController::class, 'actualizarVenta']);
+$router->post('/caja/api/{id}/cerrar-sin-ventas',   [CajaController::class, 'cerrarSinVentas']);
 $router->post('/caja/api/reporte/{id}/rectificar',        [CajaController::class, 'rectificar']);
 $router->post('/caja/api/rectificacion/{id}/eliminar',    [CajaController::class, 'eliminarRectificacion']);
 $router->post('/caja/api/sesion/{id}/conteo',                [CajaController::class, 'apiConteo']);
@@ -191,6 +193,7 @@ $router->post('/incidencias/api/{id}/editar-movimiento',   [IncidenciaContableCo
 $router->post('/incidencias/api/{id}/cobro-electronico',[IncidenciaContableController::class, 'apiAddCobro']);
 $router->get('/incidencias/api/vales-disponibles',     [IncidenciaContableController::class, 'apiValesDisponibles']);
 $router->post('/incidencias/api/{id}/asignar-lote-visa', [IncidenciaContableController::class, 'apiAsignarLoteVisa']);
+$router->post('/incidencias/api/{id}/asignar-venta-erp', [IncidenciaContableController::class, 'apiAsignarVentaErp']);
 $router->post('/incidencias/api/lote-visa/{loteId}/quitar', [IncidenciaContableController::class, 'apiQuitarLoteVisa']);
 $router->get('/incidencias/sesion/{id}',               [IncidenciaContableController::class, 'porSesion']);
 $router->get('/incidencias/{id}',                      [IncidenciaContableController::class, 'detalle']);
@@ -339,6 +342,11 @@ $router->post('/admin/ventas-emergencia/api/{id}/eliminar',     [VentaEmergencia
 // PLIN — Visor público de transacciones
 $router->get('/plin',            [PlinController::class, 'index']);
 $router->get('/plin/api/visor',  [PlinController::class, 'apiVisor']);
+
+// Puente con soloboticas-softpharma (Django) — server a servidor, API key
+require_once __DIR__ . '/../src/Controllers/SoftpharmaBridgeController.php';
+$router->get('/api/softpharma-bridge/ventas-dia',     [SoftpharmaBridgeController::class, 'apiVentasDia']);
+$router->post('/api/softpharma-bridge/asignar-venta', [SoftpharmaBridgeController::class, 'apiAsignarVenta']);
 
 // SoloBank — Vales de cierres enviados desde Python
 require_once __DIR__ . '/../src/Controllers/SoloBankController.php';
