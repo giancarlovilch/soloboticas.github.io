@@ -264,14 +264,17 @@ class CajaRepository
     {
         $stmt = $this->db->prepare(
             "SELECT sc.id_sesion, sc.estado, sc.saldo_inicial, sc.fecha_operacion,
-                    c.descripcion AS caja_desc, l.descripcion AS local_desc,
+                    l.id_local, c.descripcion AS caja_desc, l.descripcion AS local_desc,
                     t.descripcion AS turno_desc,
-                    p.nombres AS cajera_nombre
+                    p.nombres AS cajera_nombre,
+                    pv.nombres AS vendedora_nombre, pv.softpharma_usuario
              FROM sesion_caja sc
              INNER JOIN caja c ON sc.caja_id = c.id_caja
              INNER JOIN local l ON c.local_id = l.id_local
              INNER JOIN turno t ON sc.turno_id = t.id_turno
              INNER JOIN postulante p ON sc.postulante_apertura_id = p.id_postulante
+             LEFT JOIN sesion_participante sp ON sp.sesion_id = sc.id_sesion AND sp.rol_participacion = 'VENDEDORA'
+             LEFT JOIN postulante pv ON pv.id_postulante = sp.postulante_id
              WHERE sc.estado = :estado
              ORDER BY sc.fecha_operacion DESC, sc.fecha_apertura DESC"
         );
@@ -1514,6 +1517,7 @@ class CajaRepository
     {
         $stmt = $this->db->prepare(
             "SELECT sc.id_sesion, sc.estado, sc.turno_id, t.descripcion AS turno_desc,
+                    sc.fecha_cierre AS cajera_fecha_cierre,
                     pc.nombres AS cajera_nombre,
                     pv.id_postulante AS vendedora_id, pv.nombres AS vendedora_nombre,
                     pv.softpharma_usuario

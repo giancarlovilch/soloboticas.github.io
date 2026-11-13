@@ -52,18 +52,29 @@ class SoftpharmaBridgeController extends Controller
 
         $out = array_map(function ($s) use ($basePath) {
             return [
-                'sesion_id'          => (int)$s['id_sesion'],
-                'estado'             => $s['estado'],
-                'turno'              => $s['turno_desc'],
-                'cajera_nombre'      => $s['cajera_nombre'],
-                'vendedora_nombre'   => $s['vendedora_nombre'],
-                'vendedora_usuario'  => $s['softpharma_usuario'],
-                'venta_actual'       => (float)$s['venta_actual'],
-                'reporte_url'        => "{$basePath}/caja/reporte/{$s['id_sesion']}",
+                'sesion_id'           => (int)$s['id_sesion'],
+                'estado'              => $s['estado'],
+                'turno'               => $s['turno_desc'],
+                'cajera_nombre'       => $s['cajera_nombre'],
+                'cajera_fecha_cierre' => $s['cajera_fecha_cierre'],
+                'vendedora_nombre'    => $s['vendedora_nombre'],
+                'vendedora_usuario'   => $s['softpharma_usuario'],
+                'venta_actual'        => (float)$s['venta_actual'],
+                'reporte_url'         => "{$basePath}/caja/reporte/{$s['id_sesion']}",
             ];
         }, $sesiones);
 
         $this->success('OK', ['fecha' => $fecha, 'local' => $local, 'sesiones' => $out]);
+    }
+
+    /** GET /api/softpharma-bridge/cierres-asignados?fecha=YYYY-MM-DD */
+    public function apiCierresAsignados(): void
+    {
+        $this->autenticarWebhook();
+        $fecha = $_GET['fecha'] ?? '';
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) { $this->error('fecha inválida', 422); return; }
+
+        $this->success('OK', ['fecha' => $fecha, 'id_caja_erp' => $this->repo->getIdsCajaErpAsignados($fecha)]);
     }
 
     /** POST /api/softpharma-bridge/asignar-venta */

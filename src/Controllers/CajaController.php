@@ -108,6 +108,11 @@ class CajaController extends Controller
         $filtroMes    = $_GET['mes'] ?? date('Y-m');
 
         $pendientes = $this->repo->getSesionesByEstado('PENDIENTE_VENTA');
+        foreach ($pendientes as &$p) {
+            $p['tiene_erp'] = !empty($p['vendedora_nombre'])
+                && $this->repo->getLocalSoftpharmaCodigo((int)$p['id_local']) !== null;
+        }
+        unset($p);
         $abiertas   = $this->repo->getSesionesByEstado('ABIERTA');
         $recientes  = $this->repo->getSesionesRecientes($filtroCaja, $filtroCajera, $filtroMes);
         $cajas      = $this->repo->getCajasActivas();
@@ -433,76 +438,6 @@ class CajaController extends Controller
     }
 
     // ── GET /caja/{id}/ventas ──────────────────────────────
-    public function ventasView(int $id): void
-    {
-        $postulanteId = $this->requireAuth();
-        $basePath     = defined('APP_BASE_PATH') ? APP_BASE_PATH : '';
-        $userName     = $_SESSION['user_name'] ?? 'Usuario';
-        $isAdmin      = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
-
-        $sesion = $this->repo->getSesionById($id);
-        if (!$sesion || $sesion['estado'] !== 'PENDIENTE_VENTA') {
-            header('Location: ' . APP_BASE_PATH . '/caja');
-            exit;
-        }
-
-        $vendedora        = $this->repo->getVendedoraAsignada($id);
-        $vendedora_nombre = $vendedora ? trim($vendedora['nombres'] . ' ' . $vendedora['apellidos']) : '';
-        $vendedoraUsuarioErp = $vendedora['softpharma_usuario'] ?? null;
-        $cajera_id        = (int)($sesion['postulante_apertura_id'] ?? 0);
-        $cajera_cierre_id = (int)($sesion['postulante_cierre_id'] ?? 0);
-        $cajera_nombre    = $sesion['cajera_nombre']            ?? '';
-
-        // Control de acceso: la cajera (quien abrió o quien cerró) o el admin.
-        // La vendedora ya no necesita entrar aquí -- solo sigue vendiendo en
-        // SOFTPHARMA, el sistema detecta su cierre solo.
-        if (!$isAdmin && $postulanteId !== $cajera_id && $postulanteId !== $cajera_cierre_id) {
-            $nombreVend = 'la cajera del turno';
-            require_once __DIR__ . '/../../views/caja/ventas_acceso_denegado.php';
-            exit;
-        }
-
-        $localCodigo = $this->repo->getLocalSoftpharmaCodigo((int)$sesion['id_local']);
-
-        require_once __DIR__ . '/../../views/caja/ventas.php';
-    }
-
-    // ── POST /caja/api/{id}/ventas ─────────────────────────
-    public function submitVentas(int $id): void
-    {
-        $postulanteId = $this->requireAuth();
-        $data         = $this->getAllInput();
-        $ventas       = round((float)($data['monto_ventas'] ?? 0), 2);
-
-        if ($ventas < 0) $this->error('El monto de ventas no puede ser negativo', 422);
-
-        $sesion = $this->repo->getSesionById($id);
-        if (!$sesion || $sesion['estado'] !== 'PENDIENTE_VENTA') {
-            $this->error('La sesión no está en estado PENDIENTE_VENTA', 409);
-        }
-
-        $this->repo->insertVenta($id, $postulanteId, $ventas);
-        $this->repo->registrarRendimientoVendedora($id, $ventas);
-        $cuadre = $this->repo->calcularYGuardarCuadre($id, $ventas);
-
-        // Auto-detectar incidencia contable si |diferencia| > 10 soles
-        if (abs($cuadre['diferencia'] ?? 0) > 10) {
-            $tipo           = ($cuadre['diferencia'] < 0) ? 'FALTANTE' : 'SOBRANTE';
-            $montoOriginal  = round(abs($cuadre['diferencia']), 2);
-            $responsableId  = (int)($sesion['postulante_apertura_id'] ?? 0) ?: null;
-            $this->incRepo->crear(
-                $id,
-                $tipo,
-                $montoOriginal,
-                $postulanteId,
-                $responsableId,
-                "Auto-detectado al cierre. Diferencia: S/ {$cuadre['diferencia']}"
-            );
-        }
-
-        $this->success('Ventas registradas. Cuadre calculado.', $cuadre);
-    }
-
     /**
      * POST /caja/api/{id}/actualizar-venta
      * Reemplaza el ingreso manual: busca en SOFTPHARMA (via el microservicio

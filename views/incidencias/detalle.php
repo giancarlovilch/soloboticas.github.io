@@ -597,10 +597,8 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     </ul>
                     <?php endif; ?>
 
-                    <p style="font-size:.78rem;color:#94a3b8;margin:0;">
-                        Monto actual: <strong style="color:#1e293b;"><?= $f2($ventaMonto) ?></strong>
-                        — ya no se tipea a mano, se asigna el cierre real de SOFTPHARMA desde
-                        "Ventas SOFTPHARMA" más abajo.
+                    <p style="font-size:.85rem;color:#1e293b;margin:0;">
+                        <strong><?= $f2($ventaMonto) ?></strong>
                     </p>
                 </div>
             </div>

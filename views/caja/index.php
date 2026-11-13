@@ -68,20 +68,25 @@ $estadoLabel = [
         </div>
         <div class="caja-cards">
             <?php foreach ($pendientes as $s): ?>
-            <div class="caja-card caja-card--pendiente">
+            <div class="caja-card caja-card--pendiente" id="pend-card-<?= $s['id_sesion'] ?>">
                 <div class="caja-card__top">
                     <div>
                         <p class="caja-card__caja"><?= htmlspecialchars($s['caja_desc']) ?> — <?= htmlspecialchars($s['local_desc']) ?></p>
                         <p class="caja-card__meta"><?= htmlspecialchars($s['turno_desc']) ?> · <?= date('d/m/Y', strtotime($s['fecha_operacion'])) ?></p>
                         <p class="caja-card__cajera">Responsable: <?= htmlspecialchars($s['cajera_nombre']) ?></p>
+                        <?php if ($s['vendedora_nombre']): ?>
+                        <p class="caja-card__cajera">Vendedora: <?= htmlspecialchars($s['vendedora_nombre']) ?></p>
+                        <?php endif; ?>
                     </div>
-                    <span class="caja-estado estado-pendiente">Pdte. de ventas</span>
+                    <span class="caja-estado estado-pendiente">En espera de venta</span>
                 </div>
-                <div class="caja-card__actions">
-                    <a href="<?= $basePath ?>/caja/<?= $s['id_sesion'] ?>/ventas" class="caja-btn caja-btn--primary">
-                        Ver venta pendiente →
-                    </a>
+                <div class="caja-card__actions" style="gap:.5rem;flex-wrap:wrap;">
+                    <?php if ($s['tiene_erp']): ?>
+                    <button class="caja-btn caja-btn--primary" onclick="actualizarVentaInline(<?= $s['id_sesion'] ?>, this)">↻ Actualizar</button>
+                    <?php endif; ?>
+                    <button class="caja-btn caja-btn--secondary" onclick="cerrarSinVentaInline(<?= $s['id_sesion'] ?>, this)">Cerrar sin venta</button>
                 </div>
+                <p class="pend-msg" id="pend-msg-<?= $s['id_sesion'] ?>" style="font-size:.75rem;color:#64748b;margin:.5rem 0 0;display:none;"></p>
             </div>
             <?php endforeach; ?>
         </div>
@@ -291,7 +296,7 @@ $estadoLabel = [
                             <?php if ($s['estado'] === 'ABIERTA'): ?>
                                 <a href="<?= $basePath ?>/caja/sesion/<?= $s['id_sesion'] ?>" class="caja-link">Continuar</a>
                             <?php elseif ($s['estado'] === 'PENDIENTE_VENTA'): ?>
-                                <a href="<?= $basePath ?>/caja/<?= $s['id_sesion'] ?>/ventas" class="caja-link">Ver venta pendiente</a>
+                                <a href="<?= $basePath ?>/caja#pend-card-<?= $s['id_sesion'] ?>" class="caja-link">En espera de venta</a>
                             <?php elseif (in_array($s['estado'], ['CERRADA','APROBADA','OBSERVADA','RECHAZADA'])): ?>
                                 <a href="<?= $basePath ?>/caja/reporte/<?= $s['id_sesion'] ?>" class="caja-link">Ver arqueo</a>
                             <?php else: ?>
@@ -312,5 +317,54 @@ $estadoLabel = [
     </section>
 
 </main>
+
+<script>
+const BASE = '<?= $basePath ?>';
+
+function pendMsg(id, texto, esError) {
+    const el = document.getElementById('pend-msg-' + id);
+    if (!el) return;
+    el.textContent = texto;
+    el.style.color = esError ? '#dc2626' : '#64748b';
+    el.style.display = 'block';
+}
+
+async function actualizarVentaInline(id, btn) {
+    btn.disabled = true;
+    try {
+        const r   = await fetch(`${BASE}/caja/api/${id}/actualizar-venta`, { method: 'POST' });
+        const res = await r.json();
+        if (!res.success) { pendMsg(id, res.message || 'Error al actualizar.', true); btn.disabled = false; return; }
+
+        const estado = res.data?.estado;
+        if (estado === 'esperando') {
+            pendMsg(id, 'Todavía no se registra el cierre en SOFTPHARMA.', false);
+            btn.disabled = false;
+        } else if (estado === 'requiere_admin') {
+            pendMsg(id, res.message, true);
+            btn.disabled = false;
+        } else {
+            location.reload();
+        }
+    } catch {
+        pendMsg(id, 'Error de conexión.', true);
+        btn.disabled = false;
+    }
+}
+
+async function cerrarSinVentaInline(id, btn) {
+    if (!confirm('¿Cerrar este cuadre sin asignar una venta? Si había una vendedora asignada, quedará pendiente de revisión por el admin.')) return;
+    btn.disabled = true;
+    try {
+        const r   = await fetch(`${BASE}/caja/api/${id}/cerrar-sin-ventas`, { method: 'POST' });
+        const res = await r.json();
+        if (!res.success) { pendMsg(id, res.message || 'Error al cerrar.', true); btn.disabled = false; return; }
+        location.reload();
+    } catch {
+        pendMsg(id, 'Error de conexión.', true);
+        btn.disabled = false;
+    }
+}
+</script>
 </body>
 </html>
