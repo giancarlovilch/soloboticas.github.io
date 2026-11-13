@@ -308,6 +308,7 @@ $router->post('/admin/api/bono/{id}/eliminar',             [AdminController::cla
 $router->post('/admin/api/bono-estudio/agregar',           [AdminController::class, 'addBonoEstudio']);
 $router->post('/admin/api/bono-estudio/{id}/eliminar',     [AdminController::class, 'eliminarBonoEstudio']);
 $router->post('/admin/api/softpharma-usuario/guardar',     [AdminController::class, 'apiSoftpharmaUsuarioGuardar']);
+$router->post('/admin/api/softpharma-usuario/guardar-masivo', [AdminController::class, 'apiSoftpharmaUsuarioGuardarMasivo']);
 $router->post('/admin/api/supervisor/agregar',             [AdminController::class, 'addSupervisor']);
 $router->post('/admin/api/supervisor/{id}/eliminar', [AdminController::class, 'eliminarSupervisor']);
 $router->post('/admin/api/encuesta-bcp/{id}/editar',    [AdminController::class, 'editarVotoBcp']);

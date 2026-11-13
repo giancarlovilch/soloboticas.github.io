@@ -135,6 +135,15 @@ select.su-sel { padding:.35rem .5rem; border:1.5px solid #e2e8f0; border-radius:
         <div class="su-card sin"><div class="num"><?= $totalSinNada ?></div><div class="lbl">Sin sugerencia</div></div>
     </div>
 
+    <?php if ($totalSugeridos > 0): ?>
+    <div style="margin-bottom:1.1rem;">
+        <button class="btn-sm" id="btnGuardarTodo" onclick="guardarTodasLasSugerencias()">
+            Guardar las <?= $totalSugeridos ?> sugerencias de una vez
+        </button>
+        <span id="masivoMsg" style="margin-left:.6rem; font-size:.82rem;"></span>
+    </div>
+    <?php endif; ?>
+
     <table class="su-table">
         <thead>
             <tr>
@@ -189,6 +198,33 @@ select.su-sel { padding:.35rem .5rem; border:1.5px solid #e2e8f0; border-radius:
 </div>
 
 <script>
+const SUGERENCIAS = <?= json_encode(array_values(array_filter(array_map(
+    fn($f) => $f['sugerido'] && !$f['postulante']['softpharma_usuario']
+        ? ['postulante_id' => $f['postulante']['id_postulante'], 'softpharma_usuario' => $f['sugerido']['usuario']]
+        : null,
+    $filas
+)))) ?>;
+
+async function guardarTodasLasSugerencias() {
+    const btn = document.getElementById('btnGuardarTodo');
+    const msg = document.getElementById('masivoMsg');
+    btn.disabled = true;
+    msg.textContent = 'Guardando...';
+    try {
+        const r = await fetch(`${BASE}/admin/api/softpharma-usuario/guardar-masivo`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pares: SUGERENCIAS })
+        });
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.message || 'Error');
+        location.reload();
+    } catch (e) {
+        msg.textContent = e.message;
+        btn.disabled = false;
+    }
+}
+
 async function guardarUsuario(id, btn) {
     const sel = document.getElementById('su-sel-' + id);
     const usuario = sel.value;

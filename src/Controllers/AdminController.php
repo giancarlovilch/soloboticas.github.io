@@ -1099,6 +1099,32 @@ class AdminController extends Controller
         $this->success('Registro eliminado.');
     }
 
+    /** POST /admin/api/softpharma-usuario/guardar-masivo — guarda varias de una sola vez (sugerencias por DNI) */
+    public function apiSoftpharmaUsuarioGuardarMasivo(): void
+    {
+        $this->middlewareAdmin();
+        $data  = $this->getAllInput();
+        $pares = $data['pares'] ?? []; // [{postulante_id, softpharma_usuario}, ...]
+
+        if (!is_array($pares) || empty($pares)) {
+            $this->error('No hay nada que guardar', 422); return;
+        }
+
+        require_once __DIR__ . '/../Core/Database.php';
+        $db = \Database::getConnection();
+        $stmt = $db->prepare("UPDATE postulante SET softpharma_usuario = :u WHERE id_postulante = :id AND softpharma_usuario IS NULL");
+        $guardados = 0;
+        foreach ($pares as $par) {
+            $pid = (int)($par['postulante_id'] ?? 0);
+            $u   = trim($par['softpharma_usuario'] ?? '');
+            if ($pid <= 0 || $u === '') continue;
+            $stmt->execute(['u' => $u, 'id' => $pid]);
+            $guardados += $stmt->rowCount();
+        }
+
+        $this->success("Guardados {$guardados} de " . count($pares), ['guardados' => $guardados]);
+    }
+
     /** POST /admin/api/softpharma-usuario/guardar */
     public function apiSoftpharmaUsuarioGuardar(): void
     {
