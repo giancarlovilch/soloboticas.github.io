@@ -486,7 +486,7 @@ class IncidenciaContableController extends Controller
 
         $cajaRepo = new CajaRepository();
         try {
-            $cajaRepo->registrarAsignacionErp($sesionId, [
+            $resultado = $cajaRepo->asignarVentaErpVerificando($sesionId, [
                 'id_caja' => $idCaja, 'usuario' => $usuario, 'nombre' => $nombre,
                 'venta_neta' => $monto, 'cierre' => $cierre,
             ], $adminId);
@@ -494,17 +494,21 @@ class IncidenciaContableController extends Controller
             $this->error('Ese cierre ya fue asignado a otro cuadre', 409); return;
         }
 
-        $totalNuevo = $cajaRepo->getTotalVentaActual($sesionId) + $monto;
-        $cajaRepo->addCorreccionVenta(
-            $sesionId, $totalNuevo,
-            "Venta SOFTPHARMA asignada: {$usuario} (S/ " . number_format($monto, 2) . ")",
-            $adminId
-        );
+        $msg = $resultado['verificado_sin_cambio']
+            ? 'Venta verificada — ya coincidía, no se sumó de nuevo.'
+            : 'Venta asignada y sumada al cuadre.';
+        $this->success($msg, $resultado);
+    }
 
-        // Ya no está "a la espera" -- el admin la está resolviendo ahora mismo.
-        $cajaRepo->marcarVentaResueltaEnSesion($sesionId);
+    // ── POST /incidencias/api/venta-erp/{idAsignacion}/quitar ───
 
-        $this->success('Venta asignada', ['total_ventas' => $totalNuevo]);
+    public function apiQuitarVentaErp(int $idAsignacion): void
+    {
+        $adminId  = $this->requireAdmin();
+        $cajaRepo = new CajaRepository();
+        $ok = $cajaRepo->quitarAsignacionErp($idAsignacion, $adminId);
+        if (!$ok) { $this->notFound('Esa venta asignada no existe'); return; }
+        $this->success('Venta retirada del cuadre');
     }
 
     // ── POST /incidencias/api/lote-visa/{loteId}/quitar ───

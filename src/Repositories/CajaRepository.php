@@ -1443,17 +1443,104 @@ class CajaRepository
      * aquí -- ej. dos vendedoras distintas vendieron en el mismo turno por
      * una cobertura a medio día.
      */
+    /**
+     * Para la PRIMERA venta de una sesion (todavia sin monto -- recien
+     * cerrada por auto-match o por "cerrar sin ventas"). Bookkeeping puro,
+     * la suma la hace quien llama (calcularYGuardarCuadre ya recibe el
+     * monto final). Para una asignacion RETROACTIVA (cuadre ya cerrado,
+     * via incidencia o el panel de conciliacion) usar
+     * asignarVentaErpVerificando(), que decide solo si hace falta sumar.
+     */
     public function registrarAsignacionErp(int $sesionId, array $cierre, ?int $adminId): void
     {
         $this->db->prepare(
             "INSERT INTO venta_erp_asignada
-                (sesion_id, id_caja_erp, usuario_erp, nombre_erp, venta_neta, fecha_cierre_erp, asignado_por_admin_id)
-             VALUES (:sid, :idc, :uerp, :nerp, :mon, :fcierre, :adminid)"
+                (sesion_id, id_caja_erp, usuario_erp, nombre_erp, venta_neta, monto_aplicado, fecha_cierre_erp, asignado_por_admin_id)
+             VALUES (:sid, :idc, :uerp, :nerp, :mon, :mon, :fcierre, :adminid)"
         )->execute([
             'sid' => $sesionId, 'idc' => (int)$cierre['id_caja'], 'uerp' => $cierre['usuario'],
             'nerp' => $cierre['nombre'] ?? null, 'mon' => (float)$cierre['venta_neta'],
             'fcierre' => $cierre['cierre'] ?? null, 'adminid' => $adminId,
         ]);
+    }
+
+    /**
+     * Asigna un cierre de SOFTPHARMA a un cuadre YA CERRADO (retroactivo).
+     * Si el monto actual del cuadre ya coincide con el del cierre (ej.
+     * alguien lo tipeo a mano antes de que existiera este sistema), solo
+     * queda marcado como verificado -- igual que Culqi "Conforme con lo
+     * declarado" -- sin sumar dinero de nuevo. Si no coincide (ej. el
+     * cuadre se cerro en S/0 con "cerrar sin ventas"), corrige el total
+     * para incluirlo. Devuelve si hubo cambio de monto o solo verificacion.
+     */
+    public function asignarVentaErpVerificando(int $sesionId, array $cierre, ?int $adminId): array
+    {
+        $ventaNeta     = (float)$cierre['venta_neta'];
+        $actual        = $this->getTotalVentaActual($sesionId);
+        $montoAplicado = 0.0;
+
+        if (abs($actual - $ventaNeta) >= 0.50) {
+            $nuevoTotal = round($actual + $ventaNeta, 2);
+            $this->addCorreccionVenta(
+                $sesionId, $nuevoTotal,
+                "Venta SOFTPHARMA asignada: {$cierre['usuario']} (S/ " . number_format($ventaNeta, 2) . ")",
+                $adminId
+            );
+            $montoAplicado = $ventaNeta;
+        }
+
+        $this->db->prepare(
+            "INSERT INTO venta_erp_asignada
+                (sesion_id, id_caja_erp, usuario_erp, nombre_erp, venta_neta, monto_aplicado, fecha_cierre_erp, asignado_por_admin_id)
+             VALUES (:sid, :idc, :uerp, :nerp, :mon, :map, :fcierre, :adminid)"
+        )->execute([
+            'sid' => $sesionId, 'idc' => (int)$cierre['id_caja'], 'uerp' => $cierre['usuario'],
+            'nerp' => $cierre['nombre'] ?? null, 'mon' => $ventaNeta, 'map' => $montoAplicado,
+            'fcierre' => $cierre['cierre'] ?? null, 'adminid' => $adminId,
+        ]);
+
+        $this->marcarVentaResueltaEnSesion($sesionId);
+
+        return ['monto_aplicado' => $montoAplicado, 'verificado_sin_cambio' => $montoAplicado == 0.0];
+    }
+
+    /**
+     * Quita una venta ERP asignada por error. Si habia sumado dinero al
+     * cuadre, lo revierte con otra correccion (nunca se borra el rastro,
+     * igual que el resto de correcciones). Si no queda ninguna venta ERP
+     * asignada despues de quitarla, vuelve a marcar la sesion como
+     * pendiente de asignar.
+     */
+    public function quitarAsignacionErp(int $idAsignacion, ?int $adminId): bool
+    {
+        $stmt = $this->db->prepare("SELECT * FROM venta_erp_asignada WHERE id_asignacion = :id");
+        $stmt->execute(['id' => $idAsignacion]);
+        $row = $stmt->fetch();
+        if (!$row) return false;
+
+        $sesionId      = (int)$row['sesion_id'];
+        $montoAplicado = (float)$row['monto_aplicado'];
+
+        if ($montoAplicado > 0) {
+            $actual     = $this->getTotalVentaActual($sesionId);
+            $nuevoTotal = round($actual - $montoAplicado, 2);
+            $this->addCorreccionVenta(
+                $sesionId, $nuevoTotal,
+                "Venta SOFTPHARMA retirada: {$row['usuario_erp']} (-S/ " . number_format($montoAplicado, 2) . ")",
+                $adminId
+            );
+        }
+
+        $this->db->prepare("DELETE FROM venta_erp_asignada WHERE id_asignacion = :id")->execute(['id' => $idAsignacion]);
+
+        $cnt = $this->db->prepare("SELECT COUNT(*) FROM venta_erp_asignada WHERE sesion_id = :sid");
+        $cnt->execute(['sid' => $sesionId]);
+        if ((int)$cnt->fetchColumn() === 0) {
+            $this->db->prepare("UPDATE reporte_venta SET venta_pendiente_asignar = 1 WHERE sesion_id = :sid")
+                     ->execute(['sid' => $sesionId]);
+        }
+
+        return true;
     }
 
     public function getAsignacionesErp(int $sesionId): array

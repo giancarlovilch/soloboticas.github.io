@@ -99,23 +99,16 @@ class SoftpharmaBridgeController extends Controller
         }
 
         try {
-            $this->repo->registrarAsignacionErp($sesionId, [
+            // null = asignado desde el panel de conciliación, no un admin de soloboticas.com
+            $resultado = $this->repo->asignarVentaErpVerificando($sesionId, [
                 'id_caja' => $idCaja, 'usuario' => $usuario,
                 'nombre' => $d['nombre_erp'] ?? null, 'venta_neta' => $monto,
                 'cierre' => $d['cierre'] ?? null,
-            ], null); // null = asignado desde el panel de conciliación, no un admin de soloboticas.com
+            ], null);
         } catch (\PDOException $e) {
             $this->error('Ese cierre ya fue asignado a otro cuadre', 409); return;
         }
 
-        $totalNuevo = $this->repo->getTotalVentaActual($sesionId) + $monto;
-        $this->repo->addCorreccionVenta(
-            $sesionId, $totalNuevo,
-            "Venta SOFTPHARMA asignada desde el panel de conciliación: {$usuario} (S/ " . number_format($monto, 2) . ")",
-            null
-        );
-        $this->repo->marcarVentaResueltaEnSesion($sesionId);
-
-        $this->success('Venta actualizada', ['sesion_id' => $sesionId, 'total_ventas' => $totalNuevo]);
+        $this->success('Venta actualizada', ['sesion_id' => $sesionId] + $resultado);
     }
 }

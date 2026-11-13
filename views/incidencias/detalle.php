@@ -844,8 +844,12 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                                     <?= htmlspecialchars($va['nombre_erp'] ?? '') ?>
                                     <?php if ($va['fecha_cierre_erp']): ?> · cierre <?= date('d/m H:i', strtotime($va['fecha_cierre_erp'])) ?><?php endif; ?>
                                 </span>
+                                <?php if ((float)$va['monto_aplicado'] == 0.0): ?>
+                                <span class="badge" style="background:#d1fae5;color:#065f46;font-size:.65rem;margin-left:.3rem;">✓ Conforme — ya estaba correcto</span>
+                                <?php endif; ?>
                             </span>
                             <span class="item-amount" style="color:#5b21b6;">S/ <?= number_format($va['venta_neta'], 2) ?></span>
+                            <button class="item-rm" onclick="quitarVentaErp(<?= $va['id_asignacion'] ?>, this)" title="Quitar">✕</button>
                         </li>
                         <?php endforeach; ?>
                     </ul>
@@ -2367,15 +2371,23 @@ async function asignarVentaErp() {
     if (!sel.value) { mostrarAlerta('erpAlert', 'Selecciona un cierre', 'err'); return; }
     const c = JSON.parse(sel.value);
     try {
-        await apiPost(`${BASE}/incidencias/api/${INC_ID}/asignar-venta-erp`, {
+        const res = await apiPost(`${BASE}/incidencias/api/${INC_ID}/asignar-venta-erp`, {
             id_caja: c.id_caja, usuario: c.usuario, nombre: c.nombre,
             venta_neta: c.venta_neta, cierre: c.cierre,
         });
-        mostrarAlerta('erpAlert', '✓ Venta asignada', 'ok');
+        mostrarAlerta('erpAlert', '✓ ' + res.message, 'ok');
         setTimeout(() => location.reload(), 900);
     } catch(e) {
         mostrarAlerta('erpAlert', e.message, 'err');
     }
+}
+
+async function quitarVentaErp(idAsignacion, btn) {
+    if (!confirm('¿Quitar esta venta del cuadre? Si había sumado dinero, se revierte con otra corrección.')) return;
+    try {
+        await apiPost(`${BASE}/incidencias/api/venta-erp/${idAsignacion}/quitar`, {});
+        location.reload();
+    } catch(e) { alert(e.message); }
 }
 
 // ── Guardar condonación ─────────────────────────────────

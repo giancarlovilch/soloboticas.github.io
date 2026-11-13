@@ -743,6 +743,10 @@ CREATE TABLE IF NOT EXISTS `venta_erp_asignada` (
   `usuario_erp`           VARCHAR(50)   NOT NULL,
   `nombre_erp`            VARCHAR(100)  NULL,
   `venta_neta`            DECIMAL(10,2) NOT NULL,
+  -- Cuanto se sumo realmente al cuadre (0 si la venta ya estaba correcta
+  -- de antes y esto solo la marco como verificada -- igual que Culqi
+  -- "Conforme con lo declarado"). Permite revertir exacto al quitar.
+  `monto_aplicado`        DECIMAL(10,2) NOT NULL DEFAULT 0,
   `fecha_cierre_erp`      DATETIME      NULL,
   `asignado_por_admin_id` INT           NULL,
   `fecha_asignacion`      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,

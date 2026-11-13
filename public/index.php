@@ -192,6 +192,7 @@ $router->post('/incidencias/api/{id}/cobro-electronico',[IncidenciaContableContr
 $router->get('/incidencias/api/vales-disponibles',     [IncidenciaContableController::class, 'apiValesDisponibles']);
 $router->post('/incidencias/api/{id}/asignar-lote-visa', [IncidenciaContableController::class, 'apiAsignarLoteVisa']);
 $router->post('/incidencias/api/{id}/asignar-venta-erp', [IncidenciaContableController::class, 'apiAsignarVentaErp']);
+$router->post('/incidencias/api/venta-erp/{idAsignacion}/quitar', [IncidenciaContableController::class, 'apiQuitarVentaErp']);
 $router->post('/incidencias/api/lote-visa/{loteId}/quitar', [IncidenciaContableController::class, 'apiQuitarLoteVisa']);
 $router->get('/incidencias/sesion/{id}',               [IncidenciaContableController::class, 'porSesion']);
 $router->get('/incidencias/{id}',                      [IncidenciaContableController::class, 'detalle']);
