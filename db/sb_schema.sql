@@ -221,6 +221,7 @@ CREATE TABLE IF NOT EXISTS `postulante` (
   `telefono`            VARCHAR(15)  NULL DEFAULT NULL,
   `situacion_vivienda_id` INT        NULL DEFAULT NULL,
   `num_documento`       VARCHAR(8)   NOT NULL,
+  `softpharma_usuario`  VARCHAR(50)  NULL DEFAULT NULL,
   `direccion`           VARCHAR(255) NULL DEFAULT NULL,
   `distrito`            VARCHAR(100) NULL,
   `calificacion`        DECIMAL(5,2) NULL,
@@ -230,6 +231,7 @@ CREATE TABLE IF NOT EXISTS `postulante` (
   `cv_url`              VARCHAR(255) NULL DEFAULT NULL,
   PRIMARY KEY (`id_postulante`),
   UNIQUE INDEX `uq_postulante_dni`    (`num_documento` ASC),
+  INDEX `idx_postulante_softpharma_usuario` (`softpharma_usuario` ASC),
   INDEX `idx_postulante_genero`       (`genero_id` ASC),
   INDEX `idx_postulante_vivienda`     (`situacion_vivienda_id` ASC),
   CONSTRAINT `fk_postulante_genero`

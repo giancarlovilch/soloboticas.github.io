@@ -262,6 +262,13 @@ $navActive = [
                     </a>
                 </li>
 
+                <li class="list__item <?= ($page === 'softpharma-usuarios') ? 'list__item--active' : '' ?>">
+                    <a href="?page=softpharma-usuarios" class="list__button">
+                        <img src="<?= $basePath ?>/assets/img/icons/sales.svg" class="list__img">
+                        <span class="nav__link">Usuarios SOFTPHARMA</span>
+                    </a>
+                </li>
+
                 <p class="nav__section">Sistema</p>
 
                 <li class="list__item">
@@ -320,6 +327,9 @@ $navActive = [
                         break;
                     case 'bancos':
                         require_once __DIR__ . '/bancos.php';
+                        break;
+                    case 'softpharma-usuarios':
+                        require_once __DIR__ . '/softpharma_usuarios.php';
                         break;
                     case 'horario':
                         require_once __DIR__ . '/horario_admin.php';

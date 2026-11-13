@@ -1099,6 +1099,30 @@ class AdminController extends Controller
         $this->success('Registro eliminado.');
     }
 
+    /** POST /admin/api/softpharma-usuario/guardar */
+    public function apiSoftpharmaUsuarioGuardar(): void
+    {
+        $this->middlewareAdmin();
+        $data      = $this->getAllInput();
+        $pid       = (int)($data['postulante_id'] ?? 0);
+        $usuarioErp = trim($data['softpharma_usuario'] ?? '');
+
+        if ($pid <= 0 || $usuarioErp === '') {
+            $this->error('postulante_id y softpharma_usuario son requeridos', 422); return;
+        }
+
+        require_once __DIR__ . '/../Core/Database.php';
+        $db = \Database::getConnection();
+        $check = $db->prepare("SELECT id_postulante FROM postulante WHERE id_postulante = :id");
+        $check->execute(['id' => $pid]);
+        if (!$check->fetch()) { $this->error('Trabajadora no encontrada', 404); return; }
+
+        $db->prepare("UPDATE postulante SET softpharma_usuario = :u WHERE id_postulante = :id")
+           ->execute(['u' => $usuarioErp, 'id' => $pid]);
+
+        $this->success('Usuario SOFTPHARMA guardado.');
+    }
+
     /** POST /admin/api/supervisor/agregar */
     public function addSupervisor(): void
     {
