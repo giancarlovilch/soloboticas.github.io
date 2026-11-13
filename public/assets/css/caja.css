@@ -129,6 +129,13 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--cj-bg)
 .caja-link { color: var(--cj-teal); font-size: 0.82rem; font-weight: 500; text-decoration: none; }
 .caja-link:hover { text-decoration: underline; }
 
+.btn-mini { display: inline-block; padding: 3px 9px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;
+            cursor: pointer; border: 1px solid var(--cj-teal); background: var(--cj-teal); color: #fff; white-space: nowrap; }
+.btn-mini:hover { background: #007b8a; }
+.btn-mini:disabled { opacity: .55; cursor: not-allowed; }
+.btn-mini--outline { background: transparent; color: #991b1b; border-color: #fecaca; }
+.btn-mini--outline:hover { background: #fee2e2; }
+
 /* ── FORMULARIO BASE ─────────────────────────────────── */
 .caja-input {
     width: 100%; padding: .5rem .75rem;

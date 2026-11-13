@@ -263,6 +263,8 @@ $estadoLabel = [
                                     <?= $itxt ?>
                                 </span>
                                 <?php endif; ?>
+                            <?php elseif ($s['estado'] === 'PENDIENTE_VENTA'): ?>
+                                <button class="btn-mini btn-mini--outline" onclick="cerrarSinVentaInline(<?= $s['id_sesion'] ?>, this)">Cerrar sin venta</button>
                             <?php else: ?>
                                 <span class="caja-estado <?= $e['cls'] ?>"><?= $e['label'] ?></span>
                             <?php endif; ?>
@@ -296,7 +298,7 @@ $estadoLabel = [
                             <?php if ($s['estado'] === 'ABIERTA'): ?>
                                 <a href="<?= $basePath ?>/caja/sesion/<?= $s['id_sesion'] ?>" class="caja-link">Continuar</a>
                             <?php elseif ($s['estado'] === 'PENDIENTE_VENTA'): ?>
-                                <a href="<?= $basePath ?>/caja#pend-card-<?= $s['id_sesion'] ?>" class="caja-link">En espera de venta</a>
+                                <button class="btn-mini" onclick="actualizarVentaInline(<?= $s['id_sesion'] ?>, this)">↻ Actualizar</button>
                             <?php elseif (in_array($s['estado'], ['CERRADA','APROBADA','OBSERVADA','RECHAZADA'])): ?>
                                 <a href="<?= $basePath ?>/caja/reporte/<?= $s['id_sesion'] ?>" class="caja-link">Ver arqueo</a>
                             <?php else: ?>
@@ -323,7 +325,7 @@ const BASE = '<?= $basePath ?>';
 
 function pendMsg(id, texto, esError) {
     const el = document.getElementById('pend-msg-' + id);
-    if (!el) return;
+    if (!el) { if (esError || texto) alert(texto); return; }
     el.textContent = texto;
     el.style.color = esError ? '#dc2626' : '#64748b';
     el.style.display = 'block';
