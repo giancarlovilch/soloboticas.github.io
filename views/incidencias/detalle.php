@@ -593,7 +593,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     <?php endif; ?>
 
                     <p style="font-size:.85rem;color:#1e293b;margin:0;">
-                        <strong><?= $f2($ventaMonto) ?></strong>
+                        <strong><?= $f2($totalVentas) ?></strong>
                     </p>
                 </div>
             </div>
