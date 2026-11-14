@@ -620,7 +620,7 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
             </div>
 
             <!-- ── 2a. Ventas SOFTPHARMA — verificador del monto de arriba, solo admin ── -->
-            <?php if ($esAdmin && (!empty($ventasErpAsignadas) || !empty($ventasErpDisponibles))): ?>
+            <?php if ($esAdmin && (!empty($ventasErpAsignadas) || !empty($ventasErpCierres))): ?>
             <div class="card card--amber">
                 <div class="card-head">
                     <p class="card-title">Ventas SOFTPHARMA</p>
@@ -650,17 +650,25 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     <p style="font-size:.82rem;color:#94a3b8;margin-bottom:.85rem;">Sin ventas asignadas todavía.</p>
                     <?php endif; ?>
 
-                    <?php if (!empty($ventasErpDisponibles)): ?>
-                    <p class="form-label" style="margin-bottom:.5rem;">Asignar cierre disponible</p>
+                    <p class="form-label" style="margin-bottom:.5rem;">Cierres de SOFTPHARMA (<?= count($ventasErpCierres) ?>)</p>
                     <div class="form-row cols-2">
                         <div>
                             <label class="form-label">Cierre</label>
                             <select class="form-input" id="erp_cierre_id">
                                 <option value="">— seleccionar —</option>
-                                <?php foreach ($ventasErpDisponibles as $c): ?>
-                                <option value='<?= htmlspecialchars(json_encode($c)) ?>'>
+                                <?php foreach ($ventasErpCierres as $c):
+                                    $ocupado = $ventasErpOcupados[(int)$c['id_caja']] ?? null;
+                                    $esEstaSesion = $ocupado && (int)$ocupado['sesion_id'] === $sesionId;
+                                ?>
+                                <option value='<?= htmlspecialchars(json_encode($c)) ?>'
+                                    <?= ($ocupado && !$esEstaSesion) ? 'disabled' : '' ?>>
                                     <?= htmlspecialchars($c['nombre']) ?> (<?= htmlspecialchars($c['usuario']) ?>) — <?= htmlspecialchars($c['turno']) ?>
                                     · S/ <?= number_format($c['venta_neta'], 2) ?>
+                                    <?php if ($ocupado && !$esEstaSesion): ?>
+                                        — ⚠ asignado a <?= htmlspecialchars($ocupado['caja_desc']) ?> <?= htmlspecialchars($ocupado['turno_desc']) ?>
+                                    <?php elseif ($ocupado): ?>
+                                        — ✓ en esta sesión
+                                    <?php endif; ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -670,9 +678,6 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                         </div>
                     </div>
                     <span id="erpAlert" style="display:none;margin-top:.4rem;" class="alert"></span>
-                    <?php else: ?>
-                    <p style="font-size:.78rem;color:#94a3b8;">No hay cierres disponibles sin asignar para este local/fecha.</p>
-                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>

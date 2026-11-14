@@ -187,18 +187,16 @@ class IncidenciaContableController extends Controller
         // asignación manual, solo admin, soporta más de una (ej. dos vendedoras
         // distintas por una cobertura a medio turno).
         $ventasErpAsignadas   = $cajaRepo->getAsignacionesErp($sesionId);
-        $ventasErpDisponibles = [];
+        $ventasErpCierres     = [];   // TODOS los cierres de SOFTPHARMA del local/fecha
+        $ventasErpOcupados    = [];   // id_caja_erp => sesión que ya lo tiene asignado
         if ($esAdminDetalle) {
             $localCodigoErp = $cajaRepo->getLocalSoftpharmaCodigo((int)($sesion['id_local'] ?? 0));
             if ($localCodigoErp) {
                 require_once __DIR__ . '/../Services/SoftpharmaApiClient.php';
                 try {
                     $client    = new \SoftpharmaApiClient();
-                    $cierres   = $client->getVentasDia($sesion['fecha_operacion'], $localCodigoErp);
-                    $asignados = $cajaRepo->getIdsCajaErpAsignados($sesion['fecha_operacion']);
-                    $ventasErpDisponibles = array_values(array_filter(
-                        $cierres, fn($c) => !in_array((int)$c['id_caja'], $asignados, true)
-                    ));
+                    $ventasErpCierres  = $client->getVentasDia($sesion['fecha_operacion'], $localCodigoErp);
+                    $ventasErpOcupados = $cajaRepo->getAsignacionesErpPorFecha($sesion['fecha_operacion']);
                 } catch (\Throwable $e) {
                     // Si SOFTPHARMA no responde, simplemente no se ofrece la asignación
                     // automática -- no debe bloquear ver/cerrar la incidencia.

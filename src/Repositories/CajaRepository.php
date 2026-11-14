@@ -1672,6 +1672,30 @@ class CajaRepository
         return array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
     }
 
+    /**
+     * Para cada id_caja_erp asignado ese día, devuelve a qué sesión/caja/turno
+     * quedó, para que el admin vea la lista COMPLETA de cierres de SOFTPHARMA
+     * (incluidos los ya ocupados) y sepa de dónde quitarlo si está mal puesto.
+     */
+    public function getAsignacionesErpPorFecha(string $fecha): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT vea.id_caja_erp, vea.sesion_id, c.descripcion AS caja_desc,
+                    t.descripcion AS turno_desc, vea.usuario_erp
+             FROM venta_erp_asignada vea
+             INNER JOIN sesion_caja sc ON sc.id_sesion = vea.sesion_id
+             INNER JOIN caja c ON c.id_caja = sc.caja_id
+             INNER JOIN turno t ON t.id_turno = sc.turno_id
+             WHERE sc.fecha_operacion = :fecha"
+        );
+        $stmt->execute(['fecha' => $fecha]);
+        $map = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $map[(int)$r['id_caja_erp']] = $r;
+        }
+        return $map;
+    }
+
     public function marcarVentaResueltaEnSesion(int $sesionId): void
     {
         $this->db->prepare("UPDATE reporte_venta SET venta_pendiente_asignar = 0 WHERE sesion_id = :sid")
