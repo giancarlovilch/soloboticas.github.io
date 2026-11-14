@@ -495,20 +495,19 @@ class CajaController extends Controller
 
         if (count($candidatos) === 1) {
             $c = $candidatos[0];
-            $ordenCorrecto = !empty($sesion['fecha_cierre']) && strtotime($c['cierre']) > strtotime($sesion['fecha_cierre']);
-            $dentroDeVentana = !empty($sesion['fecha_cierre']) && (time() - strtotime($sesion['fecha_cierre'])) <= 2 * 3600;
+            $ordenCorrecto = !empty($sesion['fecha_cierre'])
+                && !empty($c['cierre'])
+                && strtotime($c['cierre']) > strtotime($sesion['fecha_cierre']);
 
-            if ($ordenCorrecto && $dentroDeVentana) {
+            if ($ordenCorrecto) {
                 $cuadre = $this->asignarVentaInterno($id, (int)$vendedora['id_postulante'], $c);
                 $this->success('Venta emparejada automáticamente.', $cuadre);
                 return;
             }
 
-            $motivo = !$ordenCorrecto
-                ? 'La vendedora cerró en SOFTPHARMA antes de que cerraras tu cuadre.'
-                : 'Pasaron más de 2 horas desde tu cierre.';
             $this->success(
-                $motivo . ' Usa "Cerrar sin ventas": el admin la asignará desde el caso.',
+                'La vendedora cerró en SOFTPHARMA antes de que cerraras tu cuadre (o su cierre no se registró). '
+                . 'Usa "Cerrar sin ventas": el admin la asignará desde el caso.',
                 ['estado' => 'requiere_admin']
             );
             return;
