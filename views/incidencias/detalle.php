@@ -595,6 +595,27 @@ $difBd    = abs($difActual) <= 0.01 ? '#a7f3d0'  : ($difActual > 0 ? '#93c5fd'  
                     <p style="font-size:.85rem;color:#1e293b;margin:0;">
                         <strong><?= $f2($totalVentas) ?></strong>
                     </p>
+
+                    <?php if ($esAdmin): ?>
+                    <hr class="sec-divider" style="margin:.9rem 0 .6rem;">
+                    <p class="form-label" style="margin-bottom:.5rem;">Editar venta del turno (solo admin)</p>
+                    <div class="form-row cols-2" style="margin-bottom:.6rem;">
+                        <div>
+                            <label class="form-label">Nuevo monto (S/)</label>
+                            <input type="number" step="0.01" min="0" class="form-input" id="venta_monto"
+                                   value="<?= number_format($totalVentas,2,'.','') ?>">
+                        </div>
+                        <div>
+                            <label class="form-label">Motivo de corrección</label>
+                            <input type="text" class="form-input" id="venta_desc"
+                                   placeholder="Ej: Error en captura de caja">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                        <button class="btn btn-primary btn-sm" onclick="guardarVenta()">Guardar venta</button>
+                        <span id="ventaAlert" style="display:none;" class="alert"></span>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -2112,6 +2133,20 @@ async function guardarNumBcp() {
         setTimeout(() => location.reload(), 900);
     } catch(e) {
         mostrarAlerta('bcpAlert', e.message, 'err');
+    }
+}
+
+// ── Guardar ventas (solo admin) ─────────────────────────
+async function guardarVenta() {
+    const monto = parseFloat(document.getElementById('venta_monto').value);
+    const desc  = document.getElementById('venta_desc').value.trim();
+    if (isNaN(monto) || monto < 0) { mostrarAlerta('ventaAlert', 'Ingresa un monto válido', 'err'); return; }
+    try {
+        await apiPost(`${BASE}/caja/api/sesion/${SESION_ID}/corregir-venta`, { monto_nuevo: monto, motivo: desc });
+        mostrarAlerta('ventaAlert', '✓ Venta actualizada', 'ok');
+        setTimeout(() => location.reload(), 900);
+    } catch(e) {
+        mostrarAlerta('ventaAlert', e.message, 'err');
     }
 }
 
