@@ -113,7 +113,42 @@ class CajaController extends Controller
         $cajas      = $this->repo->getCajasActivas();
         $cajeras    = $this->repo->getCajerasActivas();
 
+        foreach ($recientes as &$s) {
+            $s['semaforo'] = $this->semaforoVenta($s);
+        }
+        unset($s);
+
         require_once __DIR__ . '/../../views/caja/index.php';
+    }
+
+    /**
+     * Semáforo de riesgo de la venta de un cuadre ya cerrado:
+     *  - ROJO: se corrigió después del cierre, o la vendedora cerró en
+     *    SOFTPHARMA antes de que la cajera cerrara su cuadre (orden
+     *    incorrecto) -- ambos calculados acá mismo, sin depender de nadie.
+     *  - VERDE: nada de lo anterior, y el panel de conciliación (Django) ya
+     *    lo revisó y confirmó "ok" -- lo último es solo informativo, lo
+     *    manda el otro servicio (ver SoftpharmaBridgeController).
+     *  - NARANJA: nada de lo anterior, pero todavía no llegó esa revisión.
+     */
+    private function semaforoVenta(array $s): array
+    {
+        if ((int)($s['num_correcciones'] ?? 0) > 0) {
+            return ['color' => 'rojo', 'titulo' => 'La venta fue corregida después del cierre.'];
+        }
+        if ((int)($s['num_orden_incorrecto'] ?? 0) > 0) {
+            return ['color' => 'rojo', 'titulo' => 'La vendedora cerró en SOFTPHARMA antes de que cerraras el cuadre.'];
+        }
+
+        $conciliacion = $s['conciliacion_estado'] ?? null;
+        if ($conciliacion !== null && $conciliacion !== 'ok') {
+            return ['color' => 'rojo', 'titulo' => "Conciliación detectó un problema ({$conciliacion})."];
+        }
+        if ($conciliacion === 'ok') {
+            return ['color' => 'verde', 'titulo' => 'Revisado en conciliación: todo correcto.'];
+        }
+
+        return ['color' => 'naranja', 'titulo' => 'Todavía no se revisó en el panel de conciliación.'];
     }
 
     // ── GET /caja/sesion/nueva ─────────────────────────────

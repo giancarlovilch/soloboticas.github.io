@@ -185,6 +185,7 @@ $estadoLabel = [
                         <th>Vendedor/a</th>
                         <th class="text-center" style="width:52px;">Ops.<br><span style="font-weight:400;opacity:.7;">BCP</span></th>
                         <th style="width:52px;">Ant.</th>
+                        <th class="text-center" style="width:36px;" title="Riesgo de la venta: rojo si se corrigió o cerró en el orden incorrecto, verde si conciliación ya la revisó y confirmó, naranja si aún no se revisa.">⚠</th>
                         <th class="text-center" style="width:100px;">Estado</th>
                         <th class="text-center" style="width:80px;">Confiabilidad</th>
                         <th class="text-right" style="width:80px;">Resultado</th>
@@ -225,6 +226,16 @@ $estadoLabel = [
                                    style="font-size:0.72rem;color:#0097A7;">#<?= $s['sesion_anterior_id'] ?></a>
                             <?php else: ?>
                                 <span style="color:#cbd5e1;font-size:0.72rem;">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-center">
+                            <?php if ($tieneDetalle && !empty($s['semaforo'])):
+                                $semColor = ['rojo' => '#dc2626', 'verde' => '#16a34a', 'naranja' => '#f59e0b'][$s['semaforo']['color']];
+                            ?>
+                                <span title="<?= htmlspecialchars($s['semaforo']['titulo']) ?>"
+                                      style="display:inline-block;width:12px;height:12px;border-radius:50%;background:<?= $semColor ?>;"></span>
+                            <?php else: ?>
+                                <span style="color:#cbd5e1;font-size:.72rem;">—</span>
                             <?php endif; ?>
                         </td>
                         <td class="text-center">

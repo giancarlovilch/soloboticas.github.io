@@ -303,7 +303,13 @@ class CajaRepository
         }
 
         $sql = "SELECT sc.id_sesion, sc.estado, sc.saldo_inicial,
-                       sc.fecha_operacion, sc.fecha_apertura,
+                       sc.fecha_operacion, sc.fecha_apertura, sc.fecha_cierre,
+                       sc.conciliacion_estado, sc.conciliacion_fecha,
+                       (SELECT COUNT(*) FROM correccion_venta cv WHERE cv.sesion_id = sc.id_sesion) AS num_correcciones,
+                       (SELECT COUNT(*) FROM venta_erp_asignada vea
+                         WHERE vea.sesion_id = sc.id_sesion
+                           AND vea.fecha_cierre_erp IS NOT NULL
+                           AND vea.fecha_cierre_erp < sc.fecha_cierre) AS num_orden_incorrecto,
                        c.id_caja, c.descripcion AS caja_desc, l.id_local,
                        l.descripcion AS local_desc,
                        t.descripcion AS turno_desc,
@@ -1700,6 +1706,20 @@ class CajaRepository
     {
         $this->db->prepare("UPDATE reporte_venta SET venta_pendiente_asignar = 0 WHERE sesion_id = :sid")
                  ->execute(['sid' => $sesionId]);
+    }
+
+    /**
+     * Guarda la conclusión que el panel de conciliación (Django) reportó
+     * para este turno -- solo informativo, alimenta el semáforo de /caja.
+     * Se sobreescribe cada vez que el admin vuelve a mirar ese día allá, no
+     * hay historial de esto.
+     */
+    public function marcarConciliacion(int $sesionId, string $estado): void
+    {
+        $this->db->prepare(
+            "UPDATE sesion_caja SET conciliacion_estado = :est, conciliacion_fecha = NOW()
+             WHERE id_sesion = :sid"
+        )->execute(['est' => $estado, 'sid' => $sesionId]);
     }
 
     public function calcularYGuardarCuadre(int $sesionId, float $ventas): array

@@ -348,6 +348,7 @@ require_once __DIR__ . '/../src/Controllers/SoftpharmaBridgeController.php';
 $router->get('/api/softpharma-bridge/ventas-dia',        [SoftpharmaBridgeController::class, 'apiVentasDia']);
 $router->get('/api/softpharma-bridge/cierres-asignados', [SoftpharmaBridgeController::class, 'apiCierresAsignados']);
 $router->post('/api/softpharma-bridge/asignar-venta',     [SoftpharmaBridgeController::class, 'apiAsignarVenta']);
+$router->post('/api/softpharma-bridge/marcar-conciliacion', [SoftpharmaBridgeController::class, 'apiMarcarConciliacion']);
 
 // SoloBank — Vales de cierres enviados desde Python
 require_once __DIR__ . '/../src/Controllers/SoloBankController.php';

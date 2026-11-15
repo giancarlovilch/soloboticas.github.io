@@ -111,4 +111,30 @@ class SoftpharmaBridgeController extends Controller
 
         $this->success('Venta actualizada', ['sesion_id' => $sesionId] + $resultado);
     }
+
+    /**
+     * POST /api/softpharma-bridge/marcar-conciliacion
+     * El panel de conciliación empuja su conclusión por turno cada vez que
+     * el admin revisa un día allá -- solo informativo, alimenta el semáforo
+     * de /caja (ver CajaController). No reemplaza ni corrige nada acá.
+     */
+    public function apiMarcarConciliacion(): void
+    {
+        $this->autenticarWebhook();
+        $d      = $this->getJsonInput();
+        $turnos = $d['turnos'] ?? [];
+        if (!is_array($turnos)) { $this->error('turnos debe ser un arreglo', 422); return; }
+
+        $estadosValidos = ['ok', 'error', 'regular', 'sin_erp', 'sin_sesion_php'];
+        $marcados = 0;
+        foreach ($turnos as $t) {
+            $sesionId = (int)($t['sesion_id'] ?? 0);
+            $estado   = (string)($t['estado'] ?? '');
+            if (!$sesionId || !in_array($estado, $estadosValidos, true)) continue;
+            $this->repo->marcarConciliacion($sesionId, $estado);
+            $marcados++;
+        }
+
+        $this->success('OK', ['marcados' => $marcados]);
+    }
 }
