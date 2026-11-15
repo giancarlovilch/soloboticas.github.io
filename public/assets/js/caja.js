@@ -682,7 +682,7 @@ async function guardarSesion(cerrar = false) {
     }
 
     btn.disabled    = true;
-    btn.textContent = 'Guardando...';
+    btn.textContent = cerrar ? 'Cerrando y verificando venta…' : 'Guardando...';
     hideAlert(msg);
 
     const payload = {
@@ -713,7 +713,14 @@ async function guardarSesion(cerrar = false) {
 
         if (res.success) {
             if (cerrar) {
-                window.location.href = `${BASE}/caja`;
+                const ventaEstado = res.data?.venta_estado;
+                mostrarToastCaja(
+                    ventaEstado === 'asignada'
+                        ? '✓ Turno cerrado. Venta emparejada con SOFTPHARMA.'
+                        : '✓ Turno cerrado. Pendiente de asignar venta (lo revisará el administrador).',
+                    'ok'
+                );
+                setTimeout(() => { window.location.href = `${BASE}/caja`; }, 1200);
             } else {
                 showAlert(msg, '✓ ' + res.message, 'ok');
             }

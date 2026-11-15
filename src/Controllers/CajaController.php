@@ -108,11 +108,6 @@ class CajaController extends Controller
         $filtroMes    = $_GET['mes'] ?? date('Y-m');
 
         $pendientes = $this->repo->getSesionesByEstado('PENDIENTE_VENTA');
-        foreach ($pendientes as &$p) {
-            $p['tiene_erp'] = !empty($p['vendedora_nombre'])
-                && $this->repo->getLocalSoftpharmaCodigo((int)$p['id_local']) !== null;
-        }
-        unset($p);
         $abiertas   = $this->repo->getSesionesByEstado('ABIERTA');
         $recientes  = $this->repo->getSesionesRecientes($filtroCaja, $filtroCajera, $filtroMes);
         $cajas      = $this->repo->getCajasActivas();
@@ -434,23 +429,62 @@ class CajaController extends Controller
             }
         });
 
-        $this->success(!empty($data['cerrar']) ? 'Sesión cerrada y enviada a pendientes' : 'Guardado correctamente');
+        // La venta (match con SOFTPHARMA o "sin venta, pendiente admin") se
+        // resuelve FUERA de la transacción de arriba: implica una llamada de
+        // red al microservicio, y no debe dejar la sesión a medio bloquear
+        // si SOFTPHARMA tarda o no responde.
+        $resultadoVenta = null;
+        if (!empty($data['cerrar'])) {
+            $resultadoVenta = $this->resolverVentaAlCierre($sesionId, $postulanteId);
+        }
+
+        $this->success(
+            !empty($data['cerrar']) ? 'Sesión cerrada y enviada a pendientes' : 'Guardado correctamente',
+            $resultadoVenta
+        );
+    }
+
+    /**
+     * Se ejecuta justo después de cerrar el cuadre: intenta emparejar con
+     * SOFTPHARMA automáticamente y, si no se puede (vendedora sin cerrar
+     * aún, ambiguo, local sin integración, etc.), cierra sin venta de una
+     * vez -- la cajera ya no decide nada más, el admin resuelve el resto
+     * desde incidencias si hace falta.
+     */
+    private function resolverVentaAlCierre(int $sesionId, int $postulanteId): array
+    {
+        $sesion    = $this->repo->getSesionById($sesionId);
+        $vendedora = $this->repo->getVendedoraAsignada($sesionId);
+        $localCodigo = $sesion ? $this->repo->getLocalSoftpharmaCodigo((int)$sesion['id_local']) : null;
+
+        if ($sesion && $localCodigo && $vendedora && $vendedora['softpharma_usuario']) {
+            try {
+                $match = $this->intentarEmparejarVenta($sesion, $localCodigo, $vendedora);
+                if ($match['ok']) {
+                    return ['venta_estado' => 'asignada', 'cuadre' => $match['cuadre']];
+                }
+            } catch (\Throwable $e) {
+                // SOFTPHARMA no respondió o algo falló -- no bloquea el cierre,
+                // cae al mismo camino de abajo (sin venta, pendiente admin).
+            }
+        }
+
+        $cuadre = $this->cerrarSinVentasInterno($sesionId, $vendedora, $postulanteId);
+        return ['venta_estado' => 'sin_venta', 'cuadre' => $cuadre];
     }
 
     // ── GET /caja/{id}/ventas ──────────────────────────────
     /**
      * POST /caja/api/{id}/actualizar-venta
-     * Reemplaza el ingreso manual: busca en SOFTPHARMA (via el microservicio
-     * soloboticas-softpharma) el cierre de caja de la vendedora asignada.
-     * Auto-asigna solo si hay un único candidato, cerró DESPUÉS de que la
-     * cajera cerró (nunca antes -- esa es la garantía "a ciegas"), y dentro
-     * de la ventana de 2 horas. Fuera de eso, requiere que el admin lo
-     * confirme manualmente (ver asignarVentaManual).
+     * Reintento manual del mismo emparejamiento que ya se intenta solo al
+     * cerrar (ver resolverVentaAlCierre). Solo sirve para una sesión que
+     * quedó "sin venta, pendiente admin" y el cierre de SOFTPHARMA apareció
+     * después -- el admin puede reintentar desde incidencias sin tener que
+     * hacer la asignación manual si ya hay un único candidato válido.
      */
     public function actualizarVenta(int $id): void
     {
         $this->requireAuth();
-        $isAdmin = ($_SESSION['user_rol'] ?? '') === 'ADMIN';
 
         $sesion = $this->repo->getSesionById($id);
         if (!$sesion || $sesion['estado'] !== 'PENDIENTE_VENTA') {
@@ -474,50 +508,69 @@ class CajaController extends Controller
             return;
         }
 
-        require_once __DIR__ . '/../Services/SoftpharmaApiClient.php';
         try {
-            $client  = new \SoftpharmaApiClient();
-            $cierres = $client->getVentasDia($sesion['fecha_operacion'], $localCodigo);
+            $match = $this->intentarEmparejarVenta($sesion, $localCodigo, $vendedora);
         } catch (\Throwable $e) {
             $this->error('No se pudo contactar a SOFTPHARMA: ' . $e->getMessage(), 502); return;
         }
 
-        $asignados  = $this->repo->getIdsCajaErpAsignados($sesion['fecha_operacion']);
-        $candidatos = array_values(array_filter($cierres, function ($c) use ($vendedora, $asignados) {
-            return $c['usuario'] === $vendedora['softpharma_usuario']
-                && !in_array((int)$c['id_caja'], $asignados, true);
-        }));
-
-        if (empty($candidatos)) {
-            $this->success('Todavía no se registra el cierre en SOFTPHARMA.', ['estado' => 'esperando']);
+        if ($match['ok']) {
+            $this->success('Venta emparejada automáticamente.', $match['cuadre']);
             return;
         }
 
-        if (count($candidatos) === 1) {
-            $c = $candidatos[0];
-            $ordenCorrecto = !empty($sesion['fecha_cierre'])
-                && !empty($c['cierre'])
-                && strtotime($c['cierre']) > strtotime($sesion['fecha_cierre']);
+        $this->success($match['motivo'], ['estado' => 'requiere_admin']);
+    }
 
-            if ($ordenCorrecto) {
-                $cuadre = $this->asignarVentaInterno($id, (int)$vendedora['id_postulante'], $c);
-                $this->success('Venta emparejada automáticamente.', $cuadre);
-                return;
-            }
+    /**
+     * Intenta emparejar la sesión con el cierre de SOFTPHARMA de su
+     * vendedora ese día. Descarta primero los cierres que obviamente no le
+     * pueden corresponder a ESTE turno (sin cerrar todavía, o cerrados antes
+     * de que la cajera cerrara su cuadre -- nunca se asigna "a ciegas" uno
+     * que cerró antes) y solo entonces decide: exactamente 1 candidato válido
+     * -> se asigna; 0 o 2+ -> no hay nada seguro que hacer automáticamente.
+     */
+    private function intentarEmparejarVenta(array $sesion, string $localCodigo, array $vendedora): array
+    {
+        require_once __DIR__ . '/../Services/SoftpharmaApiClient.php';
+        $client  = new \SoftpharmaApiClient();
+        $cierres = $client->getVentasDia($sesion['fecha_operacion'], $localCodigo);
 
-            $this->success(
-                'La vendedora cerró en SOFTPHARMA antes de que cerraras tu cuadre (o su cierre no se registró). '
-                . 'Usa "Cerrar sin ventas": el admin la asignará desde el caso.',
-                ['estado' => 'requiere_admin']
-            );
-            return;
+        $asignados = $this->repo->getIdsCajaErpAsignados($sesion['fecha_operacion']);
+        $deLaVendedora = array_values(array_filter($cierres, fn($c) =>
+            $c['usuario'] === $vendedora['softpharma_usuario']
+            && !in_array((int)$c['id_caja'], $asignados, true)
+        ));
+
+        if (empty($deLaVendedora)) {
+            return ['ok' => false, 'motivo' => 'Todavía no se registra el cierre en SOFTPHARMA.'];
         }
 
-        // Ambiguo: 2+ cierres candidatos ese día para la misma vendedora
-        $this->success(
-            'Hay más de un cierre posible ese día. Usa "Cerrar sin ventas": el admin elegirá cuál desde el caso.',
-            ['estado' => 'requiere_admin']
-        );
+        $validos = array_values(array_filter($deLaVendedora, fn($c) =>
+            !empty($c['cierre'])
+            && !empty($sesion['fecha_cierre'])
+            && strtotime($c['cierre']) > strtotime($sesion['fecha_cierre'])
+        ));
+
+        if (count($validos) === 1) {
+            $cuadre = $this->asignarVentaInterno((int)$sesion['id_sesion'], (int)$vendedora['id_postulante'], $validos[0]);
+            return ['ok' => true, 'cuadre' => $cuadre];
+        }
+
+        if (empty($validos)) {
+            return [
+                'ok' => false,
+                'motivo' => 'La vendedora cerró en SOFTPHARMA antes de que cerraras tu cuadre (o su cierre no se registró). '
+                    . 'Usa "Cerrar sin ventas": el admin la asignará desde el caso.',
+            ];
+        }
+
+        // 2+ cierres válidos (cerraron después, ninguno descartable) para la misma
+        // vendedora ese día -- ambigüedad real, no se puede adivinar cuál es.
+        return [
+            'ok' => false,
+            'motivo' => 'Hay más de un cierre posible ese día. Usa "Cerrar sin ventas": el admin elegirá cuál desde el caso.',
+        ];
     }
 
     /**
@@ -535,24 +588,37 @@ class CajaController extends Controller
             $this->error('La sesión no está en estado PENDIENTE_VENTA', 409); return;
         }
 
-        $vendedora  = $this->repo->getVendedoraAsignada($id);
+        $vendedora = $this->repo->getVendedoraAsignada($id);
+        $cuadre    = $this->cerrarSinVentasInterno($id, $vendedora, $postulanteId);
+        $this->success('Cerrado sin ventas.', $cuadre);
+    }
+
+    /**
+     * Cierra el cuadre en 0 y lo marca "pendiente de asignar" para el admin
+     * -- el mismo desenlace tanto si lo dispara la cajera a mano (botón de
+     * siempre) como si lo dispara solo el cierre automático cuando no hubo
+     * forma segura de emparejar con SOFTPHARMA.
+     */
+    private function cerrarSinVentasInterno(int $sesionId, ?array $vendedora, int $postulanteId): array
+    {
+        $sesion     = $this->repo->getSesionById($sesionId);
         $vendedorId = (int)($vendedora['id_postulante'] ?? $postulanteId);
         $pendiente  = $vendedora !== null;
 
-        $this->repo->insertVenta($id, $vendedorId, 0.0, $pendiente);
-        $this->repo->registrarRendimientoVendedora($id, 0.0);
-        $cuadre = $this->repo->calcularYGuardarCuadre($id, 0.0);
+        $this->repo->insertVenta($sesionId, $vendedorId, 0.0, $pendiente);
+        $this->repo->registrarRendimientoVendedora($sesionId, 0.0);
+        $cuadre = $this->repo->calcularYGuardarCuadre($sesionId, 0.0);
 
         if (abs($cuadre['diferencia'] ?? 0) > 10) {
             $tipo = ($cuadre['diferencia'] < 0) ? 'FALTANTE' : 'SOBRANTE';
             $this->incRepo->crear(
-                $id, $tipo, round(abs($cuadre['diferencia']), 2),
+                $sesionId, $tipo, round(abs($cuadre['diferencia']), 2),
                 $postulanteId, (int)($sesion['postulante_apertura_id'] ?? 0) ?: null,
                 "Cerrado sin venta asignada. Diferencia: S/ {$cuadre['diferencia']}"
             );
         }
 
-        $this->success('Cerrado sin ventas.', $cuadre);
+        return $cuadre;
     }
 
     /**
