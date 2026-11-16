@@ -113,6 +113,28 @@ class SoftpharmaBridgeController extends Controller
     }
 
     /**
+     * GET /api/softpharma-bridge/asignaciones-erp?fecha=YYYY-MM-DD
+     * Qué cajas de SOFTPHARMA ya quedaron asignadas a qué sesión ese día --
+     * el panel de conciliación lo usa para agrupar por sesión real en vez
+     * de adivinar por hora/turno (ver CajaRepository::getAsignacionesErpPorFecha,
+     * ya usada en incidencias para la misma lista).
+     */
+    public function apiAsignacionesErp(): void
+    {
+        $this->autenticarWebhook();
+        $fecha = $_GET['fecha'] ?? '';
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) { $this->error('fecha inválida', 422); return; }
+
+        $porCaja = $this->repo->getAsignacionesErpPorFecha($fecha);
+        $porSesion = [];
+        foreach ($porCaja as $idCaja => $r) {
+            $porSesion[(int)$r['sesion_id']][] = (int)$idCaja;
+        }
+
+        $this->success('OK', ['fecha' => $fecha, 'asignaciones' => $porSesion]);
+    }
+
+    /**
      * POST /api/softpharma-bridge/marcar-conciliacion
      * El panel de conciliación empuja su conclusión por turno cada vez que
      * el admin revisa un día allá -- solo informativo, alimenta el semáforo

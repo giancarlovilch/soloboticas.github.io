@@ -347,6 +347,7 @@ $router->get('/plin/api/visor',  [PlinController::class, 'apiVisor']);
 require_once __DIR__ . '/../src/Controllers/SoftpharmaBridgeController.php';
 $router->get('/api/softpharma-bridge/ventas-dia',        [SoftpharmaBridgeController::class, 'apiVentasDia']);
 $router->get('/api/softpharma-bridge/cierres-asignados', [SoftpharmaBridgeController::class, 'apiCierresAsignados']);
+$router->get('/api/softpharma-bridge/asignaciones-erp', [SoftpharmaBridgeController::class, 'apiAsignacionesErp']);
 $router->post('/api/softpharma-bridge/asignar-venta',     [SoftpharmaBridgeController::class, 'apiAsignarVenta']);
 $router->post('/api/softpharma-bridge/marcar-conciliacion', [SoftpharmaBridgeController::class, 'apiMarcarConciliacion']);
 
