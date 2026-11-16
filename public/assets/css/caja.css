@@ -242,8 +242,8 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--cj-bg)
 /* ── TABLA ─────────────────────────────────────────── */
 .caja-table-wrap { overflow-x: auto; border: 1px solid var(--cj-border); border-radius: 10px; }
 .caja-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-.caja-table th { background: #f8fafc; padding: 9px 12px; text-align: left; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--cj-muted); border-bottom: 2px solid var(--cj-border); white-space: nowrap; }
-.caja-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.caja-table th { background: #f8fafc; padding: 9px 6px; text-align: left; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--cj-muted); border-bottom: 2px solid var(--cj-border); white-space: nowrap; }
+.caja-table td { padding: 8px 6px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
 .caja-table tr:last-child td { border-bottom: none; }
 .caja-table tr:hover td { background: #f8fafc; }
 .caja-table__empty { text-align: center; color: var(--cj-muted); padding: 2rem; }
