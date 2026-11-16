@@ -2645,6 +2645,12 @@ class CajaRepository
      * transferencias como aplicadas A ESA MISMA SESION -- sin esto, la
      * segunda llamada las veria como "no pendientes" (ya no NULL) y las
      * perderia del calculo en vez de volver a incluirlas.
+     *
+     * El "<> 0" es necesario porque algunas filas antiguas (de antes de que
+     * esta columna usara NULL como "sin aplicar") tienen literalmente 0
+     * guardado en sesion_aplicada_*_id. Sin ese guard, cualquier llamada de
+     * solo-lectura (que no pasa $sesionIdActual, default 0) las confundiría
+     * con "aplicadas a la sesión 0" y las volvería a mostrar como pendientes.
      */
     public function getTransferenciasPendientesAplicar(int $cajaId, int $sesionIdActual = 0): array
     {
@@ -2661,14 +2667,15 @@ class CajaRepository
              INNER JOIN local ld ON ld.id_local = cd.local_id
              WHERE t.estado = 'CONFIRMADA'
                AND (
-                    (t.caja_origen_id = :cid3 AND (t.sesion_aplicada_origen_id IS NULL OR t.sesion_aplicada_origen_id = :sido))
-                 OR (t.caja_destino_id = :cid4 AND (t.sesion_aplicada_destino_id IS NULL OR t.sesion_aplicada_destino_id = :sidd))
+                    (t.caja_origen_id = :cid3 AND (t.sesion_aplicada_origen_id IS NULL OR (:sido <> 0 AND t.sesion_aplicada_origen_id = :sido2)))
+                 OR (t.caja_destino_id = :cid4 AND (t.sesion_aplicada_destino_id IS NULL OR (:sidd <> 0 AND t.sesion_aplicada_destino_id = :sidd2)))
                )
              ORDER BY t.confirmed_at ASC"
         );
         $stmt->execute([
             'cid1' => $cajaId, 'cid2' => $cajaId, 'cid3' => $cajaId, 'cid4' => $cajaId,
-            'sido' => $sesionIdActual, 'sidd' => $sesionIdActual,
+            'sido' => $sesionIdActual, 'sido2' => $sesionIdActual,
+            'sidd' => $sesionIdActual, 'sidd2' => $sesionIdActual,
         ]);
         return $stmt->fetchAll();
     }
@@ -2863,10 +2870,10 @@ class CajaRepository
              FROM retiro_kgyr rk
              INNER JOIN postulante p ON p.id_postulante = rk.registrado_por_id
              WHERE rk.caja_origen_id = :cid AND rk.estado = 'ACTIVO'
-               AND (rk.sesion_aplicada_id IS NULL OR rk.sesion_aplicada_id = :sid)
+               AND (rk.sesion_aplicada_id IS NULL OR (:sid <> 0 AND rk.sesion_aplicada_id = :sid2))
              ORDER BY rk.registrado_en ASC"
         );
-        $stmt->execute(['cid' => $cajaId, 'sid' => $sesionIdActual]);
+        $stmt->execute(['cid' => $cajaId, 'sid' => $sesionIdActual, 'sid2' => $sesionIdActual]);
         return $stmt->fetchAll();
     }
 
@@ -3020,10 +3027,10 @@ class CajaRepository
              FROM ingreso_kgyr ig
              INNER JOIN postulante p ON p.id_postulante = ig.registrado_por_id
              WHERE ig.caja_destino_id = :cid AND ig.estado = 'ACTIVO'
-               AND (ig.sesion_aplicada_id IS NULL OR ig.sesion_aplicada_id = :sid)
+               AND (ig.sesion_aplicada_id IS NULL OR (:sid <> 0 AND ig.sesion_aplicada_id = :sid2))
              ORDER BY ig.registrado_en ASC"
         );
-        $stmt->execute(['cid' => $cajaId, 'sid' => $sesionIdActual]);
+        $stmt->execute(['cid' => $cajaId, 'sid' => $sesionIdActual, 'sid2' => $sesionIdActual]);
         return $stmt->fetchAll();
     }
 
