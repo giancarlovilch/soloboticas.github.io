@@ -310,6 +310,8 @@ class CajaRepository
                          WHERE vea.sesion_id = sc.id_sesion
                            AND vea.fecha_cierre_erp IS NOT NULL
                            AND vea.fecha_cierre_erp < sc.fecha_cierre) AS num_orden_incorrecto,
+                       (SELECT COUNT(*) FROM venta_erp_asignada vea
+                         WHERE vea.sesion_id = sc.id_sesion) AS tiene_erp,
                        c.id_caja, c.descripcion AS caja_desc, l.id_local,
                        l.descripcion AS local_desc,
                        t.descripcion AS turno_desc,
@@ -1459,13 +1461,14 @@ class CajaRepository
      */
     public function registrarAsignacionErp(int $sesionId, array $cierre, ?int $adminId): void
     {
+        $monto = (float)$cierre['venta_neta'];
         $this->db->prepare(
             "INSERT INTO venta_erp_asignada
                 (sesion_id, id_caja_erp, usuario_erp, nombre_erp, venta_neta, monto_aplicado, fecha_cierre_erp, asignado_por_admin_id)
-             VALUES (:sid, :idc, :uerp, :nerp, :mon, :mon, :fcierre, :adminid)"
+             VALUES (:sid, :idc, :uerp, :nerp, :mon, :map, :fcierre, :adminid)"
         )->execute([
             'sid' => $sesionId, 'idc' => (int)$cierre['id_caja'], 'uerp' => $cierre['usuario'],
-            'nerp' => $cierre['nombre'] ?? null, 'mon' => (float)$cierre['venta_neta'],
+            'nerp' => $cierre['nombre'] ?? null, 'mon' => $monto, 'map' => $monto,
             'fcierre' => $cierre['cierre'] ?? null, 'adminid' => $adminId,
         ]);
     }

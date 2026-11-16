@@ -275,8 +275,6 @@ $estadoLabel = [
                                     <?= $itxt ?>
                                 </span>
                                 <?php endif; ?>
-                            <?php elseif ($s['estado'] === 'PENDIENTE_VENTA'): ?>
-                                <button class="btn-mini btn-mini--outline" onclick="cerrarSinVentaInline(<?= $s['id_sesion'] ?>, this)">Cerrar sin venta</button>
                             <?php else: ?>
                                 <span class="caja-estado <?= $e['cls'] ?>"><?= $e['label'] ?></span>
                             <?php endif; ?>
@@ -309,10 +307,13 @@ $estadoLabel = [
                         <td class="text-center" style="white-space:nowrap;">
                             <?php if ($s['estado'] === 'ABIERTA'): ?>
                                 <a href="<?= $basePath ?>/caja/sesion/<?= $s['id_sesion'] ?>" class="caja-link">Continuar</a>
-                            <?php elseif ($s['estado'] === 'PENDIENTE_VENTA'): ?>
-                                <span style="color:#94a3b8">—</span>
-                            <?php elseif (in_array($s['estado'], ['CERRADA','APROBADA','OBSERVADA','RECHAZADA'])): ?>
+                            <?php elseif (in_array($s['estado'], ['CERRADA','APROBADA','OBSERVADA','RECHAZADA'], true)): ?>
                                 <a href="<?= $basePath ?>/caja/reporte/<?= $s['id_sesion'] ?>" class="caja-link">Ver arqueo</a>
+                                <?php if ((int)($s['tiene_erp'] ?? 0) === 0 && in_array((int)$s['id_local'], [2, 3, 4], true)): ?>
+                                    <br>
+                                    <button class="btn-mini btn-mini--outline" style="margin-top:4px;"
+                                            onclick="actualizarVentaInline(<?= $s['id_sesion'] ?>, this)">↻ Actualizar</button>
+                                <?php endif; ?>
                             <?php else: ?>
                                 <span style="color:#94a3b8">—</span>
                             <?php endif; ?>

@@ -512,18 +512,25 @@ class CajaController extends Controller
     /**
      * POST /caja/api/{id}/actualizar-venta
      * Reintento manual del mismo emparejamiento que ya se intenta solo al
-     * cerrar (ver resolverVentaAlCierre). Solo sirve para una sesión que
-     * quedó "sin venta, pendiente admin" y el cierre de SOFTPHARMA apareció
-     * después -- el admin puede reintentar desde incidencias sin tener que
-     * hacer la asignación manual si ya hay un único candidato válido.
+     * cerrar (ver resolverVentaAlCierre). El cierre queda en 'CERRADA' aunque
+     * no se haya podido emparejar (ya no existe un estado intermedio
+     * "pendiente de venta") -- esto sirve para esos casos: la vendedora
+     * cierra su caja en SOFTPHARMA unos segundos/minutos después del clic en
+     * soloboticas.com, y para entonces el intento automático ya falló. Se
+     * puede reintentar desde /caja con el botón "↻ Actualizar" o desde
+     * incidencias, sin tener que hacer la asignación manual si ya hay un
+     * único candidato válido.
      */
     public function actualizarVenta(int $id): void
     {
         $this->requireAuth();
 
         $sesion = $this->repo->getSesionById($id);
-        if (!$sesion || $sesion['estado'] !== 'PENDIENTE_VENTA') {
-            $this->error('La sesión no está en estado PENDIENTE_VENTA', 409); return;
+        if (!$sesion || !in_array($sesion['estado'], ['CERRADA', 'APROBADA', 'OBSERVADA', 'RECHAZADA'], true)) {
+            $this->error('La sesión todavía no está cerrada.', 409); return;
+        }
+        if (!empty($this->repo->getAsignacionesErp($id))) {
+            $this->error('Esta sesión ya tiene una venta de SOFTPHARMA asignada.', 409); return;
         }
 
         $localCodigo = $this->repo->getLocalSoftpharmaCodigo((int)$sesion['id_local']);
