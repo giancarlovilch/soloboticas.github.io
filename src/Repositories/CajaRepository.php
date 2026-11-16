@@ -1767,17 +1767,17 @@ class CajaRepository
         // esto evita un FALTANTE/SOBRANTE falso por el monto transferido. Cada una se aplica
         // al primer cuadre que se calcule para esta caja después de confirmarse (hoy o
         // cualquier día futuro), y queda marcada para no aplicarse dos veces.
-        $transferenciasPendientes = $this->getTransferenciasPendientesAplicar((int)$sesion['caja_id']);
+        $transferenciasPendientes = $this->getTransferenciasPendientesAplicar((int)$sesion['caja_id'], $sesionId);
         $transferenciasNetas = array_sum(array_column($transferenciasPendientes, 'efecto'));
 
         // Retiros de efectivo registrados por el admin para depósito a Grupo KGyR,
         // pendientes de aplicar al cuadre de esta caja: restan de "lo que se dice"
         // porque el efectivo físico ya salió de la caja. Se marcan como aplicados
         // al primer cuadre que se calcule para esta caja después de registrarse.
-        $retirosPendientes = $this->getRetirosPendientesAplicar((int)$sesion['caja_id']);
+        $retirosPendientes = $this->getRetirosPendientesAplicar((int)$sesion['caja_id'], $sesionId);
         $retirosNetos = array_sum(array_column($retirosPendientes, 'monto'));
 
-        $ingresosPendientes = $this->getIngresosPendientesAplicar((int)$sesion['caja_id']);
+        $ingresosPendientes = $this->getIngresosPendientesAplicar((int)$sesion['caja_id'], $sesionId);
         $ingresosNetos = array_sum(array_column($ingresosPendientes, 'monto'));
 
         $total_esperado   = round($saldo_inicial + $ventas - $total_gastos - $digital_aprobado + $transferenciasNetas - $retirosNetos + $ingresosNetos, 2);
@@ -2639,7 +2639,14 @@ class CajaRepository
     // Transferencias CONFIRMADAS aún no aplicadas a ningún cuadre de esta caja en el lado
     // correspondiente. Cada fila trae 'lado' ('ORIGEN'|'DESTINO') y 'efecto' (monto con
     // signo: negativo si esta caja es origen, positivo si es destino).
-    public function getTransferenciasPendientesAplicar(int $cajaId): array
+    /**
+     * $sesionIdActual: si calcularYGuardarCuadre() se llama dos veces para la
+     * misma sesion (reintento), la primera llamada ya marco estas
+     * transferencias como aplicadas A ESA MISMA SESION -- sin esto, la
+     * segunda llamada las veria como "no pendientes" (ya no NULL) y las
+     * perderia del calculo en vez de volver a incluirlas.
+     */
+    public function getTransferenciasPendientesAplicar(int $cajaId, int $sesionIdActual = 0): array
     {
         $stmt = $this->db->prepare(
             "SELECT t.*,
@@ -2654,12 +2661,15 @@ class CajaRepository
              INNER JOIN local ld ON ld.id_local = cd.local_id
              WHERE t.estado = 'CONFIRMADA'
                AND (
-                    (t.caja_origen_id = :cid3 AND t.sesion_aplicada_origen_id IS NULL)
-                 OR (t.caja_destino_id = :cid4 AND t.sesion_aplicada_destino_id IS NULL)
+                    (t.caja_origen_id = :cid3 AND (t.sesion_aplicada_origen_id IS NULL OR t.sesion_aplicada_origen_id = :sido))
+                 OR (t.caja_destino_id = :cid4 AND (t.sesion_aplicada_destino_id IS NULL OR t.sesion_aplicada_destino_id = :sidd))
                )
              ORDER BY t.confirmed_at ASC"
         );
-        $stmt->execute(['cid1' => $cajaId, 'cid2' => $cajaId, 'cid3' => $cajaId, 'cid4' => $cajaId]);
+        $stmt->execute([
+            'cid1' => $cajaId, 'cid2' => $cajaId, 'cid3' => $cajaId, 'cid4' => $cajaId,
+            'sido' => $sesionIdActual, 'sidd' => $sesionIdActual,
+        ]);
         return $stmt->fetchAll();
     }
 
@@ -2845,16 +2855,18 @@ class CajaRepository
     // ── Retiros de caja para depósito a Grupo KGyR ─────────
 
     // Retiros ACTIVOS aún no aplicados a ningún cuadre de esta caja.
-    public function getRetirosPendientesAplicar(int $cajaId): array
+    // $sesionIdActual: ver nota en getTransferenciasPendientesAplicar() -- misma razon.
+    public function getRetirosPendientesAplicar(int $cajaId, int $sesionIdActual = 0): array
     {
         $stmt = $this->db->prepare(
             "SELECT rk.*, p.nombres AS registrado_por_nombre
              FROM retiro_kgyr rk
              INNER JOIN postulante p ON p.id_postulante = rk.registrado_por_id
-             WHERE rk.caja_origen_id = :cid AND rk.estado = 'ACTIVO' AND rk.sesion_aplicada_id IS NULL
+             WHERE rk.caja_origen_id = :cid AND rk.estado = 'ACTIVO'
+               AND (rk.sesion_aplicada_id IS NULL OR rk.sesion_aplicada_id = :sid)
              ORDER BY rk.registrado_en ASC"
         );
-        $stmt->execute(['cid' => $cajaId]);
+        $stmt->execute(['cid' => $cajaId, 'sid' => $sesionIdActual]);
         return $stmt->fetchAll();
     }
 
@@ -3000,16 +3012,18 @@ class CajaRepository
 
     // ── Ingresos bancarios a caja ─────────────────────────
 
-    public function getIngresosPendientesAplicar(int $cajaId): array
+    // $sesionIdActual: ver nota en getTransferenciasPendientesAplicar() -- misma razon.
+    public function getIngresosPendientesAplicar(int $cajaId, int $sesionIdActual = 0): array
     {
         $stmt = $this->db->prepare(
             "SELECT ig.*, p.nombres AS registrado_por_nombre
              FROM ingreso_kgyr ig
              INNER JOIN postulante p ON p.id_postulante = ig.registrado_por_id
-             WHERE ig.caja_destino_id = :cid AND ig.estado = 'ACTIVO' AND ig.sesion_aplicada_id IS NULL
+             WHERE ig.caja_destino_id = :cid AND ig.estado = 'ACTIVO'
+               AND (ig.sesion_aplicada_id IS NULL OR ig.sesion_aplicada_id = :sid)
              ORDER BY ig.registrado_en ASC"
         );
-        $stmt->execute(['cid' => $cajaId]);
+        $stmt->execute(['cid' => $cajaId, 'sid' => $sesionIdActual]);
         return $stmt->fetchAll();
     }
 
