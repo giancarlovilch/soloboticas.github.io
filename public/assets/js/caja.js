@@ -741,29 +741,6 @@ function confirmarCierre() {
     }
 }
 
-// Reintenta el emparejamiento con SOFTPHARMA para un cierre que quedó sin
-// venta asignada -- útil cuando la vendedora cierra su caja unos segundos o
-// minutos después de que la cajera cerró en soloboticas.com.
-async function actualizarVentaInline(sesionId, btn) {
-    const original = btn.textContent;
-    btn.disabled    = true;
-    btn.textContent = 'Buscando...';
-    try {
-        const r   = await fetch(`${BASE}/caja/api/${sesionId}/actualizar-venta`, { method: 'POST' });
-        const res = await r.json();
-        if (res.success && res.data?.estado !== 'requiere_admin') {
-            mostrarToastCaja('✓ Venta emparejada con SOFTPHARMA.', 'ok');
-            setTimeout(() => window.location.reload(), 900);
-            return;
-        }
-        mostrarToastCaja(res.message || 'Todavía no se pudo emparejar.');
-    } catch {
-        mostrarToastCaja('Error de conexión.');
-    }
-    btn.disabled    = false;
-    btn.textContent = original;
-}
-
 // ── Pagos digitales ───────────────────────────────────
 
 async function agregarPagoDigital() {

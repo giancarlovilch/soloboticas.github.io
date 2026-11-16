@@ -357,6 +357,42 @@ async function cerrarSinVentaInline(id, btn) {
         btn.disabled = false;
     }
 }
+
+function toastHistorial(txt, tipo) {
+    let toast = document.getElementById('cjToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'cjToast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = txt;
+    toast.className   = `cj-toast cj-toast--${tipo}`;
+    void toast.offsetWidth;
+    toast.classList.add('cj-toast--visible');
+    clearTimeout(window._cjToastTimer);
+    window._cjToastTimer = setTimeout(() => toast.classList.remove('cj-toast--visible'), 3000);
+}
+
+async function actualizarVentaInline(sesionId, btn) {
+    const original = btn.textContent;
+    btn.disabled    = true;
+    btn.textContent = '⏳ Buscando en SOFTPHARMA...';
+    try {
+        const r   = await fetch(`${BASE}/caja/api/${sesionId}/actualizar-venta`, { method: 'POST' });
+        const res = await r.json();
+        if (res.success && res.data?.estado !== 'requiere_admin') {
+            toastHistorial('✓ Venta emparejada con SOFTPHARMA.', 'ok');
+            btn.textContent = '✓ Listo, recargando...';
+            setTimeout(() => window.location.reload(), 900);
+            return;
+        }
+        toastHistorial(res.message || 'Todavía no se pudo emparejar.', 'error');
+    } catch {
+        toastHistorial('Error de conexión.', 'error');
+    }
+    btn.disabled    = false;
+    btn.textContent = original;
+}
 </script>
 </body>
 </html>
