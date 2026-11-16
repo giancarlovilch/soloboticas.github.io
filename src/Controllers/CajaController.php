@@ -651,7 +651,7 @@ class CajaController extends Controller
         $this->repo->registrarRendimientoVendedora($sesionId, 0.0);
         $cuadre = $this->repo->calcularYGuardarCuadre($sesionId, 0.0);
 
-        if (abs($cuadre['diferencia'] ?? 0) > 10) {
+        if (abs($cuadre['diferencia'] ?? 0) > 10 && !$this->incRepo->getBySesion($sesionId)) {
             $tipo = ($cuadre['diferencia'] < 0) ? 'FALTANTE' : 'SOBRANTE';
             $this->incRepo->crear(
                 $sesionId, $tipo, round(abs($cuadre['diferencia']), 2),
@@ -679,7 +679,7 @@ class CajaController extends Controller
         $cuadre = $this->repo->calcularYGuardarCuadre($sesionId, (float)$cierre['venta_neta']);
 
         $sesion = $this->repo->getSesionById($sesionId);
-        if (abs($cuadre['diferencia'] ?? 0) > 10) {
+        if (abs($cuadre['diferencia'] ?? 0) > 10 && !$this->incRepo->getBySesion($sesionId)) {
             $tipo = ($cuadre['diferencia'] < 0) ? 'FALTANTE' : 'SOBRANTE';
             $this->incRepo->crear(
                 $sesionId, $tipo, round(abs($cuadre['diferencia']), 2),
