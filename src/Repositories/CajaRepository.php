@@ -115,18 +115,26 @@ class CajaRepository
     // ── Saldo base del día anterior para una caja ──────────
     // Toma el saldo_proximo_dia del último arqueo cerrado o aprobado que tenga detalle.
     // Un ajuste de cierre (rectificación) ya modifica saldo_proximo_dia directamente.
-    public function getSaldoBase(int $cajaId): float
+    public function getSaldoBase(int $cajaId, int $excluirSesionId = 0): float
     {
+        // excluirSesionId evita que una sesion se tome a si misma como su
+        // propio predecesor -- pasa si calcularYGuardarCuadre() se llama
+        // DOS VECES para la misma sesion (ej. el boton "Actualizar" sobre
+        // una sesion que el cierre automatico ya habia calculado antes):
+        // para la segunda llamada, esta sesion ya quedo 'CERRADA' con su
+        // propio saldo_proximo_dia guardado, y sin este filtro calificaria
+        // como "la ultima caja cerrada" de si misma.
         $stmt = $this->db->prepare(
             "SELECT dc.saldo_proximo_dia
              FROM sesion_caja sc
              INNER JOIN detalle_cuadre dc ON sc.id_sesion = dc.sesion_id
              WHERE sc.caja_id = :cid
                AND sc.estado IN ('APROBADA','CERRADA')
+               AND sc.id_sesion != :excluir
              ORDER BY sc.id_sesion DESC
              LIMIT 1"
         );
-        $stmt->execute(['cid' => $cajaId]);
+        $stmt->execute(['cid' => $cajaId, 'excluir' => $excluirSesionId]);
         return (float)($stmt->fetchColumn() ?? 0);
     }
 
@@ -1732,7 +1740,9 @@ class CajaRepository
 
         // Siempre usar la base real del predecesor (no el saldo_inicial almacenado,
         // que puede estar desactualizado si el arqueo anterior tuvo ajustes posteriores).
-        $saldo_inicial = $this->getSaldoBase((int)$sesion['caja_id']);
+        // excluirSesionId=$sesionId: si esta funcion se llama dos veces para la
+        // misma sesion (reintento), que no se tome a si misma como predecesor.
+        $saldo_inicial = $this->getSaldoBase((int)$sesion['caja_id'], $sesionId);
 
         // Actualizar saldo_inicial en la sesión para que quede consistente
         $this->db->prepare("UPDATE sesion_caja SET saldo_inicial = :sal WHERE id_sesion = :sid")

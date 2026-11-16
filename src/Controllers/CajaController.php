@@ -202,7 +202,7 @@ class CajaController extends Controller
         }
 
         // Siempre mostrar la base real del predecesor (no el saldo_inicial almacenado)
-        $saldoReal = $this->repo->getSaldoBase((int)$sesion['caja_id']);
+        $saldoReal = $this->repo->getSaldoBase((int)$sesion['caja_id'], $id);
         // Actualizar si difiere (puede haber cambiado por ajustes en el arqueo anterior)
         if (abs($saldoReal - (float)$sesion['saldo_inicial']) > 0.001) {
             $db2 = \Database::getConnection();
